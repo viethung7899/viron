@@ -1,12 +1,18 @@
-use std::io::{Write, stdout};
+use std::io::{Stdout, Write, stdout};
 
 use anyhow::Result;
-use crossterm::{ExecutableCommand, QueueableCommand, cursor, event, style, terminal};
+use crossterm::{
+    ExecutableCommand, QueueableCommand, cursor, event,
+    style::{self, Color, Stylize},
+    terminal,
+};
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct Editor {
+    stdout: Stdout,
     cursor: Cursor,
     mode: Mode,
+    size: (u16, u16),
 }
 
 #[derive(Debug, Clone, Default)]
@@ -33,23 +39,31 @@ enum Action {
     InsertChar(char),
 }
 
+impl Drop for Editor {
+    fn drop(&mut self) {
+        let _ = self.stdout.flush();
+        let _ = self.stdout.execute(terminal::LeaveAlternateScreen);
+        let _ = terminal::disable_raw_mode();
+    }
+}
+
 impl Editor {
-    pub fn draw(&self, stdout: &mut std::io::Stdout) -> Result<()> {
-        stdout.queue(cursor::MoveTo(self.cursor.col, self.cursor.row))?;
-        stdout.flush()?;
-        Ok(())
+    pub fn new() -> Result<Self> {
+        let mut stdout = stdout();
+        terminal::enable_raw_mode()?;
+        stdout.execute(terminal::EnterAlternateScreen)?;
+        stdout.execute(terminal::Clear(terminal::ClearType::All))?;
+        Ok(Self {
+            stdout,
+            cursor: Cursor::default(),
+            mode: Mode::default(),
+            size: terminal::size()?,
+        })
     }
 
     pub fn run(&mut self) -> Result<()> {
-        let mut stdout = stdout();
-
-        terminal::enable_raw_mode()?;
-        stdout.execute(terminal::EnterAlternateScreen)?;
-
-        stdout.execute(terminal::Clear(terminal::ClearType::All))?;
-
         loop {
-            self.draw(&mut stdout)?;
+            self.draw()?;
             if let Some(action) = self.handle_event(event::read()?)? {
                 match action {
                     Action::Quit => break,
@@ -69,17 +83,51 @@ impl Editor {
                         self.mode = mode;
                     }
                     Action::InsertChar(c) => {
-                        stdout.queue(cursor::MoveTo(self.cursor.col, self.cursor.row))?;
-                        stdout.queue(style::Print(c))?;
+                        self.stdout
+                            .queue(cursor::MoveTo(self.cursor.col, self.cursor.row))?;
+                        self.stdout.queue(style::Print(c))?;
                         self.cursor.col += 1;
                     }
                 }
             }
         }
 
-        stdout.execute(terminal::LeaveAlternateScreen)?;
-        terminal::disable_raw_mode()?;
+        Ok(())
+    }
 
+    fn draw(&mut self) -> Result<()> {
+        self.draw_status_line()?;
+        self.stdout
+            .queue(cursor::MoveTo(self.cursor.col, self.cursor.row))?;
+        self.stdout.flush()?;
+        Ok(())
+    }
+
+    fn draw_status_line(&mut self) -> Result<()> {
+        let mode = format!(" {:?} ", self.mode).to_uppercase();
+        let file = " src/main.rs";
+        let pos = format!(" {}:{} ", self.cursor.row + 1, self.cursor.col + 1);
+        let file_width = self.size.0 - mode.len() as u16 - pos.len() as u16 - 2;
+
+        self.stdout.queue(cursor::MoveTo(0, self.size.1 - 2))?;
+        self.stdout.queue(style::PrintStyledContent(
+            mode.with(Color::Black).bold().on(Color::Blue),
+        ))?;
+        self.stdout.queue(style::PrintStyledContent(
+            "".with(Color::Blue).on(Color::Black),
+        ))?;
+        self.stdout.queue(style::PrintStyledContent(
+            format!("{:<width$}", file, width = file_width as usize)
+                .with(Color::Black)
+                .bold()
+                .on(Color::Black),
+        ))?;
+        self.stdout.queue(style::PrintStyledContent(
+            "".with(Color::Blue).on(Color::Black),
+        ))?;
+        self.stdout.queue(style::PrintStyledContent(
+            pos.with(Color::Black).bold().on(Color::Blue),
+        ))?;
         Ok(())
     }
 
