@@ -131,7 +131,11 @@ impl Editor {
         Ok(())
     }
 
-    fn handle_event(&self, event: event::Event) -> Result<Option<Action>> {
+    fn handle_event(&mut self, event: event::Event) -> Result<Option<Action>> {
+        if let event::Event::Resize(width, height) = event {
+            self.size = (width, height);
+            return Ok(None);
+        }
         match self.mode {
             Mode::Normal => self.handle_normal_event(event),
             Mode::Insert => self.handle_insert_event(event),
