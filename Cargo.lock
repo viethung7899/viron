@@ -451,6 +451,8 @@ dependencies = [
  "anyhow",
  "crossterm",
  "once_cell",
+ "serde",
+ "serde_json",
  "tree-sitter",
  "tree-sitter-rust",
 ]

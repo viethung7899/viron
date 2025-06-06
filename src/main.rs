@@ -1,6 +1,7 @@
 mod buffer;
 mod editor;
 mod logger;
+mod theme;
 
 use std::{io::stdout, panic};
 
