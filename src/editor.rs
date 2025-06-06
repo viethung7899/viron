@@ -1,5 +1,6 @@
 use std::io::{Stdout, Write, stdout};
 
+use crate::{buffer::Buffer, log};
 use anyhow::Result;
 use crossterm::{
     ExecutableCommand, QueueableCommand, cursor,
@@ -8,29 +9,14 @@ use crossterm::{
     terminal,
 };
 
-use crate::action::Action;
-use crate::{buffer::Buffer, log};
-
-#[derive(Debug)]
-pub struct Editor {
-    pub(crate) stdout: Stdout,
-    pub(crate) buffer: Buffer,
-    pub(crate) offset: Position,
-    pub(crate) cursor: Position,
-    pub(crate) mode: Mode,
-    pub(crate) size: (u16, u16),
-    pub(crate) waiting_cmd: Option<char>,
-}
-
 #[derive(Debug, Clone, Default)]
 pub struct Position {
     pub row: u16,
     pub col: u16,
 }
 
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy)]
 pub enum Mode {
-    #[default]
     Normal,
     Insert,
 }
@@ -49,6 +35,40 @@ impl Mode {
             Mode::Insert => Color::DarkGreen,
         }
     }
+}
+
+#[derive(Debug)]
+pub enum Action {
+    Quit,
+    Undo,
+
+    MoveUp,
+    MoveDown,
+    MoveLeft,
+    MoveRight,
+    PageUp,
+    PageDown,
+    MoveToLineStart,
+    MoveToLineEnd,
+
+    EnterMode(Mode),
+    SetWaitingCmd(char),
+
+    InsertCharAtCursor(char),
+    DeleteCharAtCursor,
+    DeleteCurrentLine,
+}
+
+#[derive(Debug)]
+pub struct Editor {
+    stdout: Stdout,
+    buffer: Buffer,
+    offset: Position,
+    cursor: Position,
+    mode: Mode,
+    size: (u16, u16),
+    waiting_cmd: Option<char>,
+    undo_actions: Vec<Action>,
 }
 
 impl Drop for Editor {
@@ -70,9 +90,10 @@ impl Editor {
             buffer,
             offset: Position::default(),
             cursor: Position::default(),
-            mode: Mode::default(),
+            mode: Mode::Normal,
             size: terminal::size()?,
             waiting_cmd: None,
+            undo_actions: Vec::new(),
         })
     }
 
@@ -84,7 +105,7 @@ impl Editor {
                 if matches!(action, Action::Quit) {
                     break;
                 } else {
-                    action.execute(self);
+                    self.execute(&action);
                 }
             }
         }
@@ -92,7 +113,7 @@ impl Editor {
         Ok(())
     }
 
-    pub fn get_viewport_size(&self) -> (u16, u16) {
+    fn get_viewport_size(&self) -> (u16, u16) {
         let (width, height) = self.size;
         (width, height - 2)
     }
@@ -249,6 +270,73 @@ impl Editor {
                 _ => None,
             },
             _ => None,
+        }
+    }
+
+    fn execute(&mut self, action: &Action) {
+        let (_, viewport_height) = self.get_viewport_size();
+        match action {
+            Action::MoveUp => {
+                if self.cursor.row == 0 {
+                    self.offset.row = self.offset.row.saturating_sub(1);
+                } else {
+                    self.cursor.row -= 1;
+                }
+            }
+            Action::MoveDown => {
+                if self.cursor.row + 1 >= viewport_height {
+                    self.offset.row += 1;
+                } else {
+                    self.cursor.row += 1;
+                }
+            }
+            Action::MoveLeft => {
+                self.cursor.col = self.cursor.col.saturating_sub(1);
+            }
+            Action::MoveRight => {
+                self.cursor.col += 1;
+            }
+            Action::PageUp => {
+                let (_, height) = self.get_viewport_size();
+                self.offset.row = self.offset.row.saturating_sub(height);
+            }
+            Action::PageDown => {
+                let (_, height) = self.get_viewport_size();
+                if self.buffer.len() > (self.offset.row + height) as usize {
+                    self.offset.row += height;
+                }
+            }
+            Action::MoveToLineStart => {
+                self.cursor.col = 0;
+            }
+            Action::MoveToLineEnd => {
+                self.cursor.col = self
+                    .get_viewport_line(self.cursor.row)
+                    .map_or(0, |line| line.len() as u16)
+            }
+            Action::EnterMode(mode) => {
+                self.mode = *mode;
+            }
+            Action::InsertCharAtCursor(char) => {
+                let line = self.get_buffer_line_index();
+                let offset = self.cursor.col as usize;
+                self.buffer.insert(line as usize, offset, *char);
+                self.cursor.col += 1;
+            }
+            Action::DeleteCharAtCursor => {
+                let line = self.get_buffer_line_index();
+                let offset = self.cursor.col;
+                self.buffer.remove(line as usize, offset as usize);
+            }
+            Action::DeleteCurrentLine => {
+                let line_index = self.get_buffer_line_index();
+                self.buffer.remove_line(line_index as usize);
+            }
+            Action::SetWaitingCmd(char) => {
+                self.waiting_cmd = Some(*char);
+            }
+            Action::Undo => {}
+            _ => {}
         }
     }
 }
