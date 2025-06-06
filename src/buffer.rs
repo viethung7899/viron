@@ -33,6 +33,10 @@ impl Buffer {
         }
     }
 
+    pub fn insert_line(&mut self, line: usize, content: String) {
+        self.lines.insert(line, content);
+    }
+
     pub fn remove_line(&mut self, line: usize) {
         if line < self.len() {
             self.lines.remove(line);

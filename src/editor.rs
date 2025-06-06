@@ -50,11 +50,13 @@ pub enum Action {
     PageDown,
     MoveToLineStart,
     MoveToLineEnd,
+    MoveToViewportCenter,
 
     EnterMode(Mode),
     SetWaitingCmd(char),
 
     InsertCharAtCursor(char),
+    InsertLineAt(usize, String),
     DeleteCharAtCursor,
     DeleteCurrentLine,
 }
@@ -120,28 +122,24 @@ impl Editor {
 
     fn reset_bounds(&mut self) {
         let (width, height) = self.get_viewport_size();
-        let current_length = self
-            .get_viewport_line(self.cursor.row)
+        let mut current_length = self
+            .buffer
+            .get_line(self.get_current_line_index())
             .map_or(0, |line| line.len()) as u16;
 
+        if matches!(self.mode, Mode::Normal) {
+            current_length = current_length.saturating_sub(1);
+        }
+
         let row = self.cursor.row.min(height - 1);
-        let col = self
-            .cursor
-            .col
-            .min(width - 1)
-            .min(current_length.saturating_sub(1));
+        let col = self.cursor.col.min(width - 1).min(current_length);
 
         self.cursor.row = row;
         self.cursor.col = col;
     }
 
-    pub fn get_buffer_line_index(&self) -> u16 {
-        self.offset.row + self.cursor.row
-    }
-
-    pub fn get_viewport_line(&self, viewport_line: u16) -> Option<String> {
-        let buffer_line = self.offset.row + viewport_line;
-        self.buffer.get_line(buffer_line as usize)
+    pub fn get_current_line_index(&self) -> usize {
+        (self.offset.row + self.cursor.row) as usize
     }
 
     fn draw(&mut self) -> Result<()> {
@@ -166,7 +164,11 @@ impl Editor {
     fn draw_viewport(&mut self) -> Result<()> {
         let (width, height) = self.get_viewport_size();
         for i in 0..height {
-            let line = self.get_viewport_line(i).unwrap_or_default();
+            let line_index = self.offset.row + i;
+            let line = self
+                .buffer
+                .get_line(line_index as usize)
+                .unwrap_or_default();
             let formatted_line = format!("{line:<w$}", w = width as usize,);
             self.stdout.queue(cursor::MoveTo(0, i))?;
             self.stdout.queue(style::Print(formatted_line))?;
@@ -229,6 +231,7 @@ impl Editor {
                 let modifier = key.modifiers;
                 match key.code {
                     KeyCode::Char('q') => Some(Action::Quit),
+                    KeyCode::Char('u') => Some(Action::Undo),
                     KeyCode::Up | KeyCode::Char('k') => Some(Action::MoveUp),
                     KeyCode::Down | KeyCode::Char('j') => Some(Action::MoveDown),
                     KeyCode::Left | KeyCode::Char('h') => Some(Action::MoveLeft),
@@ -258,6 +261,13 @@ impl Editor {
                 },
                 _ => None,
             },
+            'z' => match event {
+                event::Event::Key(key) => match key.code {
+                    KeyCode::Char('z') => Some(Action::MoveToViewportCenter),
+                    _ => None,
+                },
+                _ => None,
+            },
             _ => None,
         }
     }
@@ -267,6 +277,10 @@ impl Editor {
             event::Event::Key(key) => match key.code {
                 KeyCode::Esc => Some(Action::EnterMode(Mode::Normal)),
                 KeyCode::Char(c) => Some(Action::InsertCharAtCursor(c)),
+                KeyCode::Up => Some(Action::MoveUp),
+                KeyCode::Down => Some(Action::MoveDown),
+                KeyCode::Left => Some(Action::MoveLeft),
+                KeyCode::Right => Some(Action::MoveRight),
                 _ => None,
             },
             _ => None,
@@ -311,31 +325,61 @@ impl Editor {
             }
             Action::MoveToLineEnd => {
                 self.cursor.col = self
-                    .get_viewport_line(self.cursor.row)
+                    .buffer
+                    .get_line(self.get_current_line_index())
                     .map_or(0, |line| line.len() as u16)
+            }
+            Action::MoveToViewportCenter => {
+                let (_, viewport_height) = self.get_viewport_size();
+                let viewport_center = viewport_height / 2;
+                let current_viewport_row = self.cursor.row;
+                if current_viewport_row < viewport_center {
+                    if let Some(new_offset) = self
+                        .offset
+                        .row
+                        .checked_sub(viewport_center - current_viewport_row)
+                    {
+                        self.offset.row = new_offset;
+                        self.cursor.row = viewport_center;
+                    }
+                } else {
+                    self.offset.row = self.offset.row + current_viewport_row - viewport_center;
+                    self.cursor.row = viewport_center;
+                }
             }
             Action::EnterMode(mode) => {
                 self.mode = *mode;
             }
             Action::InsertCharAtCursor(char) => {
-                let line = self.get_buffer_line_index();
+                let line = self.get_current_line_index();
                 let offset = self.cursor.col as usize;
                 self.buffer.insert(line as usize, offset, *char);
                 self.cursor.col += 1;
             }
+            Action::InsertLineAt(line, content) => {
+                self.buffer.insert_line(*line, content.to_string());
+            }
             Action::DeleteCharAtCursor => {
-                let line = self.get_buffer_line_index();
+                let line = self.get_current_line_index();
                 let offset = self.cursor.col;
                 self.buffer.remove(line as usize, offset as usize);
             }
             Action::DeleteCurrentLine => {
-                let line_index = self.get_buffer_line_index();
-                self.buffer.remove_line(line_index as usize);
+                let line_index = self.get_current_line_index() as usize;
+                if let Some(content) = self.buffer.get_line(line_index) {
+                    self.buffer.remove_line(line_index);
+                    self.undo_actions
+                        .push(Action::InsertLineAt(line_index, content));
+                }
             }
             Action::SetWaitingCmd(char) => {
                 self.waiting_cmd = Some(*char);
             }
-            Action::Undo => {}
+            Action::Undo => {
+                if let Some(action) = self.undo_actions.pop() {
+                    self.execute(&action);
+                }
+            }
             _ => {}
         }
     }
