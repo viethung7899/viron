@@ -320,7 +320,7 @@ impl Editor {
         let mode = format!(" {:?} ", self.mode).to_uppercase();
         let file = format!(" {} ", self.buffer.file.as_deref().unwrap_or("new file"));
         let pos = format!(" {}:{} ", self.cursor.row + 1, self.cursor.col + 1);
-        let file_width = self.size.0 - mode.len() as u16 - pos.len() as u16 - 2;
+        let file_width = self.size.0 - mode.len() as u16 - pos.len() as u16;
 
         let color = self.mode.get_status_color();
         let black = Color::Black;
@@ -329,15 +329,11 @@ impl Editor {
         self.stdout.queue(style::PrintStyledContent(
             mode.with(color).bold().negative(),
         ))?;
-        self.stdout
-            .queue(style::PrintStyledContent("".with(color).on(black)))?;
         self.stdout.queue(style::PrintStyledContent(
             format!("{:<width$}", file, width = file_width as usize)
                 .bold()
                 .on(black),
         ))?;
-        self.stdout
-            .queue(style::PrintStyledContent("".with(color).on(black)))?;
         self.stdout
             .queue(style::PrintStyledContent(pos.with(color).bold().negative()))?;
         Ok(())
