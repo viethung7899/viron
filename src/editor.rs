@@ -46,16 +46,19 @@ pub enum Action {
     MoveDown,
     MoveLeft,
     MoveRight,
-    
+
     PageUp,
     PageDown,
-    
+
+    MoveToTop,
+    MoveToBottom,
     MoveToLineStart,
     MoveToLineEnd,
     MoveToViewportCenter,
 
     EnterMode(Mode),
     SetWaitingCmd(char),
+    CancelWaitingCmd,
 
     InsertCharAtCursor(char),
     InsertLineAt(usize, String),
@@ -69,7 +72,7 @@ pub enum Action {
 pub struct Editor {
     stdout: Stdout,
     buffer: Buffer,
-    offset: Position,
+    top: usize,
     cursor: Position,
     mode: Mode,
     size: (u16, u16),
@@ -94,7 +97,7 @@ impl Editor {
         Ok(Self {
             stdout,
             buffer,
-            offset: Position::default(),
+            top: 0,
             cursor: Position::default(),
             mode: Mode::Normal,
             size: terminal::size()?,
@@ -143,7 +146,7 @@ impl Editor {
     }
 
     pub fn get_current_line_index(&self) -> usize {
-        (self.offset.row + self.cursor.row) as usize
+        self.top + self.cursor.row as usize
     }
 
     fn draw(&mut self) -> Result<()> {
@@ -168,11 +171,8 @@ impl Editor {
     fn draw_viewport(&mut self) -> Result<()> {
         let (width, height) = self.get_viewport_size();
         for i in 0..height {
-            let line_index = self.offset.row + i;
-            let line = self
-                .buffer
-                .get_line(line_index as usize)
-                .unwrap_or_default();
+            let line_index = self.top + i as usize;
+            let line = self.buffer.get_line(line_index).unwrap_or_default();
             let formatted_line = format!("{line:<w$}", w = width as usize,);
             self.stdout.queue(cursor::MoveTo(0, i))?;
             self.stdout.queue(style::Print(formatted_line))?;
@@ -242,6 +242,7 @@ impl Editor {
                     KeyCode::Right | KeyCode::Char('l') => Some(Action::MoveRight),
                     KeyCode::Home | KeyCode::Char('0') => Some(Action::MoveToLineStart),
                     KeyCode::End | KeyCode::Char('$') => Some(Action::MoveToLineEnd),
+                    KeyCode::Char('G') => Some(Action::MoveToBottom),
                     KeyCode::Char('i') => Some(Action::EnterMode(Mode::Insert)),
                     KeyCode::Char('o') => Some(Action::InsertLineBelowCursor),
                     KeyCode::Char('O') => Some(Action::InsertLineAtCursor),
@@ -251,6 +252,7 @@ impl Editor {
                         Some(Action::PageDown)
                     }
                     KeyCode::Char(c) => Some(Action::SetWaitingCmd(c)),
+                    KeyCode::Esc => Some(Action::CancelWaitingCmd),
                     _ => None,
                 }
             }
@@ -270,6 +272,13 @@ impl Editor {
             'z' => match event {
                 event::Event::Key(key) => match key.code {
                     KeyCode::Char('z') => Some(Action::MoveToViewportCenter),
+                    _ => None,
+                },
+                _ => None,
+            },
+            'g' => match event {
+                event::Event::Key(key) => match key.code {
+                    KeyCode::Char('g') => Some(Action::MoveToTop),
                     _ => None,
                 },
                 _ => None,
@@ -298,14 +307,14 @@ impl Editor {
         match action {
             Action::MoveUp => {
                 if self.cursor.row == 0 {
-                    self.offset.row = self.offset.row.saturating_sub(1);
+                    self.top = self.top.saturating_sub(1);
                 } else {
                     self.cursor.row -= 1;
                 }
             }
             Action::MoveDown => {
                 if self.cursor.row + 1 >= viewport_height {
-                    self.offset.row += 1;
+                    self.top += 1;
                 } else {
                     self.cursor.row += 1;
                 }
@@ -318,12 +327,26 @@ impl Editor {
             }
             Action::PageUp => {
                 let (_, height) = self.get_viewport_size();
-                self.offset.row = self.offset.row.saturating_sub(height);
+                self.top = self.top.saturating_sub(height as usize);
             }
             Action::PageDown => {
                 let (_, height) = self.get_viewport_size();
-                if self.buffer.len() > (self.offset.row + height) as usize {
-                    self.offset.row += height;
+                if self.buffer.len() > self.top + height as usize {
+                    self.top += height as usize;
+                }
+            }
+            Action::MoveToTop => {
+                self.cursor.row = 0;
+                self.top = 0;
+            }
+            Action::MoveToBottom => {
+                let (_, viewport_height) = self.get_viewport_size();
+                let viewport_index = self.buffer.len() - self.top;
+                if viewport_index < viewport_height as usize {
+                    self.cursor.row = viewport_index as u16;
+                } else {
+                    self.cursor.row = viewport_height - 1;
+                    self.top = self.buffer.len() - viewport_height as usize;
                 }
             }
             Action::MoveToLineStart => {
@@ -341,15 +364,14 @@ impl Editor {
                 let current_viewport_row = self.cursor.row;
                 if current_viewport_row < viewport_center {
                     if let Some(new_offset) = self
-                        .offset
-                        .row
-                        .checked_sub(viewport_center - current_viewport_row)
+                        .top
+                        .checked_sub((viewport_center - current_viewport_row) as usize)
                     {
-                        self.offset.row = new_offset;
+                        self.top = new_offset;
                         self.cursor.row = viewport_center;
                     }
                 } else {
-                    self.offset.row = self.offset.row + current_viewport_row - viewport_center;
+                    self.top = self.top + (current_viewport_row - viewport_center) as usize;
                     self.cursor.row = viewport_center;
                 }
             }
@@ -395,6 +417,9 @@ impl Editor {
             }
             Action::SetWaitingCmd(char) => {
                 self.waiting_cmd = Some(*char);
+            }
+            Action::CancelWaitingCmd => {
+                self.waiting_cmd = None;
             }
             Action::Undo => {
                 if let Some(action) = self.undo_actions.pop() {
