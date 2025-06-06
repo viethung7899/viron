@@ -16,4 +16,8 @@ impl Buffer {
     pub fn get_line(&self, index: usize) -> Option<String> {
         self.lines.get(index).map(|line| line.clone())
     }
+
+    pub fn len(&self) -> usize {
+        self.lines.len()
+    }
 }

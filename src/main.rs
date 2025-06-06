@@ -26,6 +26,6 @@ static LOGGER: OnceCell<Logger> = OnceCell::new();
 macro_rules! log {
     ($($args:tt)*) => {
         let message = format!($($args)*);
-        $crate::LOGGER.get_or_init(|| $crate::Logger::new("viron.log")).log(&message);
+        $crate::LOGGER.get_or_init(|| $crate::Logger::new("target/debug/viron.log")).log(&message);
     };
 }
