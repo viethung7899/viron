@@ -15,7 +15,7 @@ pub struct Position {
     pub col: u16,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Mode {
     Normal,
     Insert,
@@ -65,7 +65,43 @@ pub enum Action {
     InsertLineBelowCursor,
     InsertLineAtCursor,
     DeleteCharAtCursor,
+    DeleteChatAt(usize, usize),
     DeleteCurrentLine,
+    DeleteLineAt(usize),
+
+    Multiple(Vec<Action>),
+}
+
+#[derive(Debug, Default)]
+struct UndoStack {
+    actions: Vec<Action>,
+    buffer: Vec<Action>,
+}
+
+impl UndoStack {
+    fn record(&mut self, undo_action: Action) {
+        self.buffer.push(undo_action);
+    }
+
+    fn push(&mut self, undo_action: Action) {
+        self.batch();
+        self.actions.push(undo_action);
+    }
+
+    fn batch(&mut self) {
+        let mut reversed = Vec::new();
+        while let Some(action) = self.buffer.pop() {
+            reversed.push(action);
+        }
+        if !reversed.is_empty() {
+            self.actions.push(Action::Multiple(reversed))
+        }
+    }
+
+    fn pop(&mut self) -> Option<Action> {
+        self.batch();
+        self.actions.pop()
+    }
 }
 
 #[derive(Debug)]
@@ -77,7 +113,7 @@ pub struct Editor {
     mode: Mode,
     size: (u16, u16),
     waiting_cmd: Option<char>,
-    undo_actions: Vec<Action>,
+    undo: UndoStack,
 }
 
 impl Drop for Editor {
@@ -102,7 +138,7 @@ impl Editor {
             mode: Mode::Normal,
             size: terminal::size()?,
             waiting_cmd: None,
-            undo_actions: Vec::new(),
+            undo: UndoStack::default(),
         })
     }
 
@@ -303,7 +339,6 @@ impl Editor {
     }
 
     fn execute(&mut self, action: &Action) {
-        let (_, viewport_height) = self.get_viewport_size();
         match action {
             Action::MoveUp => {
                 if self.cursor.row == 0 {
@@ -313,7 +348,8 @@ impl Editor {
                 }
             }
             Action::MoveDown => {
-                if self.cursor.row + 1 >= viewport_height {
+                let (_, height) = self.get_viewport_size();
+                if self.cursor.row + 1 >= height {
                     self.top += 1;
                 } else {
                     self.cursor.row += 1;
@@ -376,18 +412,27 @@ impl Editor {
                 }
             }
             Action::EnterMode(mode) => {
+                match (self.mode, mode) {
+                    (Mode::Insert, Mode::Normal) => {
+                        self.undo.batch();
+                    }
+                    _ => {}
+                }
                 self.mode = *mode;
             }
             Action::InsertCharAtCursor(char) => {
                 let line = self.get_current_line_index();
                 let offset = self.cursor.col as usize;
-                self.buffer.insert(line as usize, offset, *char);
+                self.undo.record(Action::DeleteChatAt(line, offset));
+                self.buffer.insert(line, offset, *char);
                 self.cursor.col += 1;
             }
             Action::InsertLineAt(line, content) => {
                 self.buffer.insert_line(*line, content.to_string());
             }
             Action::InsertLineAtCursor => {
+                self.undo
+                    .push(Action::DeleteLineAt(self.get_current_line_index()));
                 self.execute(&Action::InsertLineAt(
                     self.get_current_line_index(),
                     "".into(),
@@ -395,6 +440,8 @@ impl Editor {
                 self.mode = Mode::Insert;
             }
             Action::InsertLineBelowCursor => {
+                self.undo
+                    .push(Action::DeleteLineAt(self.get_current_line_index() + 1));
                 self.execute(&Action::InsertLineAt(
                     self.get_current_line_index() + 1,
                     "".into(),
@@ -407,13 +454,18 @@ impl Editor {
                 let offset = self.cursor.col;
                 self.buffer.remove(line as usize, offset as usize);
             }
+            Action::DeleteChatAt(line, offset) => {
+                self.buffer.remove(*line, *offset);
+            }
             Action::DeleteCurrentLine => {
                 let line_index = self.get_current_line_index() as usize;
                 if let Some(content) = self.buffer.get_line(line_index) {
                     self.buffer.remove_line(line_index);
-                    self.undo_actions
-                        .push(Action::InsertLineAt(line_index, content));
+                    self.undo.push(Action::InsertLineAt(line_index, content));
                 }
+            }
+            Action::DeleteLineAt(line) => {
+                self.buffer.remove_line(*line);
             }
             Action::SetWaitingCmd(char) => {
                 self.waiting_cmd = Some(*char);
@@ -422,7 +474,12 @@ impl Editor {
                 self.waiting_cmd = None;
             }
             Action::Undo => {
-                if let Some(action) = self.undo_actions.pop() {
+                if let Some(action) = self.undo.pop() {
+                    self.execute(&action);
+                }
+            }
+            Action::Multiple(actions) => {
+                for action in actions {
                     self.execute(&action);
                 }
             }
