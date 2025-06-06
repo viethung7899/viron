@@ -7,16 +7,20 @@ use crossterm::{
     terminal,
 };
 
+use crate::buffer::Buffer;
+
 #[derive(Debug)]
 pub struct Editor {
     stdout: Stdout,
-    cursor: Cursor,
+    buffer: Buffer,
+    offset: Position,
+    cursor: Position,
     mode: Mode,
     size: (u16, u16),
 }
 
 #[derive(Debug, Clone, Default)]
-struct Cursor {
+struct Position {
     row: u16,
     col: u16,
 }
@@ -48,14 +52,16 @@ impl Drop for Editor {
 }
 
 impl Editor {
-    pub fn new() -> Result<Self> {
+    pub fn new(buffer: Buffer) -> Result<Self> {
         let mut stdout = stdout();
         terminal::enable_raw_mode()?;
         stdout.execute(terminal::EnterAlternateScreen)?;
         stdout.execute(terminal::Clear(terminal::ClearType::All))?;
         Ok(Self {
             stdout,
-            cursor: Cursor::default(),
+            buffer,
+            offset: Position::default(),
+            cursor: Position::default(),
             mode: Mode::default(),
             size: terminal::size()?,
         })
@@ -95,7 +101,18 @@ impl Editor {
         Ok(())
     }
 
+    fn get_viewport_size(&self) -> (u16, u16) {
+        let (width, height) = self.size;
+        (width, height - 2)
+    }
+
+    fn get_viewport_line(&self, line: u16) -> Option<String> {
+        let buffer_line = (self.offset.row + line) as usize;
+        self.buffer.get_line(buffer_line)
+    }
+
     fn draw(&mut self) -> Result<()> {
+        self.draw_viewport()?;
         self.draw_status_line()?;
         self.stdout
             .queue(cursor::MoveTo(self.cursor.col, self.cursor.row))?;
@@ -103,9 +120,20 @@ impl Editor {
         Ok(())
     }
 
+    fn draw_viewport(&mut self) -> Result<()> {
+        let (width, height) = self.get_viewport_size();
+        for i in 0..height {
+            let line = self.get_viewport_line(i).unwrap_or_default();
+            let formatted_line = format!("{line:<w$}", w = width as usize,);
+            self.stdout.queue(cursor::MoveTo(0, i))?;
+            self.stdout.queue(style::Print(formatted_line))?;
+        }
+        Ok(())
+    }
+
     fn draw_status_line(&mut self) -> Result<()> {
         let mode = format!(" {:?} ", self.mode).to_uppercase();
-        let file = " src/main.rs";
+        let file = format!(" {} ", self.buffer.file.as_deref().unwrap_or("new file"));
         let pos = format!(" {}:{} ", self.cursor.row + 1, self.cursor.col + 1);
         let file_width = self.size.0 - mode.len() as u16 - pos.len() as u16 - 2;
 
