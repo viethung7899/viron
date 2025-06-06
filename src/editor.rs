@@ -18,6 +18,7 @@ pub struct Editor {
     cursor: Position,
     mode: Mode,
     size: (u16, u16),
+    waiting_cmd: Option<char>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -31,6 +32,22 @@ enum Mode {
     #[default]
     Normal,
     Insert,
+}
+
+impl Mode {
+    fn set_cursor_style(&self) -> cursor::SetCursorStyle {
+        match self {
+            Mode::Normal => cursor::SetCursorStyle::SteadyBlock,
+            Mode::Insert => cursor::SetCursorStyle::SteadyBar,
+        }
+    }
+
+    fn get_status_color(&self) -> style::Color {
+        match self {
+            Mode::Normal => Color::DarkBlue,
+            Mode::Insert => Color::DarkGreen,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -47,7 +64,11 @@ enum Action {
     MoveToLineEnd,
 
     EnterMode(Mode),
-    InsertChar(char),
+    SetWaitingCmd(char),
+
+    InsertCharAtCursor(char),
+    DeleteCharAtCursor,
+    DeleteCurrentLine,
 }
 
 impl Drop for Editor {
@@ -71,6 +92,7 @@ impl Editor {
             cursor: Position::default(),
             mode: Mode::default(),
             size: terminal::size()?,
+            waiting_cmd: None,
         })
     }
 
@@ -78,58 +100,10 @@ impl Editor {
         loop {
             self.reset_bounds();
             self.draw()?;
-            if let Some(action) = self.handle_event(event::read()?)? {
-                let (viewport_width, viewport_height) = self.get_viewport_size();
-                match action {
-                    Action::Quit => break,
-                    Action::MoveUp => {
-                        if self.cursor.row == 0 {
-                            self.offset.row = self.offset.row.saturating_sub(1);
-                        } else {
-                            self.cursor.row -= 1;
-                        }
-                    }
-                    Action::MoveDown => {
-                        if self.cursor.row + 1 >= viewport_height {
-                            self.offset.row += 1;
-                        } else {
-                            self.cursor.row += 1;
-                        }
-                    }
-                    Action::MoveLeft => {
-                        self.cursor.col = self.cursor.col.saturating_sub(1);
-                    }
-                    Action::MoveRight => {
-                        self.cursor.col += 1;
-                    }
-                    Action::PageUp => {
-                        let (_, height) = self.get_viewport_size();
-                        self.offset.row = self.offset.row.saturating_sub(height);
-                    }
-                    Action::PageDown => {
-                        let (_, height) = self.get_viewport_size();
-                        log!("Page Down {}", self.offset.row);
-                        if self.buffer.len() > (self.offset.row + height) as usize {
-                            self.offset.row += height;
-                        }
-                    }
-                    Action::MoveToLineStart => {
-                        self.cursor.col = 0;
-                    }
-                    Action::MoveToLineEnd => {
-                        self.cursor.col = self
-                            .get_viewport_line(self.cursor.row)
-                            .map_or(0, |line| line.len() as u16)
-                    }
-                    Action::EnterMode(mode) => {
-                        self.mode = mode;
-                    }
-                    Action::InsertChar(c) => {
-                        self.stdout
-                            .queue(cursor::MoveTo(self.cursor.col, self.cursor.row))?;
-                        self.stdout.queue(style::Print(c))?;
-                        self.cursor.col += 1;
-                    }
+            if let Some(action) = self.handle_event(event::read()?) {
+                let quit = self.handle_action(action);
+                if quit {
+                    break;
                 }
             }
         }
@@ -159,21 +133,31 @@ impl Editor {
         self.cursor.col = col;
     }
 
-    fn get_buffer_line(&self, line: u16) -> u16 {
-        self.offset.row + line
+    fn get_buffer_line_index(&self) -> u16 {
+        self.offset.row + self.cursor.row
     }
 
-    fn get_viewport_line(&self, line: u16) -> Option<String> {
-        let buffer_line = self.get_buffer_line(line) as usize;
-        self.buffer.get_line(buffer_line)
+    fn get_viewport_line(&self, viewport_line: u16) -> Option<String> {
+        let buffer_line = self.offset.row + viewport_line;
+        self.buffer.get_line(buffer_line as usize)
     }
 
     fn draw(&mut self) -> Result<()> {
+        self.set_cursor_style()?;
         self.draw_viewport()?;
         self.draw_status_line()?;
         self.stdout
             .queue(cursor::MoveTo(self.cursor.col, self.cursor.row))?;
         self.stdout.flush()?;
+        Ok(())
+    }
+
+    fn set_cursor_style(&mut self) -> Result<()> {
+        let cursor = match self.waiting_cmd {
+            Some(_) => cursor::SetCursorStyle::SteadyUnderScore,
+            None => self.mode.set_cursor_style(),
+        };
+        self.stdout.queue(cursor)?;
         Ok(())
     }
 
@@ -194,74 +178,164 @@ impl Editor {
         let pos = format!(" {}:{} ", self.cursor.row + 1, self.cursor.col + 1);
         let file_width = self.size.0 - mode.len() as u16 - pos.len() as u16 - 2;
 
+        let color = self.mode.get_status_color();
+        let black = Color::Black;
+
         self.stdout.queue(cursor::MoveTo(0, self.size.1 - 2))?;
         self.stdout.queue(style::PrintStyledContent(
-            mode.with(Color::Black).bold().on(Color::Blue),
+            mode.with(color).bold().negative(),
         ))?;
-        self.stdout.queue(style::PrintStyledContent(
-            "".with(Color::Blue).on(Color::Black),
-        ))?;
+        self.stdout
+            .queue(style::PrintStyledContent("".with(color).on(black)))?;
         self.stdout.queue(style::PrintStyledContent(
             format!("{:<width$}", file, width = file_width as usize)
-                .with(Color::Black)
                 .bold()
-                .on(Color::Black),
+                .on(black),
         ))?;
-        self.stdout.queue(style::PrintStyledContent(
-            "".with(Color::Blue).on(Color::Black),
-        ))?;
-        self.stdout.queue(style::PrintStyledContent(
-            pos.with(Color::Black).bold().on(Color::Blue),
-        ))?;
+        self.stdout
+            .queue(style::PrintStyledContent("".with(color).on(black)))?;
+        self.stdout
+            .queue(style::PrintStyledContent(pos.with(color).bold().negative()))?;
         Ok(())
     }
 
-    fn handle_event(&mut self, event: event::Event) -> Result<Option<Action>> {
+    fn handle_event(&mut self, event: event::Event) -> Option<Action> {
         if let event::Event::Resize(width, height) = event {
             self.size = (width, height);
-            return Ok(None);
+            return None;
         }
         match self.mode {
-            Mode::Normal => self.handle_normal_event(event),
-            Mode::Insert => self.handle_insert_event(event),
+            Mode::Normal => self.handle_normal_event(&event),
+            Mode::Insert => self.handle_insert_event(&event),
         }
     }
 
-    fn handle_normal_event(&self, event: event::Event) -> Result<Option<Action>> {
+    fn handle_normal_event(&mut self, event: &event::Event) -> Option<Action> {
         log!("Event: {:?}", event);
+
+        let action = self
+            .waiting_cmd
+            .and_then(|cmd| self.handle_waiting_command(cmd, &event));
+
+        if action.is_some() {
+            self.waiting_cmd = None;
+            return action;
+        }
+
         match event {
             event::Event::Key(key) => {
                 let modifier = key.modifiers;
                 match key.code {
-                    KeyCode::Char('q') => Ok(Some(Action::Quit)),
-                    KeyCode::Up | KeyCode::Char('k') => Ok(Some(Action::MoveUp)),
-                    KeyCode::Down | KeyCode::Char('j') => Ok(Some(Action::MoveDown)),
-                    KeyCode::Left | KeyCode::Char('h') => Ok(Some(Action::MoveLeft)),
-                    KeyCode::Right | KeyCode::Char('l') => Ok(Some(Action::MoveRight)),
-                    KeyCode::Home | KeyCode::Char('0') => Ok(Some(Action::MoveToLineStart)),
-                    KeyCode::End | KeyCode::Char('$') => Ok(Some(Action::MoveToLineEnd)),
-                    KeyCode::Char('i') => Ok(Some(Action::EnterMode(Mode::Insert))),
-                    KeyCode::Char('b') if modifier == KeyModifiers::CONTROL => {
-                        Ok(Some(Action::PageUp))
-                    }
+                    KeyCode::Char('q') => Some(Action::Quit),
+                    KeyCode::Up | KeyCode::Char('k') => Some(Action::MoveUp),
+                    KeyCode::Down | KeyCode::Char('j') => Some(Action::MoveDown),
+                    KeyCode::Left | KeyCode::Char('h') => Some(Action::MoveLeft),
+                    KeyCode::Right | KeyCode::Char('l') => Some(Action::MoveRight),
+                    KeyCode::Home | KeyCode::Char('0') => Some(Action::MoveToLineStart),
+                    KeyCode::End | KeyCode::Char('$') => Some(Action::MoveToLineEnd),
+                    KeyCode::Char('i') => Some(Action::EnterMode(Mode::Insert)),
+                    KeyCode::Char('x') => Some(Action::DeleteCharAtCursor),
+                    KeyCode::Char('b') if modifier == KeyModifiers::CONTROL => Some(Action::PageUp),
                     KeyCode::Char('f') if modifier == KeyModifiers::CONTROL => {
-                        Ok(Some(Action::PageDown))
+                        Some(Action::PageDown)
                     }
-                    _ => Ok(None),
+                    KeyCode::Char(c) => Some(Action::SetWaitingCmd(c)),
+                    _ => None,
                 }
             }
-            _ => Ok(None),
+            _ => None,
         }
     }
 
-    fn handle_insert_event(&self, event: event::Event) -> Result<Option<Action>> {
+    fn handle_waiting_command(&self, command: char, event: &event::Event) -> Option<Action> {
+        match command {
+            'd' => match event {
+                event::Event::Key(key) => match key.code {
+                    KeyCode::Char('d') => Some(Action::DeleteCurrentLine),
+                    _ => None,
+                },
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+
+    fn handle_insert_event(&self, event: &event::Event) -> Option<Action> {
         match event {
             event::Event::Key(key) => match key.code {
-                KeyCode::Esc => Ok(Some(Action::EnterMode(Mode::Normal))),
-                KeyCode::Char(c) => Ok(Some(Action::InsertChar(c))),
-                _ => Ok(None),
+                KeyCode::Esc => Some(Action::EnterMode(Mode::Normal)),
+                KeyCode::Char(c) => Some(Action::InsertCharAtCursor(c)),
+                _ => None,
             },
-            _ => Ok(None),
+            _ => None,
         }
+    }
+
+    fn handle_action(&mut self, action: Action) -> bool {
+        let (_, viewport_height) = self.get_viewport_size();
+        match action {
+            Action::Quit => return true,
+            Action::MoveUp => {
+                if self.cursor.row == 0 {
+                    self.offset.row = self.offset.row.saturating_sub(1);
+                } else {
+                    self.cursor.row -= 1;
+                }
+            }
+            Action::MoveDown => {
+                if self.cursor.row + 1 >= viewport_height {
+                    self.offset.row += 1;
+                } else {
+                    self.cursor.row += 1;
+                }
+            }
+            Action::MoveLeft => {
+                self.cursor.col = self.cursor.col.saturating_sub(1);
+            }
+            Action::MoveRight => {
+                self.cursor.col += 1;
+            }
+            Action::PageUp => {
+                let (_, height) = self.get_viewport_size();
+                self.offset.row = self.offset.row.saturating_sub(height);
+            }
+            Action::PageDown => {
+                let (_, height) = self.get_viewport_size();
+                log!("Page Down {}", self.offset.row);
+                if self.buffer.len() > (self.offset.row + height) as usize {
+                    self.offset.row += height;
+                }
+            }
+            Action::MoveToLineStart => {
+                self.cursor.col = 0;
+            }
+            Action::MoveToLineEnd => {
+                self.cursor.col = self
+                    .get_viewport_line(self.cursor.row)
+                    .map_or(0, |line| line.len() as u16)
+            }
+            Action::EnterMode(mode) => {
+                self.mode = mode;
+            }
+            Action::InsertCharAtCursor(char) => {
+                let line = self.get_buffer_line_index();
+                let offset = self.cursor.col as usize;
+                self.buffer.insert(line as usize, offset, char);
+                self.cursor.col += 1;
+            }
+            Action::DeleteCharAtCursor => {
+                let line = self.get_buffer_line_index();
+                let offset = self.cursor.col;
+                self.buffer.remove(line as usize, offset as usize);
+            }
+            Action::DeleteCurrentLine => {
+                let line_index = self.get_buffer_line_index();
+                self.buffer.remove_line(line_index as usize);
+            }
+            Action::SetWaitingCmd(char) => {
+                self.waiting_cmd = Some(char);
+            }
+        }
+        false
     }
 }

@@ -20,4 +20,22 @@ impl Buffer {
     pub fn len(&self) -> usize {
         self.lines.len()
     }
+
+    pub fn insert(&mut self, line: usize, offset: usize, char: char) {
+        if let Some(line) = self.lines.get_mut(line) {
+            line.insert(offset, char);
+        }
+    }
+
+    pub fn remove(&mut self, line: usize, offset: usize) {
+        if let Some(line) = self.lines.get_mut(line) {
+            line.remove(offset);
+        }
+    }
+
+    pub fn remove_line(&mut self, line: usize) {
+        if line < self.len() {
+            self.lines.remove(line);
+        }
+    }
 }
