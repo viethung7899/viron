@@ -71,6 +71,7 @@ impl Editor {
         loop {
             self.draw()?;
             if let Some(action) = self.handle_event(event::read()?)? {
+                let (viewport_width, viewport_height) = self.get_viewport_size();
                 match action {
                     Action::Quit => break,
                     Action::MoveUp => {
@@ -80,10 +81,18 @@ impl Editor {
                         self.cursor.col = self.cursor.col.saturating_sub(1);
                     }
                     Action::MoveRight => {
-                        self.cursor.col += 1;
+                        let line_length = self
+                            .get_viewport_line(self.cursor.row)
+                            .map_or(0, |line| line.len() as u16);
+                        if self.cursor.col + 1 < viewport_width && self.cursor.col + 1 < line_length
+                        {
+                            self.cursor.col += 1;
+                        }
                     }
                     Action::MoveDown => {
-                        self.cursor.row += 1;
+                        if self.cursor.row + 1 < viewport_height {
+                            self.cursor.row += 1;
+                        }
                     }
                     Action::EnterMode(mode) => {
                         self.mode = mode;
