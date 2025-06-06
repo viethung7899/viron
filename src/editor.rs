@@ -197,11 +197,13 @@ impl Editor {
     }
 
     fn draw(&mut self) -> Result<()> {
-        self.set_cursor_style()?;
+        self.stdout.queue(cursor::Hide)?;
         self.draw_viewport()?;
         self.draw_status_line()?;
         self.stdout
             .queue(cursor::MoveTo(self.cursor.col, self.cursor.row))?;
+        self.set_cursor_style()?;
+        self.stdout.queue(cursor::Show)?;
         self.stdout.flush()?;
         Ok(())
     }
