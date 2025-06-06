@@ -44,9 +44,7 @@ impl Buffer {
     }
 
     pub fn get_viewport_buffer(&self, top: usize, height: usize) -> String {
-        self.lines
-            .get(top..top + height)
-            .unwrap_or_default()
-            .join("\n")
+        let max = self.len().min(top + height);
+        self.lines.get(top..max).unwrap_or_default().join("\n")
     }
 }

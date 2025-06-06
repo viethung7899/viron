@@ -222,38 +222,37 @@ impl Editor {
 
         let mut row = 0;
         let mut col = 0;
+
         for (index, char) in viewport_buffer.chars().enumerate() {
             if char == '\n' {
                 self.stdout.queue(style::Print(
                     " ".repeat((width.saturating_sub(col)) as usize),
                 ))?;
                 row += 1;
+                col = 0;
 
                 if row > height {
                     break;
                 }
-                col = 0;
                 continue;
             }
 
             let color = colors
                 .iter()
                 .find(|c| c.range.contains(&index))
-                .map(|c| c.color);
+                .map_or(Color::White, |c| c.color);
             self.stdout.queue(cursor::MoveTo(col, row))?;
-
-            match color {
-                Some(color) => {
-                    self.stdout
-                        .queue(style::PrintStyledContent(char.to_string().with(color)))?;
-                }
-                None => {
-                    self.stdout.queue(style::PrintStyledContent(
-                        char.to_string().with(Color::Reset),
-                    ))?;
-                }
-            }
+            self.stdout
+                .queue(style::PrintStyledContent(char.to_string().with(color)))?;
             col += 1;
+        }
+
+        while row < height {
+            self.stdout.queue(cursor::MoveTo(col, row))?;
+            self.stdout
+                .queue(terminal::Clear(terminal::ClearType::UntilNewLine))?;
+            row += 1;
+            col = 0;
         }
 
         Ok(())
@@ -430,10 +429,10 @@ impl Editor {
             }
             Action::MoveDown => {
                 let (_, height) = self.get_viewport_size();
-                if self.cursor.row + 1 >= height {
-                    self.top += 1;
-                } else {
+                if self.cursor.row + 1 < height {
                     self.cursor.row += 1;
+                } else if self.top + (height as usize) < self.buffer.len() {
+                    self.top += 1;
                 }
             }
             Action::MoveLeft => {
