@@ -8,27 +8,28 @@ use crossterm::{
     terminal,
 };
 
+use crate::action::Action;
 use crate::{buffer::Buffer, log};
 
 #[derive(Debug)]
 pub struct Editor {
-    stdout: Stdout,
-    buffer: Buffer,
-    offset: Position,
-    cursor: Position,
-    mode: Mode,
-    size: (u16, u16),
-    waiting_cmd: Option<char>,
+    pub(crate) stdout: Stdout,
+    pub(crate) buffer: Buffer,
+    pub(crate) offset: Position,
+    pub(crate) cursor: Position,
+    pub(crate) mode: Mode,
+    pub(crate) size: (u16, u16),
+    pub(crate) waiting_cmd: Option<char>,
 }
 
 #[derive(Debug, Clone, Default)]
-struct Position {
-    row: u16,
-    col: u16,
+pub struct Position {
+    pub row: u16,
+    pub col: u16,
 }
 
-#[derive(Debug, Clone, Default)]
-enum Mode {
+#[derive(Debug, Clone, Copy, Default)]
+pub enum Mode {
     #[default]
     Normal,
     Insert,
@@ -48,27 +49,6 @@ impl Mode {
             Mode::Insert => Color::DarkGreen,
         }
     }
-}
-
-#[derive(Debug)]
-enum Action {
-    Quit,
-
-    MoveUp,
-    MoveDown,
-    MoveLeft,
-    MoveRight,
-    PageUp,
-    PageDown,
-    MoveToLineStart,
-    MoveToLineEnd,
-
-    EnterMode(Mode),
-    SetWaitingCmd(char),
-
-    InsertCharAtCursor(char),
-    DeleteCharAtCursor,
-    DeleteCurrentLine,
 }
 
 impl Drop for Editor {
@@ -101,9 +81,10 @@ impl Editor {
             self.reset_bounds();
             self.draw()?;
             if let Some(action) = self.handle_event(event::read()?) {
-                let quit = self.handle_action(action);
-                if quit {
+                if matches!(action, Action::Quit) {
                     break;
+                } else {
+                    action.execute(self);
                 }
             }
         }
@@ -111,7 +92,7 @@ impl Editor {
         Ok(())
     }
 
-    fn get_viewport_size(&self) -> (u16, u16) {
+    pub fn get_viewport_size(&self) -> (u16, u16) {
         let (width, height) = self.size;
         (width, height - 2)
     }
@@ -133,11 +114,11 @@ impl Editor {
         self.cursor.col = col;
     }
 
-    fn get_buffer_line_index(&self) -> u16 {
+    pub fn get_buffer_line_index(&self) -> u16 {
         self.offset.row + self.cursor.row
     }
 
-    fn get_viewport_line(&self, viewport_line: u16) -> Option<String> {
+    pub fn get_viewport_line(&self, viewport_line: u16) -> Option<String> {
         let buffer_line = self.offset.row + viewport_line;
         self.buffer.get_line(buffer_line as usize)
     }
@@ -269,73 +250,5 @@ impl Editor {
             },
             _ => None,
         }
-    }
-
-    fn handle_action(&mut self, action: Action) -> bool {
-        let (_, viewport_height) = self.get_viewport_size();
-        match action {
-            Action::Quit => return true,
-            Action::MoveUp => {
-                if self.cursor.row == 0 {
-                    self.offset.row = self.offset.row.saturating_sub(1);
-                } else {
-                    self.cursor.row -= 1;
-                }
-            }
-            Action::MoveDown => {
-                if self.cursor.row + 1 >= viewport_height {
-                    self.offset.row += 1;
-                } else {
-                    self.cursor.row += 1;
-                }
-            }
-            Action::MoveLeft => {
-                self.cursor.col = self.cursor.col.saturating_sub(1);
-            }
-            Action::MoveRight => {
-                self.cursor.col += 1;
-            }
-            Action::PageUp => {
-                let (_, height) = self.get_viewport_size();
-                self.offset.row = self.offset.row.saturating_sub(height);
-            }
-            Action::PageDown => {
-                let (_, height) = self.get_viewport_size();
-                log!("Page Down {}", self.offset.row);
-                if self.buffer.len() > (self.offset.row + height) as usize {
-                    self.offset.row += height;
-                }
-            }
-            Action::MoveToLineStart => {
-                self.cursor.col = 0;
-            }
-            Action::MoveToLineEnd => {
-                self.cursor.col = self
-                    .get_viewport_line(self.cursor.row)
-                    .map_or(0, |line| line.len() as u16)
-            }
-            Action::EnterMode(mode) => {
-                self.mode = mode;
-            }
-            Action::InsertCharAtCursor(char) => {
-                let line = self.get_buffer_line_index();
-                let offset = self.cursor.col as usize;
-                self.buffer.insert(line as usize, offset, char);
-                self.cursor.col += 1;
-            }
-            Action::DeleteCharAtCursor => {
-                let line = self.get_buffer_line_index();
-                let offset = self.cursor.col;
-                self.buffer.remove(line as usize, offset as usize);
-            }
-            Action::DeleteCurrentLine => {
-                let line_index = self.get_buffer_line_index();
-                self.buffer.remove_line(line_index as usize);
-            }
-            Action::SetWaitingCmd(char) => {
-                self.waiting_cmd = Some(char);
-            }
-        }
-        false
     }
 }
