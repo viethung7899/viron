@@ -81,14 +81,14 @@ impl TryFrom<VsCodeTokenColorSettings> for Style {
 
     fn try_from(value: VsCodeTokenColorSettings) -> std::result::Result<Self, Self::Error> {
         let foreground = if let Some(fg) = value.foreground {
-            parse_rgb(&fg)?
+            Some(parse_rgb(&fg)?)
         } else {
-            Color::Reset
+            None
         };
         let background = if let Some(bg) = value.background {
-            parse_rgb(&bg)?
+            Some(parse_rgb(&bg)?)
         } else {
-            Color::Reset
+            None
         };
         let bold = value
             .font_style
@@ -165,15 +165,11 @@ pub fn parse_vscode_theme(file: &str) -> Result<Theme> {
     let editor_foreground = vscode
         .colors
         .get("editor.foreground")
-        .map_or(Color::Reset, |s| {
-            parse_rgb(s.as_str()).unwrap_or(Color::Reset)
-        });
+        .and_then(|s| parse_rgb(s.as_str()).ok());
     let editor_background = vscode
         .colors
         .get("editor.background")
-        .map_or(Color::Reset, |s| {
-            parse_rgb(s.as_str()).unwrap_or(Color::Reset)
-        });
+        .and_then(|s| parse_rgb(s.as_str()).ok());
 
     let token_styles = vscode
         .token_colors

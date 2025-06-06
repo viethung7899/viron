@@ -1,24 +1,36 @@
-use crossterm::style::Color;
+use crossterm::style::{Attribute, Attributes, Color, ContentStyle};
 
 mod vscode;
 
 pub use vscode::parse_vscode_theme;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Style {
-    pub foreground: Color,
-    pub background: Color,
+    pub foreground: Option<Color>,
+    pub background: Option<Color>,
     pub bold: bool,
     pub italic: bool,
 }
 
-impl Default for Style {
-    fn default() -> Self {
-        Style {
-            foreground: Color::Reset,
-            background: Color::Reset,
-            bold: false,
-            italic: false,
+impl Style {
+    pub fn to_content_style(&self, fallback: &Style) -> ContentStyle {
+        let foreground_color = self.foreground.or(fallback.foreground);
+        let background_color = self.background.or(fallback.background);
+        let mut attributes = Attributes::default();
+
+        if self.italic {
+            attributes.set(Attribute::Italic);
+        }
+
+        if self.bold {
+            attributes.set(Attribute::Bold);
+        }
+
+        ContentStyle {
+            foreground_color,
+            background_color,
+            attributes,
+            ..Default::default()
         }
     }
 }

@@ -18,14 +18,13 @@ fn main() -> anyhow::Result<()> {
         .map(|path| Buffer::from_file(&path))
         .unwrap_or_default();
 
-    let mut editor = Editor::new(buffer)?;
+    let theme = theme::parse_vscode_theme("themes/catppuchin/frappe.json")?;
 
-    log!("{}", "Starting");
+    let mut editor = Editor::new(theme, buffer)?;
 
     panic::set_hook(Box::new(|info| {
         _ = stdout().execute(terminal::LeaveAlternateScreen);
         _ = terminal::disable_raw_mode();
-
         eprintln!("{}", info);
     }));
 

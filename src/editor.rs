@@ -3,21 +3,25 @@ use std::{
     ops::Range,
 };
 
-use crate::{buffer::Buffer, log};
+use crate::{
+    buffer::Buffer,
+    log,
+    theme::{Style, Theme},
+};
 use anyhow::Result;
 use crossterm::{
     ExecutableCommand, QueueableCommand, cursor,
     event::{self, KeyCode, KeyModifiers},
-    style::{self, Color, Stylize},
+    style::{self, Color, StyledContent, Stylize},
     terminal,
 };
 use tree_sitter::{Parser, Query, QueryCursor, StreamingIterator};
 use tree_sitter_rust::HIGHLIGHTS_QUERY;
 
 #[derive(Debug, Clone)]
-pub struct ColorInfo {
+pub struct StyleInfo {
     range: Range<usize>,
-    color: Color,
+    style: Style,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -117,8 +121,9 @@ impl UndoStack {
 
 #[derive(Debug)]
 pub struct Editor {
-    stdout: Stdout,
+    theme: Theme,
     buffer: Buffer,
+    stdout: Stdout,
     top: usize,
     cursor: Position,
     mode: Mode,
@@ -136,12 +141,13 @@ impl Drop for Editor {
 }
 
 impl Editor {
-    pub fn new(buffer: Buffer) -> Result<Self> {
+    pub fn new(theme: Theme, buffer: Buffer) -> Result<Self> {
         let mut stdout = stdout();
         terminal::enable_raw_mode()?;
         stdout.execute(terminal::EnterAlternateScreen)?;
         stdout.execute(terminal::Clear(terminal::ClearType::All))?;
         Ok(Self {
+            theme,
             stdout,
             buffer,
             top: 0,
@@ -218,18 +224,17 @@ impl Editor {
     }
 
     fn draw_viewport(&mut self) -> Result<()> {
-        let (width, height) = self.get_viewport_size();
+        let (_, height) = self.get_viewport_size();
         let viewport_buffer = self.buffer.get_viewport_buffer(self.top, height as usize);
-        let colors = self.highlight(&viewport_buffer)?;
+        let styles = self.highlight(&viewport_buffer)?;
+        let editor_style = self.theme.editor_style.clone();
 
         let mut row = 0;
         let mut col = 0;
 
         for (index, char) in viewport_buffer.chars().enumerate() {
             if char == '\n' {
-                self.stdout.queue(style::Print(
-                    " ".repeat((width.saturating_sub(col)) as usize),
-                ))?;
+                self.fill_line(row, col, &editor_style)?;
                 row += 1;
                 col = 0;
 
@@ -239,20 +244,17 @@ impl Editor {
                 continue;
             }
 
-            let color = colors
+            let style = styles
                 .iter()
                 .find(|c| c.range.contains(&index))
-                .map_or(Color::White, |c| c.color);
-            self.stdout.queue(cursor::MoveTo(col, row))?;
-            self.stdout
-                .queue(style::PrintStyledContent(char.to_string().with(color)))?;
+                .map(|c| c.style.clone())
+                .unwrap_or(editor_style.clone());
+            self.print_char(row, col, char, &style)?;
             col += 1;
         }
 
         while row < height {
-            self.stdout.queue(cursor::MoveTo(col, row))?;
-            self.stdout
-                .queue(terminal::Clear(terminal::ClearType::UntilNewLine))?;
+            self.fill_line(row, col, &editor_style)?;
             row += 1;
             col = 0;
         }
@@ -260,7 +262,27 @@ impl Editor {
         Ok(())
     }
 
-    fn highlight(&self, code: &str) -> Result<Vec<ColorInfo>> {
+    fn print_char(&mut self, row: u16, col: u16, ch: char, style: &Style) -> Result<()> {
+        let style = style.to_content_style(&self.theme.editor_style);
+        let styled_content = StyledContent::new(style, ch);
+        self.stdout
+            .queue(cursor::MoveTo(col, row))?
+            .queue(style::PrintStyledContent(styled_content))?;
+        Ok(())
+    }
+
+    fn fill_line(&mut self, row: u16, col: u16, style: &Style) -> Result<()> {
+        let (viewport_width, _) = self.get_viewport_size();
+        let repeat = (viewport_width.saturating_sub(col)) as usize;
+        let style = style.to_content_style(&self.theme.editor_style);
+        let styled_content = StyledContent::new(style, " ".repeat(repeat));
+        self.stdout
+            .queue(cursor::MoveTo(col, row))?
+            .queue(style::PrintStyledContent(styled_content))?;
+        Ok(())
+    }
+
+    fn highlight(&self, code: &str) -> Result<Vec<StyleInfo>> {
         let mut parser = Parser::new();
         let language = tree_sitter_rust::LANGUAGE.into();
         parser.set_language(&language)?;
@@ -274,27 +296,23 @@ impl Editor {
         while let Some(matching) = matches.next() {
             for capture in matching.captures {
                 let node = capture.node;
-                let start = node.start_byte();
-                let end = node.end_byte();
-                let color = query
-                    .capture_names()
-                    .get(capture.index as usize)
-                    .and_then(|&name| match name {
-                        "keyword" => Some(Color::DarkRed),
-                        "string" => Some(Color::Cyan),
-                        "function" => Some(Color::Magenta),
-                        _ => None,
-                    });
+                let range = node.byte_range();
 
-                if let Some(color) = color {
-                    colors.push(ColorInfo {
-                        range: start..end,
-                        color,
+                let scope = query.capture_names()[capture.index as usize];
+                let style = self.theme.get_style(scope);
+                let content = &code[range.clone()];
+
+                if let Some(style) = style {
+                    log!("[found] {scope} = {content}");
+                    colors.push(StyleInfo {
+                        range,
+                        style: style,
                     });
+                } else {
+                    log!("[not found] {scope} = {content}");
                 }
             }
         }
-        log!("{:?}", colors);
         Ok(colors)
     }
 
