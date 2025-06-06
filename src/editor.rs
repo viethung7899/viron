@@ -1,4 +1,7 @@
-use std::io::{Stdout, Write, stdout};
+use std::{
+    io::{Stdout, Write, stdout},
+    ops::Range,
+};
 
 use crate::{buffer::Buffer, log};
 use anyhow::Result;
@@ -8,6 +11,14 @@ use crossterm::{
     style::{self, Color, Stylize},
     terminal,
 };
+use tree_sitter::{Parser, Query, QueryCursor, StreamingIterator};
+use tree_sitter_rust::HIGHLIGHTS_QUERY;
+
+#[derive(Debug, Clone)]
+pub struct ColorInfo {
+    range: Range<usize>,
+    color: Color,
+}
 
 #[derive(Debug, Clone, Default)]
 pub struct Position {
@@ -206,14 +217,84 @@ impl Editor {
 
     fn draw_viewport(&mut self) -> Result<()> {
         let (width, height) = self.get_viewport_size();
-        for i in 0..height {
-            let line_index = self.top + i as usize;
-            let line = self.buffer.get_line(line_index).unwrap_or_default();
-            let formatted_line = format!("{line:<w$}", w = width as usize,);
-            self.stdout.queue(cursor::MoveTo(0, i))?;
-            self.stdout.queue(style::Print(formatted_line))?;
+        let viewport_buffer = self.buffer.get_viewport_buffer(self.top, height as usize);
+        let colors = self.highlight(&viewport_buffer)?;
+
+        let mut row = 0;
+        let mut col = 0;
+        for (index, char) in viewport_buffer.chars().enumerate() {
+            if char == '\n' {
+                self.stdout.queue(style::Print(
+                    " ".repeat((width.saturating_sub(col)) as usize),
+                ))?;
+                row += 1;
+
+                if row > height {
+                    break;
+                }
+                col = 0;
+                continue;
+            }
+
+            let color = colors
+                .iter()
+                .find(|c| c.range.contains(&index))
+                .map(|c| c.color);
+            self.stdout.queue(cursor::MoveTo(col, row))?;
+
+            match color {
+                Some(color) => {
+                    self.stdout
+                        .queue(style::PrintStyledContent(char.to_string().with(color)))?;
+                }
+                None => {
+                    self.stdout.queue(style::PrintStyledContent(
+                        char.to_string().with(Color::Reset),
+                    ))?;
+                }
+            }
+            col += 1;
         }
+
         Ok(())
+    }
+
+    fn highlight(&self, code: &str) -> Result<Vec<ColorInfo>> {
+        let mut parser = Parser::new();
+        let language = tree_sitter_rust::LANGUAGE.into();
+        parser.set_language(&language)?;
+        let tree = parser.parse(code, None).expect("Grammar tree exists");
+        let query = Query::new(&language, HIGHLIGHTS_QUERY).expect("Rust highlight query exists");
+
+        let mut cursor = QueryCursor::new();
+        let mut matches = cursor.matches(&query, tree.root_node(), code.as_bytes());
+        let mut colors = Vec::new();
+
+        while let Some(matching) = matches.next() {
+            for capture in matching.captures {
+                let node = capture.node;
+                let start = node.start_byte();
+                let end = node.end_byte();
+                let color = query
+                    .capture_names()
+                    .get(capture.index as usize)
+                    .and_then(|&name| match name {
+                        "keyword" => Some(Color::DarkRed),
+                        "string" => Some(Color::Cyan),
+                        "function" => Some(Color::Magenta),
+                        _ => None,
+                    });
+
+                if let Some(color) = color {
+                    colors.push(ColorInfo {
+                        range: start..end,
+                        color,
+                    });
+                }
+            }
+        }
+        log!("{:?}", colors);
+        Ok(colors)
     }
 
     fn draw_status_line(&mut self) -> Result<()> {

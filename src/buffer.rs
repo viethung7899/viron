@@ -42,4 +42,11 @@ impl Buffer {
             self.lines.remove(line);
         }
     }
+
+    pub fn get_viewport_buffer(&self, top: usize, height: usize) -> String {
+        self.lines
+            .get(top..top + height)
+            .unwrap_or_default()
+            .join("\n")
+    }
 }
