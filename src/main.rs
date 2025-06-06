@@ -2,7 +2,10 @@ mod buffer;
 mod editor;
 mod logger;
 
+use std::{io::stdout, panic};
+
 use buffer::Buffer;
+use crossterm::{ExecutableCommand, terminal};
 use editor::Editor;
 use logger::Logger;
 use once_cell::sync::OnceCell;
@@ -17,9 +20,18 @@ fn main() -> anyhow::Result<()> {
     let mut editor = Editor::new(buffer)?;
 
     log!("{}", "Starting");
+
+    panic::set_hook(Box::new(|info| {
+        _ = stdout().execute(terminal::LeaveAlternateScreen);
+        _ = terminal::disable_raw_mode();
+
+        eprintln!("{}", info);
+    }));
+
     editor.run()
 }
 
+#[allow(unused)]
 static LOGGER: OnceCell<Logger> = OnceCell::new();
 
 #[macro_export]
