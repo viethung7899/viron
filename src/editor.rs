@@ -46,8 +46,10 @@ pub enum Action {
     MoveDown,
     MoveLeft,
     MoveRight,
+    
     PageUp,
     PageDown,
+    
     MoveToLineStart,
     MoveToLineEnd,
     MoveToViewportCenter,
@@ -57,6 +59,8 @@ pub enum Action {
 
     InsertCharAtCursor(char),
     InsertLineAt(usize, String),
+    InsertLineBelowCursor,
+    InsertLineAtCursor,
     DeleteCharAtCursor,
     DeleteCurrentLine,
 }
@@ -239,6 +243,8 @@ impl Editor {
                     KeyCode::Home | KeyCode::Char('0') => Some(Action::MoveToLineStart),
                     KeyCode::End | KeyCode::Char('$') => Some(Action::MoveToLineEnd),
                     KeyCode::Char('i') => Some(Action::EnterMode(Mode::Insert)),
+                    KeyCode::Char('o') => Some(Action::InsertLineBelowCursor),
+                    KeyCode::Char('O') => Some(Action::InsertLineAtCursor),
                     KeyCode::Char('x') => Some(Action::DeleteCharAtCursor),
                     KeyCode::Char('b') if modifier == KeyModifiers::CONTROL => Some(Action::PageUp),
                     KeyCode::Char('f') if modifier == KeyModifiers::CONTROL => {
@@ -358,6 +364,21 @@ impl Editor {
             }
             Action::InsertLineAt(line, content) => {
                 self.buffer.insert_line(*line, content.to_string());
+            }
+            Action::InsertLineAtCursor => {
+                self.execute(&Action::InsertLineAt(
+                    self.get_current_line_index(),
+                    "".into(),
+                ));
+                self.mode = Mode::Insert;
+            }
+            Action::InsertLineBelowCursor => {
+                self.execute(&Action::InsertLineAt(
+                    self.get_current_line_index() + 1,
+                    "".into(),
+                ));
+                self.cursor.row += 1;
+                self.mode = Mode::Insert;
             }
             Action::DeleteCharAtCursor => {
                 let line = self.get_current_line_index();
