@@ -51,7 +51,6 @@ static TRANSLATION_MAP: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(||
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct VsCodeTokenColor {
-    name: Option<String>,
     scope: VsCodeScope,
     settings: VsCodeTokenColorSettings,
 }
@@ -61,7 +60,6 @@ impl TryFrom<VsCodeTokenColor> for TokenStyle {
 
     fn try_from(value: VsCodeTokenColor) -> std::result::Result<Self, Self::Error> {
         Ok(TokenStyle {
-            name: value.name,
             scope: value.scope.into(),
             style: Style::try_from(value.settings)?,
         })
@@ -110,9 +108,6 @@ impl TryFrom<VsCodeTokenColorSettings> for Style {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct VsCodeTheme {
-    name: Option<String>,
-    #[serde(rename = "type")]
-    type_: Option<String>,
     colors: HashMap<String, String>,
     token_colors: Vec<VsCodeTokenColor>,
 }
@@ -161,8 +156,6 @@ pub fn parse_vscode_theme(file: &str) -> Result<Theme> {
     let vscode: VsCodeTheme = serde_json::from_str(&content)?;
     println!("{vscode:#?}");
 
-    let name = vscode.name.unwrap_or_default();
-
     let editor_foreground = vscode
         .colors
         .get("editor.foreground")
@@ -188,7 +181,6 @@ pub fn parse_vscode_theme(file: &str) -> Result<Theme> {
         .collect::<Result<Vec<TokenStyle>, _>>()?;
 
     Ok(Theme {
-        name,
         editor_style: Style {
             foreground: editor_foreground,
             background: editor_background,

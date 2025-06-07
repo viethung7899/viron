@@ -41,14 +41,12 @@ impl Style {
 
 #[derive(Debug)]
 pub struct TokenStyle {
-    pub name: Option<String>,
     pub scope: Vec<String>,
     pub style: Style,
 }
 
 #[derive(Debug)]
 pub struct Theme {
-    pub name: String,
     pub gutter_style: Style,
     pub editor_style: Style,
     pub token_styles: Vec<TokenStyle>,
