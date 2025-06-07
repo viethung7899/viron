@@ -266,7 +266,10 @@ impl Editor {
 
     fn draw_gutter(&mut self) -> Result<()> {
         let (_, height) = self.get_viewport_size();
-        let style = self.theme.editor_style.to_content_style(None);
+        let style = self
+            .theme
+            .gutter_style
+            .to_content_style(Some(&self.theme.editor_style));
         for i in 0..height {
             self.stdout.queue(cursor::MoveTo(0, i))?;
             let line_number = self.offset.top + i as usize + 1;
@@ -370,7 +373,7 @@ impl Editor {
 
                 let scope = query.capture_names()[capture.index as usize];
                 let style = self.theme.get_style(scope);
-                let content = &code[range.clone()];
+                // let content = &code[range.clone()];
 
                 if let Some(style) = style {
                     // log!("[found] {scope} = {content}");

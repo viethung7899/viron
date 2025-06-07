@@ -162,6 +162,7 @@ pub fn parse_vscode_theme(file: &str) -> Result<Theme> {
     println!("{vscode:#?}");
 
     let name = vscode.name.unwrap_or_default();
+
     let editor_foreground = vscode
         .colors
         .get("editor.foreground")
@@ -169,6 +170,15 @@ pub fn parse_vscode_theme(file: &str) -> Result<Theme> {
     let editor_background = vscode
         .colors
         .get("editor.background")
+        .and_then(|s| parse_rgb(s.as_str()).ok());
+
+    let gutter_foreground = vscode
+        .colors
+        .get("editorLineNumber.foreground")
+        .and_then(|s| parse_rgb(s.as_str()).ok());
+    let gutter_background = vscode
+        .colors
+        .get("editorLineNumber.background")
         .and_then(|s| parse_rgb(s.as_str()).ok());
 
     let token_styles = vscode
@@ -182,6 +192,11 @@ pub fn parse_vscode_theme(file: &str) -> Result<Theme> {
         editor_style: Style {
             foreground: editor_foreground,
             background: editor_background,
+            ..Style::default()
+        },
+        gutter_style: Style {
+            foreground: gutter_foreground,
+            background: gutter_background,
             ..Style::default()
         },
         token_styles,

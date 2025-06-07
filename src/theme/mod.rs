@@ -49,6 +49,7 @@ pub struct TokenStyle {
 #[derive(Debug)]
 pub struct Theme {
     pub name: String,
+    pub gutter_style: Style,
     pub editor_style: Style,
     pub token_styles: Vec<TokenStyle>,
 }
