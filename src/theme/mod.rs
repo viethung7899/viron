@@ -13,9 +13,13 @@ pub struct Style {
 }
 
 impl Style {
-    pub fn to_content_style(&self, fallback: &Style) -> ContentStyle {
-        let foreground_color = self.foreground.or(fallback.foreground);
-        let background_color = self.background.or(fallback.background);
+    pub fn to_content_style(&self, fallback: Option<&Style>) -> ContentStyle {
+        let foreground_color = self
+            .foreground
+            .or(fallback.and_then(|style| style.foreground));
+        let background_color = self
+            .background
+            .or(fallback.and_then(|style| style.background));
         let mut attributes = Attributes::default();
 
         if self.italic {

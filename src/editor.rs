@@ -128,6 +128,7 @@ impl UndoStack {
 #[derive(Debug)]
 pub struct Editor {
     theme: Theme,
+    gutter_width: u16,
     buffer: Buffer,
     stdout: Stdout,
     offset: Offset,
@@ -152,10 +153,14 @@ impl Editor {
         terminal::enable_raw_mode()?;
         stdout.execute(terminal::EnterAlternateScreen)?;
         stdout.execute(terminal::Clear(terminal::ClearType::All))?;
+
+        let gutter_width = buffer.len().to_string().len() as u16 + 2;
+
         Ok(Self {
             theme,
             stdout,
             buffer,
+            gutter_width,
             offset: Offset::default(),
             cursor: Position::default(),
             mode: Mode::Normal,
@@ -183,13 +188,13 @@ impl Editor {
 
     fn get_viewport_size(&self) -> (u16, u16) {
         let (width, height) = self.size;
-        (width, height - 2)
+        (width - self.gutter_width, height - 2)
     }
 
     fn get_current_screen_position(&self) -> (u16, u16) {
         let row = self.cursor.row - self.offset.top;
         let col = self.cursor.col - self.offset.left;
-        (row as u16, col as u16)
+        (row as u16, col as u16 + self.gutter_width)
     }
 
     fn reset_bounds(&mut self) {
@@ -233,6 +238,7 @@ impl Editor {
 
     fn draw(&mut self) -> Result<()> {
         self.hide_cursor()?;
+        self.draw_gutter()?;
         self.draw_viewport()?;
         self.draw_status_line()?;
         self.draw_cursor()?;
@@ -258,8 +264,27 @@ impl Editor {
         Ok(())
     }
 
-    fn draw_viewport(&mut self) -> Result<()> {
+    fn draw_gutter(&mut self) -> Result<()> {
         let (_, height) = self.get_viewport_size();
+        let style = self.theme.editor_style.to_content_style(None);
+        for i in 0..height {
+            self.stdout.queue(cursor::MoveTo(0, i))?;
+            let line_number = self.offset.top + i as usize + 1;
+            let content = if line_number <= self.buffer.len() {
+                let w = (self.gutter_width - 1) as usize;
+                format!("{line_number:>w$} ")
+            } else {
+                " ".repeat(self.gutter_width as usize)
+            };
+            let styled_content = StyledContent::new(style, content);
+            self.stdout
+                .queue(style::PrintStyledContent(styled_content))?;
+        }
+        Ok(())
+    }
+
+    fn draw_viewport(&mut self) -> Result<()> {
+        let (width, height) = self.get_viewport_size();
         let viewport_buffer = self
             .buffer
             .get_viewport_buffer(self.offset.top, height as usize);
@@ -282,7 +307,7 @@ impl Editor {
                 continue;
             }
 
-            if col >= self.offset.left {
+            if col >= self.offset.left && col < self.offset.left + width as usize {
                 let style = styles
                     .iter()
                     .find(|c| c.range.contains(&index))
@@ -304,8 +329,8 @@ impl Editor {
 
     fn print_char(&mut self, row: usize, col: usize, ch: char, style: &Style) -> Result<()> {
         let row = (row - self.offset.top) as u16;
-        let col = (col - self.offset.left) as u16;
-        let style = style.to_content_style(&self.theme.editor_style);
+        let col = (col - self.offset.left) as u16 + self.gutter_width;
+        let style = style.to_content_style(Some(&self.theme.editor_style));
         let styled_content = StyledContent::new(style, ch);
         self.stdout
             .queue(cursor::MoveTo(col, row))?
@@ -314,14 +339,15 @@ impl Editor {
     }
 
     fn fill_line(&mut self, row: usize, col: usize, style: &Style) -> Result<()> {
+        let col = col.max(self.offset.left);
         let row = (row - self.offset.top) as u16;
-        let col = (col.saturating_sub(self.offset.left)) as u16;
+        let col = (col - self.offset.left) as u16;
         let (viewport_width, _) = self.get_viewport_size();
         let repeat = (viewport_width.saturating_sub(col)) as usize;
-        let style = style.to_content_style(&self.theme.editor_style);
+        let style = style.to_content_style(Some(&self.theme.editor_style));
         let styled_content = StyledContent::new(style, " ".repeat(repeat));
         self.stdout
-            .queue(cursor::MoveTo(col, row))?
+            .queue(cursor::MoveTo(col + self.gutter_width, row))?
             .queue(style::PrintStyledContent(styled_content))?;
         Ok(())
     }
