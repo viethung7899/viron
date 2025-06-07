@@ -5,6 +5,7 @@ use std::{
 
 use crate::{
     buffer::Buffer,
+    config::{Config, KeyAction},
     log,
     theme::{Style, Theme},
 };
@@ -15,6 +16,7 @@ use crossterm::{
     style::{self, Color, StyledContent, Stylize},
     terminal,
 };
+use serde::{Deserialize, Serialize};
 use tree_sitter::{Parser, Query, QueryCursor, StreamingIterator};
 use tree_sitter_rust::HIGHLIGHTS_QUERY;
 
@@ -36,7 +38,7 @@ struct Offset {
     pub left: usize,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Mode {
     Normal,
     Insert,
@@ -58,7 +60,7 @@ impl Mode {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Action {
     Quit,
     Undo,
@@ -127,6 +129,7 @@ impl UndoStack {
 
 #[derive(Debug)]
 pub struct Editor {
+    config: Config,
     theme: Theme,
     gutter_width: u16,
     buffer: Buffer,
@@ -148,7 +151,7 @@ impl Drop for Editor {
 }
 
 impl Editor {
-    pub fn new(theme: Theme, buffer: Buffer) -> Result<Self> {
+    pub fn new(config: Config, theme: Theme, buffer: Buffer) -> Result<Self> {
         let mut stdout = stdout();
         terminal::enable_raw_mode()?;
         stdout.execute(terminal::EnterAlternateScreen)?;
@@ -157,6 +160,7 @@ impl Editor {
         let gutter_width = buffer.len().to_string().len() as u16 + 2;
 
         Ok(Self {
+            config,
             theme,
             stdout,
             buffer,
@@ -174,11 +178,23 @@ impl Editor {
         loop {
             self.reset_bounds();
             self.draw()?;
-            if let Some(action) = self.handle_event(event::read()?) {
-                if matches!(action, Action::Quit) {
+            if let Some(key_action) = self.handle_event(event::read()?) {
+                let quit = match key_action {
+                    KeyAction::Single(action) => self.execute(&action),
+                    KeyAction::Multiple(actions) => {
+                        let mut quit = false;
+                        for action in actions {
+                            quit |= self.execute(&action);
+                            if quit {
+                                break;
+                            }
+                        }
+                        quit
+                    }
+                    KeyAction::Nested(_) => false,
+                };
+                if quit {
                     break;
-                } else {
-                    self.execute(&action);
                 }
             }
         }
@@ -412,15 +428,12 @@ impl Editor {
         Ok(())
     }
 
-    fn handle_event(&mut self, event: event::Event) -> Option<Action> {
+    fn handle_event(&mut self, event: event::Event) -> Option<KeyAction> {
         if let event::Event::Resize(width, height) = event {
             self.size = (width, height);
             return None;
         }
-        match self.mode {
-            Mode::Normal => self.handle_normal_event(&event),
-            Mode::Insert => self.handle_insert_event(&event),
-        }
+        self.config.keys.get_key_action(event, &self.mode)
     }
 
     fn handle_normal_event(&mut self, event: &event::Event) -> Option<Action> {
@@ -507,8 +520,11 @@ impl Editor {
         }
     }
 
-    fn execute(&mut self, action: &Action) {
+    fn execute(&mut self, action: &Action) -> bool {
         match action {
+            Action::Quit => {
+                return true;
+            }
             Action::MoveUp => {
                 self.cursor.row = self.cursor.row.saturating_sub(1);
             }
@@ -621,7 +637,7 @@ impl Editor {
                     self.execute(&action);
                 }
             }
-            _ => {}
         }
+        false
     }
 }

@@ -1,0 +1,38 @@
+theme = "themes/catppuchin/mocha.json"
+
+[keys.normal]
+"q" = "Quit"
+"u" = "Undo"
+"k" = "MoveUp"
+"j" = "MoveDown"
+"l" = "MoveRight"
+"h" = "MoveLeft"
+"Up" = "MoveUp"
+"Down" = "MoveDown"
+"Left" = "MoveLeft"
+"Right" = "MoveRight"
+"0" = "MoveToLineStart"
+"$" = "MoveToLineEnd"
+"Home" = "MoveToLineStart"
+"End" = "MoveToLineEnd"
+"G" = "MoveToBottom"
+"o" = "InsertLineBelowCursor"
+"O" = "InsertLineAtCursor"
+"x" = "DeleteCharAtCursor"
+"Ctrl-b" = "PageUp"
+"Ctrl-f" = "PageDown"
+
+[keys.normal.g]
+"g" = "MoveToTop"
+
+[keys.normal.d]
+"d" = "DeleteCurrentLine"
+
+[keys.normal.z]
+"z" = "MoveToViewportCenter"
+
+[keys.normal.i]
+EnterMode = "Insert"
+
+[keys.insert.Esc]
+EnterMode = "Normal"
