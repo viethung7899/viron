@@ -5,14 +5,14 @@ use std::{
 
 use crate::{
     buffer::Buffer,
-    config::{Config, KeyAction},
+    config::{Config, KeyAction, KeyMapping, get_key_action},
     log,
     theme::{Style, Theme},
 };
 use anyhow::Result;
 use crossterm::{
     ExecutableCommand, QueueableCommand, cursor,
-    event::{self, KeyCode, KeyModifiers},
+    event::{self, Event, KeyCode},
     style::{self, Color, StyledContent, Stylize},
     terminal,
 };
@@ -80,8 +80,6 @@ pub enum Action {
     MoveToViewportCenter,
 
     EnterMode(Mode),
-    SetWaitingCmd(char),
-    CancelWaitingCmd,
 
     InsertCharAtCursor(char),
     InsertLineAt(usize, String),
@@ -138,7 +136,7 @@ pub struct Editor {
     cursor: Position,
     mode: Mode,
     size: (u16, u16),
-    waiting_cmd: Option<char>,
+    waiting_key_action: Option<KeyMapping>,
     undo: UndoStack,
 }
 
@@ -169,7 +167,7 @@ impl Editor {
             cursor: Position::default(),
             mode: Mode::Normal,
             size: terminal::size()?,
-            waiting_cmd: None,
+            waiting_key_action: None,
             undo: UndoStack::default(),
         })
     }
@@ -179,6 +177,7 @@ impl Editor {
             self.reset_bounds();
             self.draw()?;
             if let Some(key_action) = self.handle_event(event::read()?) {
+                log!("Key action = {:?}", key_action);
                 let quit = match key_action {
                     KeyAction::Single(action) => self.execute(&action),
                     KeyAction::Multiple(actions) => {
@@ -191,7 +190,10 @@ impl Editor {
                         }
                         quit
                     }
-                    KeyAction::Nested(_) => false,
+                    KeyAction::Nested(mapping) => {
+                        self.waiting_key_action = Some(mapping);
+                        false
+                    }
                 };
                 if quit {
                     break;
@@ -248,10 +250,6 @@ impl Editor {
         }
     }
 
-    pub fn get_current_line_index(&self) -> usize {
-        self.offset.top + self.cursor.row as usize
-    }
-
     fn draw(&mut self) -> Result<()> {
         self.hide_cursor()?;
         self.draw_gutter()?;
@@ -269,7 +267,7 @@ impl Editor {
 
     fn draw_cursor(&mut self) -> Result<()> {
         let (row, col) = self.get_current_screen_position();
-        let cursor_style = match self.waiting_cmd {
+        let cursor_style = match self.waiting_key_action {
             Some(_) => cursor::SetCursorStyle::SteadyUnderScore,
             None => self.mode.set_cursor_style(),
         };
@@ -428,92 +426,38 @@ impl Editor {
         Ok(())
     }
 
-    fn handle_event(&mut self, event: event::Event) -> Option<KeyAction> {
-        if let event::Event::Resize(width, height) = event {
+    fn handle_event(&mut self, event: Event) -> Option<KeyAction> {
+        if let Event::Resize(width, height) = event {
             self.size = (width, height);
             return None;
         }
-        self.config.keys.get_key_action(event, &self.mode)
+
+        if let Some(mapping) = &self.waiting_key_action {
+            let action = get_key_action(mapping, &event);
+            self.waiting_key_action = None;
+            return action;
+        }
+
+        match self.mode {
+            Mode::Insert => self.handle_insert_event(&event),
+            Mode::Normal => self.handle_normal_event(&event),
+        }
     }
 
-    fn handle_normal_event(&mut self, event: &event::Event) -> Option<Action> {
-        log!("Event: {:?}", event);
+    fn handle_normal_event(&mut self, event: &Event) -> Option<KeyAction> {
+        get_key_action(&self.config.keys.normal, &event)
+    }
 
-        let action = self
-            .waiting_cmd
-            .and_then(|cmd| self.handle_waiting_command(cmd, &event));
+    fn handle_insert_event(&self, event: &Event) -> Option<KeyAction> {
+        let action = get_key_action(&self.config.keys.insert, &event);
 
         if action.is_some() {
-            self.waiting_cmd = None;
             return action;
         }
 
         match event {
-            event::Event::Key(key) => {
-                let modifier = key.modifiers;
-                match key.code {
-                    KeyCode::Char('q') => Some(Action::Quit),
-                    KeyCode::Char('u') => Some(Action::Undo),
-                    KeyCode::Up | KeyCode::Char('k') => Some(Action::MoveUp),
-                    KeyCode::Down | KeyCode::Char('j') => Some(Action::MoveDown),
-                    KeyCode::Left | KeyCode::Char('h') => Some(Action::MoveLeft),
-                    KeyCode::Right | KeyCode::Char('l') => Some(Action::MoveRight),
-                    KeyCode::Home | KeyCode::Char('0') => Some(Action::MoveToLineStart),
-                    KeyCode::End | KeyCode::Char('$') => Some(Action::MoveToLineEnd),
-                    KeyCode::Char('G') => Some(Action::MoveToBottom),
-                    KeyCode::Char('i') => Some(Action::EnterMode(Mode::Insert)),
-                    KeyCode::Char('o') => Some(Action::InsertLineBelowCursor),
-                    KeyCode::Char('O') => Some(Action::InsertLineAtCursor),
-                    KeyCode::Char('x') => Some(Action::DeleteCharAtCursor),
-                    KeyCode::Char('b') if modifier == KeyModifiers::CONTROL => Some(Action::PageUp),
-                    KeyCode::Char('f') if modifier == KeyModifiers::CONTROL => {
-                        Some(Action::PageDown)
-                    }
-                    KeyCode::Char(c) => Some(Action::SetWaitingCmd(c)),
-                    KeyCode::Esc => Some(Action::CancelWaitingCmd),
-                    _ => None,
-                }
-            }
-            _ => None,
-        }
-    }
-
-    fn handle_waiting_command(&self, command: char, event: &event::Event) -> Option<Action> {
-        match command {
-            'd' => match event {
-                event::Event::Key(key) => match key.code {
-                    KeyCode::Char('d') => Some(Action::DeleteCurrentLine),
-                    _ => None,
-                },
-                _ => None,
-            },
-            'z' => match event {
-                event::Event::Key(key) => match key.code {
-                    KeyCode::Char('z') => Some(Action::MoveToViewportCenter),
-                    _ => None,
-                },
-                _ => None,
-            },
-            'g' => match event {
-                event::Event::Key(key) => match key.code {
-                    KeyCode::Char('g') => Some(Action::MoveToTop),
-                    _ => None,
-                },
-                _ => None,
-            },
-            _ => None,
-        }
-    }
-
-    fn handle_insert_event(&self, event: &event::Event) -> Option<Action> {
-        match event {
-            event::Event::Key(key) => match key.code {
-                KeyCode::Esc => Some(Action::EnterMode(Mode::Normal)),
-                KeyCode::Char(c) => Some(Action::InsertCharAtCursor(c)),
-                KeyCode::Up => Some(Action::MoveUp),
-                KeyCode::Down => Some(Action::MoveDown),
-                KeyCode::Left => Some(Action::MoveLeft),
-                KeyCode::Right => Some(Action::MoveRight),
+            Event::Key(event) => match event.code {
+                KeyCode::Char(c) => KeyAction::Single(Action::InsertCharAtCursor(c)).into(),
                 _ => None,
             },
             _ => None,
@@ -575,8 +519,8 @@ impl Editor {
                 self.mode = *mode;
             }
             Action::InsertCharAtCursor(char) => {
-                let line = self.get_current_line_index();
-                let offset = self.cursor.col as usize;
+                let line = self.cursor.row;
+                let offset = self.cursor.col;
                 self.undo.record(Action::DeleteChatAt(line, offset));
                 self.buffer.insert(line, offset, *char);
                 self.cursor.col += 1;
@@ -585,26 +529,18 @@ impl Editor {
                 self.buffer.insert_line(*line, content.to_string());
             }
             Action::InsertLineAtCursor => {
-                self.undo
-                    .push(Action::DeleteLineAt(self.get_current_line_index()));
-                self.execute(&Action::InsertLineAt(
-                    self.get_current_line_index(),
-                    "".into(),
-                ));
-                self.mode = Mode::Insert;
+                let line = self.cursor.row;
+                self.undo.push(Action::DeleteLineAt(line));
+                self.execute(&Action::InsertLineAt(line, "".into()));
             }
             Action::InsertLineBelowCursor => {
-                self.undo
-                    .push(Action::DeleteLineAt(self.get_current_line_index() + 1));
-                self.execute(&Action::InsertLineAt(
-                    self.get_current_line_index() + 1,
-                    "".into(),
-                ));
+                let line = self.cursor.row;
+                self.undo.push(Action::DeleteLineAt(line + 1));
+                self.execute(&Action::InsertLineAt(line + 1, "".into()));
                 self.cursor.row += 1;
-                self.mode = Mode::Insert;
             }
             Action::DeleteCharAtCursor => {
-                let line = self.get_current_line_index();
+                let line = self.cursor.row;
                 let offset = self.cursor.col;
                 self.buffer.remove(line as usize, offset as usize);
             }
@@ -612,20 +548,14 @@ impl Editor {
                 self.buffer.remove(*line, *offset);
             }
             Action::DeleteCurrentLine => {
-                let line_index = self.get_current_line_index() as usize;
-                if let Some(content) = self.buffer.get_line(line_index) {
-                    self.buffer.remove_line(line_index);
-                    self.undo.push(Action::InsertLineAt(line_index, content));
+                let line = self.cursor.row;
+                if let Some(content) = self.buffer.get_line(line) {
+                    self.buffer.remove_line(line);
+                    self.undo.push(Action::InsertLineAt(line, content));
                 }
             }
             Action::DeleteLineAt(line) => {
                 self.buffer.remove_line(*line);
-            }
-            Action::SetWaitingCmd(char) => {
-                self.waiting_cmd = Some(*char);
-            }
-            Action::CancelWaitingCmd => {
-                self.waiting_cmd = None;
             }
             Action::Undo => {
                 if let Some(action) = self.undo.pop() {
