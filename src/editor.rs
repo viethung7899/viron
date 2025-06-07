@@ -26,8 +26,14 @@ pub struct StyleInfo {
 
 #[derive(Debug, Clone, Default)]
 pub struct Position {
-    pub row: u16,
-    pub col: u16,
+    pub row: usize,
+    pub col: usize,
+}
+
+#[derive(Debug, Clone, Default)]
+struct Offset {
+    pub top: usize,
+    pub left: usize,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -124,7 +130,7 @@ pub struct Editor {
     theme: Theme,
     buffer: Buffer,
     stdout: Stdout,
-    top: usize,
+    offset: Offset,
     cursor: Position,
     mode: Mode,
     size: (u16, u16),
@@ -150,7 +156,7 @@ impl Editor {
             theme,
             stdout,
             buffer,
-            top: 0,
+            offset: Offset::default(),
             cursor: Position::default(),
             mode: Mode::Normal,
             size: terminal::size()?,
@@ -180,57 +186,89 @@ impl Editor {
         (width, height - 2)
     }
 
-    fn reset_bounds(&mut self) {
-        let (width, height) = self.get_viewport_size();
-        let mut current_length = self
-            .buffer
-            .get_line(self.get_current_line_index())
-            .map_or(0, |line| line.len()) as u16;
+    fn get_current_screen_position(&self) -> (u16, u16) {
+        let row = self.cursor.row - self.offset.top;
+        let col = self.cursor.col - self.offset.left;
+        (row as u16, col as u16)
+    }
 
-        if matches!(self.mode, Mode::Normal) {
+    fn reset_bounds(&mut self) {
+        // Reset the column
+        let current_line = self.buffer.get_line(self.cursor.row);
+        let mut current_length = current_line.clone().map_or(0, |line| line.len());
+        if self.mode != Mode::Insert {
             current_length = current_length.saturating_sub(1);
         }
+        self.cursor.col = self.cursor.col.min(current_length);
 
-        let row = self.cursor.row.min(height - 1);
-        let col = self.cursor.col.min(width - 1).min(current_length);
+        // Reset the offset
+        let (width, height) = self.get_viewport_size();
 
-        self.cursor.row = row;
-        self.cursor.col = col;
+        if self.cursor.row < self.offset.top {
+            self.offset.top = self.cursor.row;
+        }
+
+        if self.cursor.row >= self.offset.top + height as usize {
+            self.offset.top = self
+                .cursor
+                .row
+                .saturating_sub(height.saturating_sub(1) as usize);
+        }
+
+        if self.cursor.col < self.offset.left {
+            self.offset.left = self.cursor.col;
+        }
+
+        if self.cursor.col >= self.offset.left + width as usize {
+            self.offset.left = self
+                .cursor
+                .col
+                .saturating_sub(width.saturating_sub(1) as usize);
+        }
     }
 
     pub fn get_current_line_index(&self) -> usize {
-        self.top + self.cursor.row as usize
+        self.offset.top + self.cursor.row as usize
     }
 
     fn draw(&mut self) -> Result<()> {
-        self.stdout.queue(cursor::Hide)?;
+        self.hide_cursor()?;
         self.draw_viewport()?;
         self.draw_status_line()?;
-        self.stdout
-            .queue(cursor::MoveTo(self.cursor.col, self.cursor.row))?;
-        self.set_cursor_style()?;
-        self.stdout.queue(cursor::Show)?;
+        self.draw_cursor()?;
         self.stdout.flush()?;
         Ok(())
     }
 
-    fn set_cursor_style(&mut self) -> Result<()> {
-        let cursor = match self.waiting_cmd {
+    fn hide_cursor(&mut self) -> Result<()> {
+        self.stdout.queue(cursor::Hide)?;
+        Ok(())
+    }
+
+    fn draw_cursor(&mut self) -> Result<()> {
+        let (row, col) = self.get_current_screen_position();
+        let cursor_style = match self.waiting_cmd {
             Some(_) => cursor::SetCursorStyle::SteadyUnderScore,
             None => self.mode.set_cursor_style(),
         };
-        self.stdout.queue(cursor)?;
+        self.stdout
+            .queue(cursor::MoveTo(col as u16, row as u16))?
+            .queue(cursor_style)?
+            .queue(cursor::Show)?;
         Ok(())
     }
 
     fn draw_viewport(&mut self) -> Result<()> {
         let (_, height) = self.get_viewport_size();
-        let viewport_buffer = self.buffer.get_viewport_buffer(self.top, height as usize);
+        let viewport_buffer = self
+            .buffer
+            .get_viewport_buffer(self.offset.top, height as usize);
         let styles = self.highlight(&viewport_buffer)?;
         let editor_style = self.theme.editor_style.clone();
 
-        let mut row = 0;
-        let mut col = 0;
+        let mut row = self.offset.top;
+        let end_row = self.offset.top + height as usize;
+        let mut col = 0 as usize;
 
         for (index, char) in viewport_buffer.chars().enumerate() {
             if char == '\n' {
@@ -238,22 +276,24 @@ impl Editor {
                 row += 1;
                 col = 0;
 
-                if row > height {
+                if row > end_row {
                     break;
                 }
                 continue;
             }
 
-            let style = styles
-                .iter()
-                .find(|c| c.range.contains(&index))
-                .map(|c| c.style.clone())
-                .unwrap_or(editor_style.clone());
-            self.print_char(row, col, char, &style)?;
+            if col >= self.offset.left {
+                let style = styles
+                    .iter()
+                    .find(|c| c.range.contains(&index))
+                    .map(|c| c.style.clone())
+                    .unwrap_or(editor_style.clone());
+                self.print_char(row, col, char, &style)?;
+            }
             col += 1;
         }
 
-        while row < height {
+        while row < end_row {
             self.fill_line(row, col, &editor_style)?;
             row += 1;
             col = 0;
@@ -262,7 +302,9 @@ impl Editor {
         Ok(())
     }
 
-    fn print_char(&mut self, row: u16, col: u16, ch: char, style: &Style) -> Result<()> {
+    fn print_char(&mut self, row: usize, col: usize, ch: char, style: &Style) -> Result<()> {
+        let row = (row - self.offset.top) as u16;
+        let col = (col - self.offset.left) as u16;
         let style = style.to_content_style(&self.theme.editor_style);
         let styled_content = StyledContent::new(style, ch);
         self.stdout
@@ -271,7 +313,9 @@ impl Editor {
         Ok(())
     }
 
-    fn fill_line(&mut self, row: u16, col: u16, style: &Style) -> Result<()> {
+    fn fill_line(&mut self, row: usize, col: usize, style: &Style) -> Result<()> {
+        let row = (row - self.offset.top) as u16;
+        let col = (col.saturating_sub(self.offset.left)) as u16;
         let (viewport_width, _) = self.get_viewport_size();
         let repeat = (viewport_width.saturating_sub(col)) as usize;
         let style = style.to_content_style(&self.theme.editor_style);
@@ -303,13 +347,13 @@ impl Editor {
                 let content = &code[range.clone()];
 
                 if let Some(style) = style {
-                    log!("[found] {scope} = {content}");
+                    // log!("[found] {scope} = {content}");
                     colors.push(StyleInfo {
                         range,
                         style: style,
                     });
                 } else {
-                    log!("[not found] {scope} = {content}");
+                    // log!("[not found] {scope} = {content}");
                 }
             }
         }
@@ -437,19 +481,10 @@ impl Editor {
     fn execute(&mut self, action: &Action) {
         match action {
             Action::MoveUp => {
-                if self.cursor.row == 0 {
-                    self.top = self.top.saturating_sub(1);
-                } else {
-                    self.cursor.row -= 1;
-                }
+                self.cursor.row = self.cursor.row.saturating_sub(1);
             }
             Action::MoveDown => {
-                let (_, height) = self.get_viewport_size();
-                if self.cursor.row + 1 < height {
-                    self.cursor.row += 1;
-                } else if self.top + (height as usize) < self.buffer.len() {
-                    self.top += 1;
-                }
+                self.cursor.row = self.buffer.len().saturating_sub(1).min(self.cursor.row + 1);
             }
             Action::MoveLeft => {
                 self.cursor.col = self.cursor.col.saturating_sub(1);
@@ -459,53 +494,31 @@ impl Editor {
             }
             Action::PageUp => {
                 let (_, height) = self.get_viewport_size();
-                self.top = self.top.saturating_sub(height as usize);
+                self.cursor.row = self.cursor.row.saturating_sub(height as usize);
             }
             Action::PageDown => {
                 let (_, height) = self.get_viewport_size();
-                if self.buffer.len() > self.top + height as usize {
-                    self.top += height as usize;
-                }
+                self.cursor.row = self
+                    .buffer
+                    .len()
+                    .saturating_sub(1)
+                    .min(self.cursor.row + height as usize);
             }
             Action::MoveToTop => {
                 self.cursor.row = 0;
-                self.top = 0;
             }
             Action::MoveToBottom => {
-                let (_, viewport_height) = self.get_viewport_size();
-                let viewport_index = self.buffer.len() - self.top;
-                if viewport_index < viewport_height as usize {
-                    self.cursor.row = viewport_index as u16;
-                } else {
-                    self.cursor.row = viewport_height - 1;
-                    self.top = self.buffer.len() - viewport_height as usize;
-                }
+                self.cursor.row = self.buffer.len().saturating_sub(1);
             }
             Action::MoveToLineStart => {
                 self.cursor.col = 0;
             }
             Action::MoveToLineEnd => {
-                self.cursor.col = self
-                    .buffer
-                    .get_line(self.get_current_line_index())
-                    .map_or(0, |line| line.len() as u16)
+                self.cursor.col = self.buffer.get_line(self.cursor.row).map_or(0, |s| s.len())
             }
             Action::MoveToViewportCenter => {
-                let (_, viewport_height) = self.get_viewport_size();
-                let viewport_center = viewport_height / 2;
-                let current_viewport_row = self.cursor.row;
-                if current_viewport_row < viewport_center {
-                    if let Some(new_offset) = self
-                        .top
-                        .checked_sub((viewport_center - current_viewport_row) as usize)
-                    {
-                        self.top = new_offset;
-                        self.cursor.row = viewport_center;
-                    }
-                } else {
-                    self.top = self.top + (current_viewport_row - viewport_center) as usize;
-                    self.cursor.row = viewport_center;
-                }
+                let (_, height) = self.get_viewport_size();
+                self.offset.top = self.cursor.row.saturating_sub(height as usize / 2);
             }
             Action::EnterMode(mode) => {
                 match (self.mode, mode) {
