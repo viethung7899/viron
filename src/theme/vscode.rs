@@ -5,7 +5,7 @@ use crossterm::style::Color;
 use once_cell::sync::Lazy;
 use serde::Deserialize;
 
-use crate::theme::{Style, Theme, TokenStyle};
+use crate::theme::{StatusLineStyle, Style, Theme, TokenStyle};
 
 static TRANSLATION_MAP: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| {
     HashMap::from([
@@ -112,6 +112,14 @@ pub(super) struct VsCodeTheme {
     token_colors: Vec<VsCodeTokenColor>,
 }
 
+impl VsCodeTheme {
+    pub fn get_color(&self, key: &str) -> Option<Color> {
+        self.colors
+            .get(key)
+            .and_then(|s| parse_rgb(s.as_str()).ok())
+    }
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(untagged)]
 pub(super) enum VsCodeScope {
@@ -124,6 +132,44 @@ impl From<VsCodeScope> for Vec<String> {
         match value {
             VsCodeScope::Single(s) => vec![translate_scope(&s)],
             VsCodeScope::Multiple(v) => v.into_iter().map(|s| translate_scope(&s)).collect(),
+        }
+    }
+}
+
+impl From<&VsCodeTheme> for StatusLineStyle {
+    fn from(theme: &VsCodeTheme) -> Self {
+        let inner_background = theme.get_color("statusBar.background");
+        let inner_foreground = theme.get_color("statusBar.foreground");
+
+        let outer_foreground = theme.get_color("statusBar.background");
+        let normal_background = theme.get_color("terminal.ansiBlue");
+        let insert_background = theme.get_color("terminal.ansiGreen");
+
+        let inner = Style {
+            background: inner_background,
+            foreground: inner_foreground,
+            bold: true,
+            ..Style::default()
+        };
+
+        let normal = Style {
+            background: normal_background,
+            foreground: outer_foreground,
+            bold: true,
+            ..Style::default()
+        };
+
+        let insert = Style {
+            background: insert_background,
+            foreground: outer_foreground,
+            bold: true,
+            ..Style::default()
+        };
+
+        StatusLineStyle {
+            normal,
+            insert,
+            inner,
         }
     }
 }
@@ -154,25 +200,12 @@ fn translate_scope(key: &str) -> String {
 pub fn parse_vscode_theme(file: &str) -> Result<Theme> {
     let content = std::fs::read_to_string(file)?;
     let vscode: VsCodeTheme = serde_json::from_str(&content)?;
-    println!("{vscode:#?}");
 
-    let editor_foreground = vscode
-        .colors
-        .get("editor.foreground")
-        .and_then(|s| parse_rgb(s.as_str()).ok());
-    let editor_background = vscode
-        .colors
-        .get("editor.background")
-        .and_then(|s| parse_rgb(s.as_str()).ok());
-
-    let gutter_foreground = vscode
-        .colors
-        .get("editorLineNumber.foreground")
-        .and_then(|s| parse_rgb(s.as_str()).ok());
-    let gutter_background = vscode
-        .colors
-        .get("editorLineNumber.background")
-        .and_then(|s| parse_rgb(s.as_str()).ok());
+    let editor_foreground = vscode.get_color("editor.foreground");
+    let editor_background = vscode.get_color("editor.background");
+    let gutter_foreground = vscode.get_color("editorLineNumber.foreground");
+    let gutter_background = vscode.get_color("editorLineNumber.background");
+    let status_line_style = StatusLineStyle::from(&vscode);
 
     let token_styles = vscode
         .token_colors
@@ -191,6 +224,7 @@ pub fn parse_vscode_theme(file: &str) -> Result<Theme> {
             background: gutter_background,
             ..Style::default()
         },
+        status_line_style,
         token_styles,
     })
 }
