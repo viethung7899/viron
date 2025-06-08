@@ -39,20 +39,20 @@ impl Style {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TokenStyle {
     pub scope: Vec<String>,
     pub style: Style,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct StatusLineStyle {
     pub normal: Style,
     pub insert: Style,
     pub inner: Style,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Theme {
     pub gutter_style: Style,
     pub editor_style: Style,

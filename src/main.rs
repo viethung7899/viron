@@ -3,6 +3,7 @@ mod config;
 mod editor;
 mod logger;
 mod theme;
+mod highlighter;
 
 use std::{io::stdout, panic};
 
