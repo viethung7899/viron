@@ -66,13 +66,26 @@ impl Buffer {
         }
     }
 
-    pub fn move_left(&self, cursor: &mut Point) {
-        cursor.column = cursor.column.saturating_sub(1);
+    pub fn move_left(&self, cursor: &mut Point, mode: &editor::Mode) {
+        if cursor.column > 0 {
+            cursor.column -= 1;
+            return;
+        }
+        if cursor.row > 0 {
+            cursor.row -= 1;
+            cursor.column = usize::MAX;
+            self.clamp_column(cursor, mode);
+        }
     }
 
     pub fn move_right(&self, cursor: &mut Point, mode: &editor::Mode) {
+        let previous = cursor.column;
         cursor.column += 1;
         self.clamp_column(cursor, mode);
+        if previous == cursor.column && cursor.row + 1 < self.line_count() {
+            cursor.row += 1;
+            cursor.column = 0;
+        }
     }
 
     pub fn move_up(&self, cursor: &mut Point, mode: &editor::Mode) {

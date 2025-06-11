@@ -69,6 +69,7 @@ pub enum Action {
     InsertCharAtCursor(char),
     NewLineAtCursor,
     DeleteCharAtCursor,
+    BackspaceCharAtCursor,
     DeleteCurrentLine,
 
     Multiple(Vec<Action>),
@@ -544,7 +545,7 @@ impl Editor {
             Action::MoveDown => {
                 self.buffer.move_down(&mut self.cursor, &self.mode);
             }
-            Action::MoveLeft => self.buffer.move_left(&mut self.cursor),
+            Action::MoveLeft => self.buffer.move_left(&mut self.cursor, &self.mode),
             Action::MoveRight => self.buffer.move_right(&mut self.cursor, &self.mode),
             Action::PageUp => {
                 let (_, height) = self.get_viewport_size();
@@ -608,9 +609,12 @@ impl Editor {
                         self.draw_viewport(buffer)?;
                     }
                 }
-                // let line = self.cursor.row;
-                // let offset = self.cursor.col;
-                // self.buffer.remove(line as usize, offset as usize);
+            }
+            Action::BackspaceCharAtCursor => {
+                if self.cursor.row != 0 || self.cursor.column != 0 {
+                    self.execute(&Action::MoveLeft, buffer)?;
+                    self.execute(&Action::DeleteCharAtCursor, buffer)?;
+                }
             }
             Action::DeleteCurrentLine => {
                 // let line = self.cursor.row;
