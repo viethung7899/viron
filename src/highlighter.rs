@@ -1,13 +1,12 @@
 use std::ops::Range;
 
 use anyhow::Result;
-use tree_sitter::{Parser, Point, Query, QueryCursor, StreamingIterator, Tree};
+use tree_sitter::{Parser, Point, Query, QueryCursor, StreamingIterator};
 use tree_sitter_rust::{HIGHLIGHTS_QUERY, LANGUAGE};
 
 pub struct Highlighter {
     parser: Parser,
     query: Query,
-    tree: Option<Tree>,
 }
 
 #[derive(Debug, Clone)]
@@ -24,17 +23,13 @@ impl Highlighter {
         let language = LANGUAGE.into();
         parser.set_language(&language)?;
         let query = Query::new(&language, HIGHLIGHTS_QUERY)?;
-        Ok(Self {
-            parser,
-            query,
-            tree: None,
-        })
+        Ok(Self { parser, query })
     }
 
     pub fn highlight(&mut self, code: &[u8]) -> Result<Vec<TokenInfo>> {
-        self.tree = self.parser.parse(code, self.tree.as_ref());
+        let tree = self.parser.parse(code, None);
         let mut colors = Vec::new();
-        let Some(tree) = &self.tree else {
+        let Some(tree) = tree else {
             return Ok(colors);
         };
         let mut cursor = QueryCursor::new();
