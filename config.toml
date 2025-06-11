@@ -16,8 +16,8 @@ theme = "themes/catppuchin/mocha.json"
 "Home" = "MoveToLineStart"
 "End" = "MoveToLineEnd"
 "G" = "MoveToBottom"
-"o" = ["InsertLineBelowCursor", { EnterMode = "Insert" }]
-"O" = ["InsertLineAtCursor", { EnterMode = "Insert" }]
+"o" = [{ EnterMode = "Insert" }, "MoveToLineEnd", "NewLineAtCursor"]
+"O" = [{ EnterMode = "Insert" }, "MoveToLineStart", "NewLineAtCursor", "MoveUp"]
 "x" = "DeleteCharAtCursor"
 "Ctrl-b" = "PageUp"
 "Ctrl-f" = "PageDown"
@@ -40,3 +40,4 @@ theme = "themes/catppuchin/mocha.json"
 "Down" = "MoveDown"
 "Left" = "MoveLeft"
 "Right" = "MoveRight"
+"Delete" = "DeleteCharAtCursor"

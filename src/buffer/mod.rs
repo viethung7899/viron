@@ -1,13 +1,11 @@
-use std::str::FromStr;
-
 use tree_sitter::Point;
 
-use crate::{buffer::gap_buffer::GapBuffer, editor};
+use crate::{buffer::gap_buffer::GapBuffer, editor, log};
 
 mod gap_buffer;
 
 pub struct Buffer {
-    buffer: GapBuffer<u8>,
+    buffer: GapBuffer<char>,
     line_starts: Vec<usize>,
 }
 
@@ -26,24 +24,24 @@ impl Buffer {
     }
 
     pub fn from_str(s: &str) -> Self {
-        let slice = s.as_bytes();
+        let chars = s.chars().collect::<Vec<_>>();
         let mut lines_start = vec![0];
-        for (i, &byte) in slice.iter().enumerate() {
-            if byte == b'\n' {
+        for (i, &char) in chars.iter().enumerate() {
+            if char == '\n' {
                 lines_start.push(i + 1);
             }
         }
         Self {
-            buffer: GapBuffer::from_slice(&slice),
+            buffer: GapBuffer::from_slice(&chars),
             line_starts: lines_start,
         }
     }
 
     pub fn to_bytes(&self) -> Vec<u8> {
-        let mut result = Vec::new();
-        result.extend(&self.buffer.buffer[..self.buffer.gap_start]);
-        result.extend(&self.buffer.buffer[self.buffer.gap_end..]);
-        result
+        let prefix = &self.buffer.buffer[..self.buffer.gap_start];
+        let suffix = &self.buffer.buffer[self.buffer.gap_end..];
+        let content: String = prefix.iter().chain(suffix.iter()).collect();
+        content.into_bytes()
     }
 
     pub fn cursor_position(&self, cursor: &Point) -> usize {
@@ -52,13 +50,11 @@ impl Buffer {
 
     pub fn insert_char(&mut self, ch: char, cursor: &mut Point) {
         let position = self.cursor_position(cursor);
-        let s = ch.to_string();
-        let bytes = s.as_bytes();
         self.buffer.move_gap(position);
-        self.buffer.insert_multiple(bytes);
+        self.buffer.insert_single(ch);
 
         for line in self.line_starts[cursor.row + 1..].iter_mut() {
-            *line += bytes.len();
+            *line += 1;
         }
 
         if ch == '\n' {
@@ -66,7 +62,7 @@ impl Buffer {
             cursor.column = 0;
             cursor.row += 1;
         } else {
-            cursor.column += bytes.len();
+            cursor.column += 1;
         }
     }
 
@@ -102,6 +98,39 @@ impl Buffer {
     pub fn move_to_line_end(&self, cursor: &mut Point, mode: &editor::Mode) {
         cursor.column = usize::MAX;
         self.clamp_column(cursor, mode);
+    }
+
+    pub fn delete_char(&mut self, cursor: &mut Point, mode: &editor::Mode) -> Option<char> {
+        let position = self.cursor_position(cursor);
+        self.buffer.move_gap(position);
+
+        let Some(char) = self.buffer.delete_single() else {
+            return None;
+        };
+
+        for line in self.line_starts[cursor.row + 1..].iter_mut() {
+            *line -= 1;
+        }
+
+        if char == '\n' {
+            self.line_starts.remove(cursor.row + 1);
+            cursor.row = cursor.row.saturating_sub(1);
+        }
+        self.clamp_column(cursor, mode);
+
+        log!("Deleted character: {}", char);
+
+        Some(char)
+    }
+
+    pub fn get_current_char(&mut self, cursor: &Point) -> Option<char> {
+        let position = self.cursor_position(cursor);
+        if position < self.buffer.gap_start {
+            Some(self.buffer.buffer[position])
+        } else {
+            let index = position + self.buffer.gap_len();
+            self.buffer.buffer.get(index).copied()
+        }
     }
 
     fn clamp_column(&self, cursor: &mut Point, mode: &editor::Mode) {

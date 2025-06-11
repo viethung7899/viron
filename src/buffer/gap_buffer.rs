@@ -17,7 +17,10 @@ impl<T: Default + Clone> Default for GapBuffer<T> {
     }
 }
 
-impl<T: Clone + Copy + Default> GapBuffer<T> {
+impl<T> GapBuffer<T>
+where
+    T: Clone + Copy + Default,
+{
     pub fn from_slice(slice: &[T]) -> Self {
         let length = slice.len();
         let capacity = length + INITIAL_CAPACITY;
@@ -95,10 +98,18 @@ impl<T: Clone + Copy + Default> GapBuffer<T> {
         self.gap_start += values.len();
     }
 
-    pub fn remove_single(&mut self) -> Option<T> {
+    pub fn delete_single(&mut self) -> Option<T> {
         let value = self.buffer.get(self.gap_end);
-        if value.is_none() {
+        if value.is_some() {
             self.gap_end += 1;
+        }
+        value.copied()
+    }
+
+    pub fn backspace_single(&mut self) -> Option<T> {
+        let value = self.buffer.get(self.gap_start - 1);
+        if value.is_none() {
+            self.gap_start -= 1;
         }
         value.copied()
     }

@@ -67,13 +67,9 @@ pub enum Action {
     EnterMode(Mode),
 
     InsertCharAtCursor(char),
-    InsertLineAt(usize, String),
-    InsertLineBelowCursor,
-    InsertLineAtCursor,
+    NewLineAtCursor,
     DeleteCharAtCursor,
-    DeleteChatAt(usize, usize),
     DeleteCurrentLine,
-    DeleteLineAt(usize),
 
     Multiple(Vec<Action>),
 }
@@ -171,7 +167,7 @@ impl Editor {
             let content = std::fs::read_to_string(file).unwrap_or_default();
             Buffer::from_str(&content)
         } else {
-            Default::default()
+            Buffer::default()
         };
 
         Self::new_with_size(width, height, config, theme, file_name, buffer)
@@ -544,12 +540,12 @@ impl Editor {
             Action::Quit => {
                 return Ok(true);
             }
-            Action::MoveUp => self.buffer.move_vertical(&mut self.cursor, -1),
+            Action::MoveUp => self.buffer.move_up(&mut self.cursor, &self.mode),
             Action::MoveDown => {
-                self.buffer.move_vertical(&mut self.cursor, 1);
+                self.buffer.move_down(&mut self.cursor, &self.mode);
             }
             Action::MoveLeft => self.buffer.move_left(&mut self.cursor),
-            Action::MoveRight => self.buffer.move_right(&mut self.cursor),
+            Action::MoveRight => self.buffer.move_right(&mut self.cursor, &self.mode),
             Action::PageUp => {
                 let (_, height) = self.get_viewport_size();
                 self.cursor.row = self.cursor.row.saturating_sub(height as usize);
@@ -573,11 +569,11 @@ impl Editor {
                 self.cursor.column = 0;
             }
             Action::MoveToLineStart => {
-                self.cursor.row = 0;
+                self.buffer.move_to_line_start(&mut self.cursor);
             }
-            // Action::MoveToLineEnd => {
-            //     self.cursor.col = self.buffer.get_line(self.cursor.row).map_or(0, |s| s.len())
-            // }
+            Action::MoveToLineEnd => {
+                self.buffer.move_to_line_end(&mut self.cursor, &self.mode);
+            }
             Action::MoveToViewportCenter => {
                 let (_, height) = self.get_viewport_size();
                 self.offset.top = self.cursor.row.saturating_sub(height as usize / 2);
@@ -593,45 +589,36 @@ impl Editor {
                 }
                 self.mode = *mode;
             }
-            // Action::InsertCharAtCursor(char) => {
-            //     let line = self.cursor.row;
-            //     let offset = self.cursor.col;
-            //     self.undo.record(Action::DeleteChatAt(line, offset));
-            //     self.buffer.insert(line, offset, *char);
-            //     self.cursor.col += 1;
-            // }
-            // Action::InsertLineAt(line, content) => {
-            //     self.buffer.insert_line(*line, content.to_string());
-            // }
-            // Action::InsertLineAtCursor => {
-            //     let line = self.cursor.row;
-            //     self.undo.push(Action::DeleteLineAt(line));
-            //     self.execute(&Action::InsertLineAt(line, "".into()));
-            // }
-            // Action::InsertLineBelowCursor => {
-            //     let line = self.cursor.row;
-            //     self.undo.push(Action::DeleteLineAt(line + 1));
-            //     self.execute(&Action::InsertLineAt(line + 1, "".into()));
-            //     self.cursor.row += 1;
-            // }
-            // Action::DeleteCharAtCursor => {
-            //     let line = self.cursor.row;
-            //     let offset = self.cursor.col;
-            //     self.buffer.remove(line as usize, offset as usize);
-            // }
-            // Action::DeleteChatAt(line, offset) => {
-            //     self.buffer.remove(*line, *offset);
-            // }
-            // Action::DeleteCurrentLine => {
-            //     let line = self.cursor.row;
-            //     if let Some(content) = self.buffer.get_line(line) {
-            //         self.buffer.remove_line(line);
-            //         self.undo.push(Action::InsertLineAt(line, content));
-            //     }
-            // }
-            // Action::DeleteLineAt(line) => {
-            //     self.buffer.remove_line(*line);
-            // }
+            Action::InsertCharAtCursor(char) => {
+                self.buffer.insert_char(*char, &mut self.cursor);
+                self.draw_viewport(buffer)?;
+            }
+            Action::NewLineAtCursor => {
+                self.buffer.insert_char('\n', &mut self.cursor);
+                self.draw_viewport(buffer)?;
+                self.draw_gutter(buffer);
+            }
+            Action::DeleteCharAtCursor => {
+                if let Some(char) = self.buffer.get_current_char(&self.cursor) {
+                    if char != '\n' || self.mode == Mode::Insert {
+                        self.buffer.delete_char(&mut self.cursor, &self.mode);
+                        if char == '\n' {
+                            self.draw_gutter(buffer);
+                        }
+                        self.draw_viewport(buffer)?;
+                    }
+                }
+                // let line = self.cursor.row;
+                // let offset = self.cursor.col;
+                // self.buffer.remove(line as usize, offset as usize);
+            }
+            Action::DeleteCurrentLine => {
+                // let line = self.cursor.row;
+                // if let Some(content) = self.buffer.get_line(line) {
+                //     self.buffer.remove_line(line);
+                //     self.undo.push(Action::InsertLineAt(line, content));
+                // }
+            }
             Action::Undo => {
                 if let Some(action) = self.undo.pop() {
                     return self.execute(&action, buffer);
@@ -644,7 +631,6 @@ impl Editor {
                     }
                 }
             }
-            _ => {}
         }
         Ok(false)
     }
