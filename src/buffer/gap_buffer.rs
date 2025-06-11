@@ -166,7 +166,7 @@ impl GapBuffer {
         self.buffer = new_buffer;
     }
 
-    fn move_left(&mut self, cursor: &mut Point) {
+    pub fn move_left(&mut self, cursor: &mut Point) {
         if cursor.column > 0 {
             cursor.column -= 1;
         } else if cursor.row > 0 {
@@ -175,7 +175,7 @@ impl GapBuffer {
         }
     }
 
-    fn move_right(&mut self, cursor: &mut Point) {
+    pub fn move_right(&mut self, cursor: &mut Point) {
         if cursor.column < self.lines[cursor.row].length {
             cursor.column += 1;
         } else if cursor.row < self.lines.len() - 1 {
@@ -184,7 +184,7 @@ impl GapBuffer {
         }
     }
 
-    fn move_vertical(&mut self, cursor: &mut Point, delta: i32) {
+    pub fn move_vertical(&mut self, cursor: &mut Point, delta: i32) {
         let new_row = cursor.row as i32 + delta;
         if new_row >= 0 && new_row < self.lines.len() as i32 {
             cursor.row = new_row as usize;

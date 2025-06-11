@@ -35,8 +35,8 @@ pub fn get_key_action(mapping: &KeyMapping, event: &Event) -> Option<KeyAction> 
                 _ => format!("{code:?}"),
             };
             let key = match *modifiers {
-                KeyModifiers::CONTROL => format!("Ctrl+{}", key),
-                KeyModifiers::ALT => format!("Alt+{}", key),
+                KeyModifiers::CONTROL => format!("Ctrl-{}", key),
+                KeyModifiers::ALT => format!("Alt-{}", key),
                 _ => key,
             };
             mapping.get(&key).cloned()
