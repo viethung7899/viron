@@ -36,8 +36,11 @@ impl RenderBuffer {
         }
     }
 
-    pub(super) fn set_cell(&mut self, x: usize, y: usize, c: char, style: &Style) {
-        if let Some(current) = self.cells.get_mut(y * self.width + x) {
+    pub(super) fn set_cell(&mut self, row: usize, col: usize, c: char, style: &Style) {
+        if col >= self.width || row >= self.height {
+            return;
+        }
+        if let Some(current) = self.cells.get_mut(row * self.width + col) {
             *current = Cell {
                 c,
                 style: style.clone(),
@@ -45,9 +48,17 @@ impl RenderBuffer {
         }
     }
 
-    pub(super) fn set_text(&mut self, x: usize, y: usize, text: &str, style: &Style) {
-        let position = y * self.width + x;
-        for (i, c) in text.chars().enumerate() {
+    pub(super) fn set_text(&mut self, row: usize, col: usize, text: &str, style: &Style) {
+        if col >= self.width || row >= self.height {
+            return;
+        }
+        let content = if col + text.len() > self.width {
+            &text[..self.width - col]
+        } else {
+            text
+        };
+        let position = row * self.width + col;
+        for (i, c) in content.chars().enumerate() {
             if let Some(current) = self.cells.get_mut(position + i) {
                 *current = Cell {
                     c,

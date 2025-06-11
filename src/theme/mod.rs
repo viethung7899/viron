@@ -39,20 +39,20 @@ impl Style {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct TokenStyle {
     pub scope: Vec<String>,
     pub style: Style,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct StatusLineStyle {
     pub normal: Style,
     pub insert: Style,
     pub inner: Style,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Theme {
     pub gutter_style: Style,
     pub editor_style: Style,
@@ -61,13 +61,11 @@ pub struct Theme {
 }
 
 impl Theme {
-    pub fn get_style(&self, scope: &str) -> Option<Style> {
-        self.token_styles.iter().find_map(|style| {
-            if style.scope.contains(&scope.to_string()) {
-                Some(style.style.clone())
-            } else {
-                None
-            }
-        })
+    pub fn get_style(&self, scope: &str) -> Style {
+        self.token_styles
+            .iter()
+            .find(|style| style.scope.contains(&scope.to_string()))
+            .map(|style| style.style.clone())
+            .unwrap_or(self.editor_style.clone())
     }
 }
