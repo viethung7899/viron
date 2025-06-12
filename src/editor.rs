@@ -348,6 +348,7 @@ impl Editor {
         let top = self.offset.top;
         let (width, height) = self.get_viewport_size();
         let code = self.buffer.to_bytes();
+        log!("Code: {code:?}");
         let tokens = self.highlighter.highlight(&code)?;
 
         let mut info_iter = tokens
@@ -387,7 +388,6 @@ impl Editor {
         };
 
         while let Some(info) = info_iter.next() {
-            log!("{:?}", info);
             let style = self.theme.get_style(&info.scope);
             let bytes = &code[info.byte_range.start..info.byte_range.end];
             end_row = info.end_position.row;
@@ -617,11 +617,9 @@ impl Editor {
                 }
             }
             Action::DeleteCurrentLine => {
-                // let line = self.cursor.row;
-                // if let Some(content) = self.buffer.get_line(line) {
-                //     self.buffer.remove_line(line);
-                //     self.undo.push(Action::InsertLineAt(line, content));
-                // }
+                let _ = self.buffer.delete_current_line(&mut self.cursor);
+                self.draw_gutter(buffer);
+                self.draw_viewport(buffer)?;
             }
             Action::Undo => {
                 if let Some(action) = self.undo.pop() {

@@ -19,7 +19,7 @@ impl<T: Default + Clone> Default for GapBuffer<T> {
 
 impl<T> GapBuffer<T>
 where
-    T: Clone + Copy + Default,
+    T: Default + Clone + Copy,
 {
     pub fn from_slice(slice: &[T]) -> Self {
         let length = slice.len();
@@ -116,7 +116,7 @@ where
 
     pub fn delete(&mut self, count: usize) -> Option<Vec<T>> {
         let values = self.buffer.get(self.gap_end..self.gap_end + count);
-        if values.is_none() {
+        if values.is_some() {
             self.gap_end += count;
         }
         values.as_ref().map(|v| v.to_vec())

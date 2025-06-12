@@ -130,9 +130,6 @@ impl Buffer {
             cursor.row = cursor.row.saturating_sub(1);
         }
         self.clamp_column(cursor, mode);
-
-        log!("Deleted character: {}", char);
-
         Some(char)
     }
 
@@ -144,6 +141,33 @@ impl Buffer {
             let index = position + self.buffer.gap_len();
             self.buffer.buffer.get(index).copied()
         }
+    }
+
+    pub fn delete_current_line(&mut self, cursor: &mut Point) -> Option<String> {
+        cursor.column = 0;
+        let position = self.cursor_position(cursor);
+        self.buffer.move_gap(position);
+        let line_end = if cursor.row + 1 < self.line_starts.len() {
+            self.line_starts[cursor.row + 1]
+        } else {
+            self.buffer.len_without_gap()
+        };
+        let line_length = line_end - self.line_starts[cursor.row];
+        let Some(chars) = self.buffer.delete(line_length) else {
+            return None;
+        };
+        for line in self.line_starts[cursor.row + 1..].iter_mut() {
+            *line -= line_length;
+        }
+        let lines = self.line_count();
+        if lines > 1 {
+            self.line_starts.remove(cursor.row);
+            cursor.row = cursor.row.min(self.line_count() - 1);
+        } else {
+            self.line_starts[0] = 0;
+            cursor.row = 0;
+        }
+        Some(chars.into_iter().collect())
     }
 
     fn clamp_column(&self, cursor: &mut Point, mode: &editor::Mode) {
