@@ -14,17 +14,20 @@ use editor::Editor;
 use logger::Logger;
 use once_cell::sync::OnceCell;
 
+use crate::lsp::LspClient;
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let toml = std::fs::read_to_string("config.toml")?;
     let config: Config = toml::from_str(&toml)?;
 
-    log!("Config: {:?}", config.keys.command);
-
     let file = std::env::args().nth(1);
     let theme = theme::parse_vscode_theme(&config.theme)?;
 
-    let mut editor = Editor::new(config, theme, file)?;
+    let mut lsp = LspClient::start().await?;
+    lsp.initialize().await?;
+
+    let mut editor = Editor::new(config, theme, lsp, file).await?;
 
     panic::set_hook(Box::new(|info| {
         _ = stdout().execute(terminal::LeaveAlternateScreen);
@@ -32,7 +35,7 @@ async fn main() -> anyhow::Result<()> {
         eprintln!("{}", info);
     }));
 
-    editor.run()
+    editor.run().await
 }
 
 #[allow(unused)]

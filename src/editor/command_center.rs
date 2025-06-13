@@ -49,7 +49,7 @@ impl CommandCenter {
             "q" => Ok(Action::Quit),
             command => {
                 if let Ok(line_number) = command.parse::<usize>() {
-                    Ok(Action::GotoLine(line_number))
+                    Ok(Action::GotoLine(line_number.saturating_sub(1)))
                 } else {
                     Err(format!("Invalid command: {}", command))
                 }

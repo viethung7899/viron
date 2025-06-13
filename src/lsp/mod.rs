@@ -99,6 +99,7 @@ pub async fn start_lsp() -> Result<LspClient> {
     tokio::spawn(async move {
         let mut writer = BufWriter::new(stdin);
         while let Some(message) = request_rx.recv().await {
+            log!("[lsp] editor requested to send message: {:?}", message);
             match message {
                 OutboundMessage::Request(request) => {
                     if let Err(error) = lsp_send_request(&mut writer, &request).await {
@@ -130,7 +131,10 @@ pub async fn start_lsp() -> Result<LspClient> {
                         .unwrap();
                     continue;
                 }
-                Ok(value) => value,
+                Ok(value) => {
+                    log!("[lsp] incoming message: {value:?}");
+                    value
+                }
             };
 
             match process_response(&response) {
@@ -183,7 +187,10 @@ impl LspClient {
     pub async fn initialize(&mut self) -> Result<()> {
         let params = json!({
             "processId": process::id(),
-            "rootUri": "file:///Users/nguyenviethung/Desktop/fun/viron",
+            "clientInfo": {
+                "name": "viron",
+                "version": "0.1.0"
+            },
             "capabilities": {
                 "textDocument": {
                     "completion": {
@@ -221,14 +228,19 @@ impl LspClient {
         Ok(())
     }
 
-    pub async fn goto_definition(&mut self, file: &str, x: usize, y: usize) -> anyhow::Result<i64> {
+    pub async fn goto_definition(
+        &mut self,
+        file: &str,
+        line: usize,
+        character: usize,
+    ) -> anyhow::Result<i64> {
         let params = json!({
             "textDocument": {
                 "uri": format!("file:///{}", file),
             },
             "position": {
-                "line": y,
-                "character": x,
+                "line": line,
+                "character": character,
             }
         });
 

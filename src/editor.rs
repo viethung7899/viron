@@ -4,7 +4,7 @@ mod render_buffer;
 use std::{
     io::{Stdout, Write, stdout},
     str::from_utf8,
-    time::Instant,
+    time::{Duration, Instant},
 };
 
 use crate::{
@@ -16,16 +16,21 @@ use crate::{
     },
     highlighter::Highlighter,
     log,
+    lsp::{InboundMessage, LspClient},
     theme::{Style, Theme},
 };
 use anyhow::{Ok, Result};
+use async_recursion::async_recursion;
 use crossterm::{
     ExecutableCommand, QueueableCommand, cursor,
-    event::{self, Event, KeyCode, KeyEvent},
+    event::{Event, EventStream, KeyCode, KeyEvent},
     style::{self, StyledContent},
     terminal::{self},
 };
+use futures::{FutureExt, StreamExt};
+use futures_timer::Delay;
 use serde::{Deserialize, Serialize};
+use tokio::select;
 use tree_sitter::Point;
 
 #[derive(Debug, Clone, Default)]
@@ -89,6 +94,9 @@ pub enum Action {
     ExecuteCommand,
 
     Multiple(Vec<Action>),
+
+    GotoDefinition,
+    MoveTo(usize, usize),
 }
 
 #[derive(Debug, Default)]
@@ -128,6 +136,7 @@ pub struct Editor {
     theme: Theme,
     file_name: Option<String>,
     highlighter: Highlighter,
+    lsp: LspClient,
     gutter_width: u16,
     buffer: Buffer,
     stdout: Stdout,
@@ -152,10 +161,10 @@ impl Drop for Editor {
 
 impl Editor {
     pub fn new_with_size(
-        width: u16,
-        height: u16,
+        size: (u16, u16),
         config: Config,
         theme: Theme,
+        lsp: LspClient,
         file_name: Option<String>,
         buffer: Buffer,
     ) -> Result<Self> {
@@ -170,12 +179,13 @@ impl Editor {
             file_name,
             buffer,
             highlighter,
+            lsp,
             stdout,
             gutter_width,
             offset: Offset { top: 0, left: 0 },
             cursor: Point { row: 0, column: 0 },
             mode: Mode::Normal,
-            size: (width, height),
+            size,
             waiting_key_command: None,
             waiting_key_action: None,
             undo: UndoStack::default(),
@@ -184,19 +194,24 @@ impl Editor {
         })
     }
 
-    pub fn new(config: Config, theme: Theme, file_name: Option<String>) -> Result<Self> {
-        let (width, height) = terminal::size()?;
+    pub async fn new(
+        config: Config,
+        theme: Theme,
+        mut lsp: LspClient,
+        file_name: Option<String>,
+    ) -> Result<Self> {
         let buffer = if let Some(file) = &file_name {
             let content = std::fs::read_to_string(file).unwrap_or_default();
+            lsp.did_open(file, &content).await?;
             Buffer::from_str(&content)
         } else {
             Buffer::default()
         };
 
-        Self::new_with_size(width, height, config, theme, file_name, buffer)
+        Self::new_with_size(terminal::size()?, config, theme, lsp, file_name, buffer)
     }
 
-    pub fn run(&mut self) -> Result<()> {
+    pub async fn run(&mut self) -> Result<()> {
         terminal::enable_raw_mode()?;
         self.stdout
             .execute(terminal::EnterAlternateScreen)?
@@ -211,60 +226,123 @@ impl Editor {
 
         self.render(&mut buffer)?;
 
-        loop {
-            let current_buffer = buffer.clone();
-            let event = event::read()?;
-            let start = Instant::now();
+        let mut reader = EventStream::new();
 
-            let action_start = Instant::now();
-            self.last_error = None;
-            if let Some(key_action) = self.handle_event(&event) {
-                log!("Key action = {key_action:?}");
-                let quit = match key_action {
-                    KeyAction::Single(action) => self.execute(&action, &mut buffer)?,
-                    KeyAction::Multiple(actions) => {
-                        let mut quit = false;
-                        for action in actions {
-                            quit |= self.execute(&action, &mut buffer)?;
-                            if quit {
-                                break;
+        loop {
+            let delay = Delay::new(Duration::from_millis(500)).fuse();
+            let event = reader.next().fuse();
+
+            select! {
+                _ = delay => {
+                    // handle responses from lsp
+                    if let Some((msg, method)) = self.lsp.recv_response().await? {
+                        if let Some(action) = self.handle_lsp_message(&msg, method) {
+                            // TODO: handle quit
+                            let current_buffer = buffer.clone();
+                            log!("executing action: {action:?}");
+                            self.execute(&action, &mut buffer).await?;
+                            self.rerender(&current_buffer, &mut buffer)?;
+                        }
+
+                    }
+                }
+                option_event = event => {
+                    match option_event {
+                        Some(Err(error)) => {
+                            log!("error: {error}");
+                        },
+                        Some(std::result::Result::Ok(event)) => {
+                            let current_buffer = buffer.clone();
+                            self.last_error = None;
+                            if let Some(key_action) = self.handle_event(&event) {
+                                let quit = match key_action {
+                                    KeyAction::Single(action) => self.execute(&action, &mut buffer).await?,
+                                    KeyAction::Multiple(actions) => {
+                                        let mut quit = false;
+                                        for action in actions {
+                                            quit |= self.execute(&action, &mut buffer).await?;
+                                            if quit {
+                                                break;
+                                            }
+                                        }
+                                        quit
+                                    }
+                                    KeyAction::Nested(mapping) => {
+                                        if let Event::Key(KeyEvent {
+                                            code: KeyCode::Char(c),
+                                            ..
+                                        }) = event
+                                        {
+                                            self.waiting_key_command = Some(c);
+                                        }
+                                        self.waiting_key_action = Some(mapping);
+                                        false
+                                    }
+                                };
+                                if quit {
+                                    break;
+                                }
                             }
+                            let changed = self.reset_bounds();
+                            if changed {
+                                self.draw_viewport(&mut buffer)?;
+                                self.draw_gutter(&mut buffer);
+                            }
+                            self.rerender(&current_buffer, &mut buffer)?;
                         }
-                        quit
+                        _ => {}
                     }
-                    KeyAction::Nested(mapping) => {
-                        if let Event::Key(KeyEvent {
-                            code: KeyCode::Char(c),
-                            ..
-                        }) = event
-                        {
-                            self.waiting_key_command = Some(c);
-                        }
-                        self.waiting_key_action = Some(mapping);
-                        false
-                    }
-                };
-                if quit {
-                    break;
                 }
             }
-            let changed = self.reset_bounds();
-            if changed {
-                self.draw_viewport(&mut buffer)?;
-                self.draw_gutter(&mut buffer);
-            }
-            log!("Action takes {:?}", action_start.elapsed());
-
-            self.stdout.execute(cursor::Hide)?;
-            self.draw_status_line(&mut buffer);
-            self.draw_command_line(&mut buffer);
-            self.render_diff(buffer.diff(&current_buffer))?;
-            self.draw_cursor()?;
-            self.stdout.execute(cursor::Show)?;
-            log!("Action takes {:?}", start.elapsed());
         }
 
         Ok(())
+    }
+
+    fn handle_lsp_message(
+        &mut self,
+        message: &InboundMessage,
+        method: Option<String>,
+    ) -> Option<Action> {
+        match message {
+            InboundMessage::ProcessingError(error) => {
+                self.last_error = Some(error.to_owned());
+            }
+            InboundMessage::Notification(notification) => {
+                log!("got an unhandled notification: {notification:?}");
+            }
+            InboundMessage::Error(error_msg) => {
+                log!("got an error: {error_msg:?}");
+            }
+            InboundMessage::Message(message) => {
+                let Some(method) = method else {
+                    return None;
+                };
+                match method.as_str() {
+                    "textDocument/definition" => {
+                        let result = match message.result {
+                            serde_json::Value::Array(ref arr) => arr[0].as_object().unwrap(),
+                            serde_json::Value::Object(ref obj) => obj,
+                            _ => return None,
+                        };
+                        let Some(start) = result.get("range").and_then(|range| range.get("start"))
+                        else {
+                            return None;
+                        };
+                        if let (Some(line), Some(character)) = (
+                            start.get("line").and_then(|line| line.as_u64()),
+                            start
+                                .get("character")
+                                .and_then(|character| character.as_u64()),
+                        ) {
+                            Some(Action::MoveTo(line as usize, character as usize));
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+        None
     }
 
     fn get_viewport_size(&self) -> (u16, u16) {
@@ -328,6 +406,16 @@ impl Editor {
 
         self.draw_cursor()?;
         self.stdout.flush()?;
+        Ok(())
+    }
+
+    fn rerender(&mut self, current_buffer: &RenderBuffer, buffer: &mut RenderBuffer) -> Result<()> {
+        self.stdout.execute(cursor::Hide)?;
+        self.draw_status_line(buffer);
+        self.draw_command_line(buffer);
+        self.render_diff(buffer.diff(&current_buffer))?;
+        self.draw_cursor()?;
+        self.stdout.execute(cursor::Show)?;
         Ok(())
     }
 
@@ -603,7 +691,8 @@ impl Editor {
         None
     }
 
-    fn execute(&mut self, action: &Action, buffer: &mut RenderBuffer) -> Result<bool> {
+    #[async_recursion]
+    async fn execute(&mut self, action: &Action, buffer: &mut RenderBuffer) -> Result<bool> {
         match action {
             Action::Quit => {
                 return Ok(true);
@@ -653,13 +742,17 @@ impl Editor {
                 self.draw_gutter(buffer);
             }
             Action::GotoLine(line) => {
-                let line = line.min(&self.buffer.line_count()).saturating_sub(1);
+                let line = self.buffer.line_count().min(*line);
                 self.cursor.row = line;
                 self.cursor.column = 0;
                 let (_, height) = self.get_viewport_size();
                 if line < self.offset.top || line > self.offset.top + height as usize - 1 {
-                    self.execute(&Action::MoveToViewportCenter, buffer)?;
+                    self.execute(&Action::MoveToViewportCenter, buffer).await?;
                 }
+            }
+            Action::MoveTo(line, column) => {
+                self.execute(&Action::GotoLine(*line), buffer).await?;
+                self.cursor.column = *column;
             }
             Action::EnterMode(mode) => {
                 match (&self.mode, mode) {
@@ -696,14 +789,15 @@ impl Editor {
             Action::BackspaceCharAtCursor => match &self.mode {
                 Mode::Insert | Mode::Normal => {
                     if self.cursor.row != 0 || self.cursor.column != 0 {
-                        self.execute(&Action::MoveLeft, buffer)?;
-                        self.execute(&Action::DeleteCharAtCursor, buffer)?;
+                        self.execute(&Action::MoveLeft, buffer).await?;
+                        self.execute(&Action::DeleteCharAtCursor, buffer).await?;
                     }
                 }
                 Mode::Command => {
                     let sucess = self.command_center.backspace();
                     if !sucess {
-                        self.execute(&Action::EnterMode(Mode::Normal), buffer)?;
+                        self.execute(&Action::EnterMode(Mode::Normal), buffer)
+                            .await?;
                     }
                 }
             },
@@ -714,13 +808,13 @@ impl Editor {
             }
             Action::Undo => {
                 if let Some(action) = self.undo.pop() {
-                    return self.execute(&action, buffer);
+                    return self.execute(&action, buffer).await;
                 }
             }
             Action::ExecuteCommand => {
                 match self.command_center.parse_action() {
                     std::result::Result::Ok(action) => {
-                        if self.execute(&action, buffer)? {
+                        if self.execute(&action, buffer).await? {
                             return Ok(true);
                         }
                     }
@@ -728,14 +822,23 @@ impl Editor {
                         self.last_error = Some(error);
                     }
                 };
-                self.execute(&Action::EnterMode(Mode::Normal), buffer)?;
+                self.execute(&Action::EnterMode(Mode::Normal), buffer)
+                    .await?;
             }
             Action::Multiple(actions) => {
                 for action in actions {
-                    if self.execute(&action, buffer)? {
+                    if self.execute(&action, buffer).await? {
                         return Ok(true);
                     }
                 }
+            }
+            Action::GotoDefinition => {
+                if let Some(file) = &self.file_name {
+                    log!("going to definition for {file}");
+                    self.lsp
+                        .goto_definition(file, self.cursor.row, self.cursor.column)
+                        .await?;
+                };
             }
         }
         Ok(false)
