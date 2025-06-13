@@ -23,6 +23,7 @@ pub struct Config {
 pub struct Keys {
     pub normal: KeyMapping,
     pub insert: KeyMapping,
+    pub command: KeyMapping,
 }
 
 pub fn get_key_action(mapping: &KeyMapping, event: &Event) -> Option<KeyAction> {

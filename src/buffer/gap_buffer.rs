@@ -121,4 +121,9 @@ where
         }
         values.as_ref().map(|v| v.to_vec())
     }
+
+    pub fn clear(&mut self) {
+        self.gap_start = 0;
+        self.gap_end = self.buffer.len();
+    }
 }

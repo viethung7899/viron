@@ -1,3 +1,4 @@
+mod command_center;
 mod render_buffer;
 
 use std::{
@@ -9,7 +10,10 @@ use std::{
 use crate::{
     buffer::Buffer,
     config::{Config, KeyAction, KeyMapping, get_key_action},
-    editor::render_buffer::{Change, RenderBuffer},
+    editor::{
+        command_center::CommandCenter,
+        render_buffer::{Change, RenderBuffer},
+    },
     highlighter::Highlighter,
     log,
     theme::{Style, Theme},
@@ -17,7 +21,7 @@ use crate::{
 use anyhow::{Ok, Result};
 use crossterm::{
     ExecutableCommand, QueueableCommand, cursor,
-    event::{self, Event, KeyCode},
+    event::{self, Event, KeyCode, KeyEvent},
     style::{self, StyledContent},
     terminal::{self},
 };
@@ -30,16 +34,24 @@ struct Offset {
     pub left: usize,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Mode {
     Normal,
     Insert,
+    Command,
 }
 
 impl Mode {
+    fn to_name(&self) -> &str {
+        match self {
+            Mode::Normal => "Normal",
+            Mode::Insert => "Insert",
+            Mode::Command => "Command",
+        }
+    }
     fn set_cursor_style(&self) -> cursor::SetCursorStyle {
         match self {
-            Mode::Normal => cursor::SetCursorStyle::SteadyBlock,
+            Mode::Normal | Mode::Command => cursor::SetCursorStyle::SteadyBlock,
             Mode::Insert => cursor::SetCursorStyle::SteadyBar,
         }
     }
@@ -64,13 +76,17 @@ pub enum Action {
     MoveToLineEnd,
     MoveToViewportCenter,
 
-    EnterMode(Mode),
+    GotoLine(usize),
 
     InsertCharAtCursor(char),
     NewLineAtCursor,
     DeleteCharAtCursor,
     BackspaceCharAtCursor,
     DeleteCurrentLine,
+
+    EnterMode(Mode),
+
+    ExecuteCommand,
 
     Multiple(Vec<Action>),
 }
@@ -119,8 +135,11 @@ pub struct Editor {
     cursor: Point,
     mode: Mode,
     size: (u16, u16),
+    waiting_key_command: Option<char>,
     waiting_key_action: Option<KeyMapping>,
     undo: UndoStack,
+    command_center: CommandCenter,
+    last_error: Option<String>,
 }
 
 impl Drop for Editor {
@@ -157,8 +176,11 @@ impl Editor {
             cursor: Point { row: 0, column: 0 },
             mode: Mode::Normal,
             size: (width, height),
+            waiting_key_command: None,
             waiting_key_action: None,
             undo: UndoStack::default(),
+            command_center: CommandCenter::default(),
+            last_error: None,
         })
     }
 
@@ -195,7 +217,8 @@ impl Editor {
             let start = Instant::now();
 
             let action_start = Instant::now();
-            if let Some(key_action) = self.handle_event(event) {
+            self.last_error = None;
+            if let Some(key_action) = self.handle_event(&event) {
                 log!("Key action = {key_action:?}");
                 let quit = match key_action {
                     KeyAction::Single(action) => self.execute(&action, &mut buffer)?,
@@ -210,6 +233,13 @@ impl Editor {
                         quit
                     }
                     KeyAction::Nested(mapping) => {
+                        if let Event::Key(KeyEvent {
+                            code: KeyCode::Char(c),
+                            ..
+                        }) = event
+                        {
+                            self.waiting_key_command = Some(c);
+                        }
                         self.waiting_key_action = Some(mapping);
                         false
                     }
@@ -227,6 +257,7 @@ impl Editor {
 
             self.stdout.execute(cursor::Hide)?;
             self.draw_status_line(&mut buffer);
+            self.draw_command_line(&mut buffer);
             self.render_diff(buffer.diff(&current_buffer))?;
             self.draw_cursor()?;
             self.stdout.execute(cursor::Show)?;
@@ -319,14 +350,18 @@ impl Editor {
     }
 
     fn draw_cursor(&mut self) -> Result<()> {
-        let (row, col) = self.get_current_screen_position();
         let cursor_style = match self.waiting_key_action {
             Some(_) => cursor::SetCursorStyle::SteadyUnderScore,
             None => self.mode.set_cursor_style(),
         };
+        let (row, col) = if self.mode == Mode::Command {
+            (self.size.0 - 1, self.command_center.position as u16 + 1)
+        } else {
+            self.get_current_screen_position()
+        };
         self.stdout
             .queue(cursor_style)?
-            .queue(cursor::MoveTo(col as u16, row as u16))?;
+            .queue(cursor::MoveTo(col, row))?;
         Ok(())
     }
 
@@ -348,7 +383,6 @@ impl Editor {
         let top = self.offset.top;
         let (width, height) = self.get_viewport_size();
         let code = self.buffer.to_bytes();
-        log!("Code: {code:?}");
         let tokens = self.highlighter.highlight(&code)?;
 
         let mut info_iter = tokens
@@ -476,7 +510,7 @@ impl Editor {
     }
 
     fn draw_status_line(&mut self, buffer: &mut RenderBuffer) {
-        let left = format!(" {:?} ", self.mode).to_uppercase();
+        let left = format!(" {} ", self.mode.to_name().to_uppercase());
         let right = format!(" {}:{} ", self.cursor.row + 1, self.cursor.column + 1);
         let file = format!(" {}", self.file_name.as_deref().unwrap_or("new file"));
         let center_width = self.size.0 as usize - left.len() - right.len();
@@ -485,6 +519,7 @@ impl Editor {
         let outer_style = match self.mode {
             Mode::Insert => &self.theme.status_line_style.insert,
             Mode::Normal => &self.theme.status_line_style.normal,
+            Mode::Command => &self.theme.status_line_style.command,
         };
 
         let height = self.get_viewport_size().1 as usize;
@@ -498,21 +533,38 @@ impl Editor {
         buffer.set_text(height, left.len() + center_width, &right, &outer_style);
     }
 
-    fn handle_event(&mut self, event: Event) -> Option<KeyAction> {
+    fn draw_command_line(&mut self, buffer: &mut RenderBuffer) {
+        let (width, height) = self.size;
+        let format = if self.mode == Mode::Command {
+            let command = self.command_center.buffer.clone();
+            format!(":{command:<w$}", w = width as usize)
+        } else if let Some(ref error) = self.last_error {
+            format!("Error: {error:<w$}", w = width as usize)
+        } else if let Some(c) = self.waiting_key_command {
+            format!("{c:<w$}", w = width as usize)
+        } else {
+            " ".repeat(width as usize)
+        };
+        buffer.set_text(height as usize - 1, 0, &format, &self.theme.editor_style);
+    }
+
+    fn handle_event(&mut self, event: &Event) -> Option<KeyAction> {
         if let Event::Resize(width, height) = event {
-            self.size = (width, height);
+            self.size = (*width, *height);
             return None;
         }
 
         if let Some(mapping) = &self.waiting_key_action {
             let action = get_key_action(mapping, &event);
+            self.waiting_key_command = None;
             self.waiting_key_action = None;
             return action;
         }
 
-        match self.mode {
+        match &self.mode {
             Mode::Insert => self.handle_insert_event(&event),
             Mode::Normal => self.handle_normal_event(&event),
+            Mode::Command => self.handle_command_event(&event),
         }
     }
 
@@ -536,17 +588,36 @@ impl Editor {
         }
     }
 
+    fn handle_command_event(&mut self, event: &Event) -> Option<KeyAction> {
+        let action = get_key_action(&self.config.keys.command, &event);
+
+        if action.is_some() {
+            return action;
+        }
+
+        if let Event::Key(event) = event {
+            if let KeyCode::Char(c) = event.code {
+                self.command_center.insert(c);
+            }
+        }
+        None
+    }
+
     fn execute(&mut self, action: &Action, buffer: &mut RenderBuffer) -> Result<bool> {
         match action {
             Action::Quit => {
                 return Ok(true);
             }
             Action::MoveUp => self.buffer.move_up(&mut self.cursor, &self.mode),
-            Action::MoveDown => {
-                self.buffer.move_down(&mut self.cursor, &self.mode);
-            }
-            Action::MoveLeft => self.buffer.move_left(&mut self.cursor, &self.mode),
-            Action::MoveRight => self.buffer.move_right(&mut self.cursor, &self.mode),
+            Action::MoveDown => self.buffer.move_down(&mut self.cursor, &self.mode),
+            Action::MoveLeft => match self.mode {
+                Mode::Normal | Mode::Insert => self.buffer.move_left(&mut self.cursor, &self.mode),
+                Mode::Command => self.command_center.move_left(),
+            },
+            Action::MoveRight => match self.mode {
+                Mode::Normal | Mode::Insert => self.buffer.move_right(&mut self.cursor, &self.mode),
+                Mode::Command => self.command_center.move_right(),
+            },
             Action::PageUp => {
                 let (_, height) = self.get_viewport_size();
                 self.cursor.row = self.cursor.row.saturating_sub(height as usize);
@@ -581,14 +652,26 @@ impl Editor {
                 self.draw_viewport(buffer)?;
                 self.draw_gutter(buffer);
             }
+            Action::GotoLine(line) => {
+                let line = line.min(&self.buffer.line_count()).saturating_sub(1);
+                self.cursor.row = line;
+                self.cursor.column = 0;
+                let (_, height) = self.get_viewport_size();
+                if line < self.offset.top || line > self.offset.top + height as usize - 1 {
+                    self.execute(&Action::MoveToViewportCenter, buffer)?;
+                }
+            }
             Action::EnterMode(mode) => {
-                match (self.mode, mode) {
+                match (&self.mode, mode) {
                     (Mode::Insert, Mode::Normal) => {
                         self.undo.batch();
                     }
+                    (Mode::Command, _) => {
+                        self.command_center.reset();
+                    }
                     _ => {}
                 }
-                self.mode = *mode;
+                self.mode = mode.to_owned();
             }
             Action::InsertCharAtCursor(char) => {
                 self.buffer.insert_char(*char, &mut self.cursor);
@@ -610,12 +693,20 @@ impl Editor {
                     }
                 }
             }
-            Action::BackspaceCharAtCursor => {
-                if self.cursor.row != 0 || self.cursor.column != 0 {
-                    self.execute(&Action::MoveLeft, buffer)?;
-                    self.execute(&Action::DeleteCharAtCursor, buffer)?;
+            Action::BackspaceCharAtCursor => match &self.mode {
+                Mode::Insert | Mode::Normal => {
+                    if self.cursor.row != 0 || self.cursor.column != 0 {
+                        self.execute(&Action::MoveLeft, buffer)?;
+                        self.execute(&Action::DeleteCharAtCursor, buffer)?;
+                    }
                 }
-            }
+                Mode::Command => {
+                    let sucess = self.command_center.backspace();
+                    if !sucess {
+                        self.execute(&Action::EnterMode(Mode::Normal), buffer)?;
+                    }
+                }
+            },
             Action::DeleteCurrentLine => {
                 let _ = self.buffer.delete_current_line(&mut self.cursor);
                 self.draw_gutter(buffer);
@@ -625,6 +716,19 @@ impl Editor {
                 if let Some(action) = self.undo.pop() {
                     return self.execute(&action, buffer);
                 }
+            }
+            Action::ExecuteCommand => {
+                match self.command_center.parse_action() {
+                    std::result::Result::Ok(action) => {
+                        if self.execute(&action, buffer)? {
+                            return Ok(true);
+                        }
+                    }
+                    Err(error) => {
+                        self.last_error = Some(error);
+                    }
+                };
+                self.execute(&Action::EnterMode(Mode::Normal), buffer)?;
             }
             Action::Multiple(actions) => {
                 for action in actions {

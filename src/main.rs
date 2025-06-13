@@ -17,6 +17,8 @@ fn main() -> anyhow::Result<()> {
     let toml = std::fs::read_to_string("config.toml")?;
     let config: Config = toml::from_str(&toml)?;
 
+    log!("Config: {:?}", config.keys.command);
+
     let file = std::env::args().nth(1);
     let theme = theme::parse_vscode_theme(&config.theme)?;
 

@@ -1,8 +1,8 @@
 use tree_sitter::Point;
 
-use crate::{buffer::gap_buffer::GapBuffer, editor, log};
+use crate::{buffer::gap_buffer::GapBuffer, editor};
 
-mod gap_buffer;
+pub mod gap_buffer;
 
 pub struct Buffer {
     buffer: GapBuffer<char>,

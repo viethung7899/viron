@@ -144,6 +144,7 @@ impl From<&VsCodeTheme> for StatusLineStyle {
         let outer_foreground = theme.get_color("statusBar.background");
         let normal_background = theme.get_color("terminal.ansiBlue");
         let insert_background = theme.get_color("terminal.ansiGreen");
+        let command_background = theme.get_color("terminal.ansiYellow");
 
         let inner = Style {
             background: inner_background,
@@ -166,9 +167,17 @@ impl From<&VsCodeTheme> for StatusLineStyle {
             ..Style::default()
         };
 
+        let command = Style {
+            background: command_background,
+            foreground: outer_foreground,
+            bold: true,
+            ..Style::default()
+        };
+
         StatusLineStyle {
             normal,
             insert,
+            command,
             inner,
         }
     }

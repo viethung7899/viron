@@ -49,6 +49,7 @@ pub struct TokenStyle {
 pub struct StatusLineStyle {
     pub normal: Style,
     pub insert: Style,
+    pub command: Style,
     pub inner: Style,
 }
 

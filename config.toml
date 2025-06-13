@@ -25,6 +25,8 @@ theme = "themes/catppuchin/mocha.json"
 "i" = { EnterMode = "Insert" }
 "a" = [{ EnterMode = "Insert" }, "MoveRight"]
 
+":" = { EnterMode = "Command" }
+
 [keys.normal.g]
 "g" = "MoveToTop"
 
@@ -43,3 +45,10 @@ theme = "themes/catppuchin/mocha.json"
 "Delete" = "DeleteCharAtCursor"
 "Backspace" = "BackspaceCharAtCursor"
 "Enter" = "NewLineAtCursor"
+
+[keys.command]
+"Esc" = { EnterMode = "Normal" }
+"Left" = "MoveLeft"
+"Right" = "MoveRight"
+"Backspace" = "BackspaceCharAtCursor"
+"Enter" = "ExecuteCommand"
