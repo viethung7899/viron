@@ -3,6 +3,7 @@ mod config;
 mod editor;
 mod highlighter;
 mod logger;
+mod lsp;
 mod theme;
 
 use std::{io::stdout, panic};
@@ -13,7 +14,8 @@ use editor::Editor;
 use logger::Logger;
 use once_cell::sync::OnceCell;
 
-fn main() -> anyhow::Result<()> {
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
     let toml = std::fs::read_to_string("config.toml")?;
     let config: Config = toml::from_str(&toml)?;
 
