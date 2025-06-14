@@ -170,7 +170,7 @@ impl Buffer {
         Some(chars.into_iter().collect())
     }
 
-    fn clamp_column(&self, cursor: &mut Point, mode: &editor::Mode) {
+    pub fn clamp_column(&self, cursor: &mut Point, mode: &editor::Mode) {
         let line_end = if cursor.row + 1 < self.line_starts.len() {
             self.line_starts[cursor.row + 1] - 1
         } else {

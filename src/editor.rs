@@ -23,7 +23,7 @@ use anyhow::{Ok, Result};
 use async_recursion::async_recursion;
 use crossterm::{
     ExecutableCommand, QueueableCommand, cursor,
-    event::{Event, EventStream, KeyCode, KeyEvent},
+    event::{self, Event, EventStream, KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind},
     style::{self, StyledContent},
     terminal::{self},
 };
@@ -214,6 +214,7 @@ impl Editor {
     pub async fn run(&mut self) -> Result<()> {
         terminal::enable_raw_mode()?;
         self.stdout
+            .execute(event::EnableMouseCapture)?
             .execute(terminal::EnterAlternateScreen)?
             .execute(terminal::Clear(terminal::ClearType::All))?;
 
@@ -650,11 +651,38 @@ impl Editor {
             return action;
         }
 
-        match &self.mode {
+        let action = match &self.mode {
             Mode::Insert => self.handle_insert_event(&event),
             Mode::Normal => self.handle_normal_event(&event),
             Mode::Command => self.handle_command_event(&event),
+        };
+
+        log!("Action from config: {action:?}");
+
+        if action.is_some() {
+            return action;
         }
+
+        if let Event::Mouse(MouseEvent {
+            kind, column, row, ..
+        }) = event
+        {
+            match kind {
+                MouseEventKind::Down(MouseButton::Left) => {
+                    let (_, height) = self.get_viewport_size();
+                    if column < &self.gutter_width || row >= &height {
+                        return None;
+                    }
+                    return Some(KeyAction::Single(Action::MoveTo(
+                        *row as usize + self.offset.top,
+                        (*column - self.gutter_width) as usize,
+                    )));
+                }
+                _ => {}
+            }
+        }
+
+        None
     }
 
     fn handle_normal_event(&mut self, event: &Event) -> Option<KeyAction> {
@@ -754,6 +782,7 @@ impl Editor {
             Action::MoveTo(line, column) => {
                 self.execute(&Action::GotoLine(*line), buffer).await?;
                 self.cursor.column = *column;
+                self.buffer.clamp_column(&mut self.cursor, &self.mode);
             }
             Action::EnterMode(mode) => {
                 match (&self.mode, mode) {
