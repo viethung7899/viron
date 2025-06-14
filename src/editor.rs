@@ -158,6 +158,7 @@ impl Drop for Editor {
     fn drop(&mut self) {
         let _ = self.stdout.flush();
         let _ = self.stdout.execute(terminal::LeaveAlternateScreen);
+        let _ = self.stdout.execute(event::DisableMouseCapture);
         let _ = terminal::disable_raw_mode();
     }
 }

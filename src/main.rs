@@ -9,7 +9,7 @@ mod theme;
 use std::{io::stdout, panic};
 
 use config::Config;
-use crossterm::{ExecutableCommand, terminal};
+use crossterm::{ExecutableCommand, event, terminal};
 use editor::Editor;
 use logger::Logger;
 use once_cell::sync::OnceCell;
@@ -30,7 +30,9 @@ async fn main() -> anyhow::Result<()> {
     let mut editor = Editor::new(config, theme, lsp, file).await?;
 
     panic::set_hook(Box::new(|info| {
-        _ = stdout().execute(terminal::LeaveAlternateScreen);
+        let mut stdout = stdout();
+        _ = stdout.execute(terminal::LeaveAlternateScreen);
+        _ = stdout.execute(event::DisableMouseCapture);
         _ = terminal::disable_raw_mode();
         eprintln!("{}", info);
     }));
