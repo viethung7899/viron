@@ -17,6 +17,7 @@ pub enum KeyAction {
 pub struct Config {
     pub theme: String,
     pub keys: Keys,
+    pub mouse_scroll_lines: Option<usize>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

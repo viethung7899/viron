@@ -81,7 +81,11 @@ pub enum Action {
     MoveToLineEnd,
     MoveToViewportCenter,
 
+    ScrollUp,
+    ScrollDown,
+
     GotoLine(usize),
+    MoveTo(usize, usize),
 
     InsertCharAtCursor(char),
     NewLineAtCursor,
@@ -96,7 +100,6 @@ pub enum Action {
     Multiple(Vec<Action>),
 
     GotoDefinition,
-    MoveTo(usize, usize),
 }
 
 #[derive(Debug, Default)]
@@ -657,32 +660,35 @@ impl Editor {
             Mode::Command => self.handle_command_event(&event),
         };
 
-        log!("Action from config: {action:?}");
-
         if action.is_some() {
             return action;
         }
 
-        if let Event::Mouse(MouseEvent {
-            kind, column, row, ..
-        }) = event
-        {
-            match kind {
-                MouseEventKind::Down(MouseButton::Left) => {
-                    let (_, height) = self.get_viewport_size();
-                    if column < &self.gutter_width || row >= &height {
-                        return None;
-                    }
-                    return Some(KeyAction::Single(Action::MoveTo(
-                        *row as usize + self.offset.top,
-                        (*column - self.gutter_width) as usize,
-                    )));
-                }
-                _ => {}
-            }
+        if let Event::Mouse(mouse_event) = event {
+            return self.handle_mouse_event(mouse_event);
         }
 
         None
+    }
+
+    fn handle_mouse_event(&mut self, mouse_event: &MouseEvent) -> Option<KeyAction> {
+        let row = mouse_event.row;
+        let column = mouse_event.column;
+        match mouse_event.kind {
+            MouseEventKind::Down(MouseButton::Left) => {
+                let (_, height) = self.get_viewport_size();
+                if column < self.gutter_width || row >= height {
+                    return None;
+                }
+                Some(KeyAction::Single(Action::MoveTo(
+                    row as usize + self.offset.top,
+                    (column - self.gutter_width) as usize,
+                )))
+            }
+            MouseEventKind::ScrollUp => Some(KeyAction::Single(Action::ScrollUp)),
+            MouseEventKind::ScrollDown => Some(KeyAction::Single(Action::ScrollDown)),
+            _ => None,
+        }
     }
 
     fn handle_normal_event(&mut self, event: &Event) -> Option<KeyAction> {
@@ -783,6 +789,29 @@ impl Editor {
                 self.execute(&Action::GotoLine(*line), buffer).await?;
                 self.cursor.column = *column;
                 self.buffer.clamp_column(&mut self.cursor, &self.mode);
+            }
+            Action::ScrollUp => {
+                let (_, height) = self.get_viewport_size();
+                let scroll_lines = self.config.mouse_scroll_lines.unwrap_or(3);
+                self.offset.top = self.offset.top.saturating_sub(scroll_lines);
+                let end_row = self.offset.top + height as usize - 1;
+                if self.cursor.row > end_row {
+                    self.cursor.row = end_row;
+                    self.buffer.clamp_column(&mut self.cursor, &self.mode);
+                }
+                self.draw_viewport(buffer)?;
+                self.draw_gutter(buffer);
+            }
+            Action::ScrollDown => {
+                let lines = self.buffer.line_count().saturating_sub(1);
+                let scroll_lines = self.config.mouse_scroll_lines.unwrap_or(3);
+                self.offset.top = lines.min(self.offset.top + scroll_lines);
+                if self.cursor.row < self.offset.top {
+                    self.cursor.row = self.offset.top;
+                    self.buffer.clamp_column(&mut self.cursor, &self.mode);
+                }
+                self.draw_viewport(buffer)?;
+                self.draw_gutter(buffer);
             }
             Action::EnterMode(mode) => {
                 match (&self.mode, mode) {
