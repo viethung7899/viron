@@ -29,6 +29,7 @@ theme = "themes/catppuchin/mocha.json"
 
 [keys.normal.g]
 "g" = "MoveToTop"
+"d" = "GotoDefinition"
 
 [keys.normal.d]
 "d" = "DeleteCurrentLine"

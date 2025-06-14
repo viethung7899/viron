@@ -237,10 +237,11 @@ impl Editor {
                     // handle responses from lsp
                     if let Some((msg, method)) = self.lsp.recv_response().await? {
                         if let Some(action) = self.handle_lsp_message(&msg, method) {
-                            // TODO: handle quit
                             let current_buffer = buffer.clone();
-                            log!("executing action: {action:?}");
-                            self.execute(&action, &mut buffer).await?;
+                            log!("executing action from lsp: {action:?}");
+                            if self.execute(&action, &mut buffer).await? {
+                                break;
+                            }
                             self.rerender(&current_buffer, &mut buffer)?;
                         }
 
@@ -335,7 +336,7 @@ impl Editor {
                                 .get("character")
                                 .and_then(|character| character.as_u64()),
                         ) {
-                            Some(Action::MoveTo(line as usize, character as usize));
+                            return Some(Action::MoveTo(line as usize, character as usize));
                         }
                     }
                     _ => {}
