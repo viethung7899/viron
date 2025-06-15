@@ -1,6 +1,10 @@
 use tree_sitter::Point;
 
-use crate::{buffer::gap_buffer::GapBuffer, editor};
+use crate::{
+    buffer::gap_buffer::GapBuffer,
+    editor::{self, Mode},
+    log,
+};
 
 pub mod gap_buffer;
 
@@ -133,7 +137,7 @@ impl Buffer {
         Some(char)
     }
 
-    pub fn get_current_char(&mut self, cursor: &Point) -> Option<char> {
+    pub fn get_current_char(&self, cursor: &Point) -> Option<char> {
         let position = self.cursor_position(cursor);
         if position < self.buffer.gap_start {
             Some(self.buffer.buffer[position])
@@ -170,6 +174,82 @@ impl Buffer {
         Some(chars.into_iter().collect())
     }
 
+    pub fn find_next_word(&mut self, cursor: &Point) -> Option<Point> {
+        self.buffer.move_gap(self.cursor_position(cursor));
+        let mut index = self.buffer.gap_end;
+        let mut point = cursor.clone();
+        let buffer = &self.buffer.buffer;
+        let length = buffer.len();
+        let mode = Mode::Insert;
+
+        log!("[next word] before {point:?}");
+
+        // Skip the current word
+        if index < length && !buffer[index].is_whitespace() {
+            let keyword_type = is_in_keyword(buffer[index]);
+
+            while index < length {
+                let c = buffer[index];
+                if c.is_whitespace() || is_in_keyword(c) != keyword_type {
+                    break;
+                }
+                index += 1;
+                self.move_right(&mut point, &mode);
+            }
+        }
+
+        log!("[next word] first pass {point:?}");
+
+        // Skip the whitespace
+        let mut already_new_line = false;
+        while index < length && buffer[index].is_whitespace() {
+            let c = buffer[index];
+            if c == '\n' && already_new_line {
+                log!("[next word] second new line");
+                return Some(point);
+            }
+            already_new_line = c == '\n';
+            index += 1;
+            self.move_right(&mut point, &mode);
+        }
+        
+        Some(point)
+    }
+
+    pub fn find_previous_word(&mut self, cursor: &Point) -> Option<Point> {
+        self.buffer.move_gap(self.cursor_position(cursor));
+        let mut point = cursor.clone();
+        let buffer = &self.buffer.buffer;
+        let mode = Mode::Insert;
+
+        let mut index = self.buffer.gap_start.saturating_sub(1);
+        self.move_left(&mut point, &mode);
+
+        while index > 0 && buffer[index].is_whitespace() {
+            if buffer[index] == '\n' && buffer[index - 1] == '\n' {
+                return Some(point);
+            }
+            index -= 1;
+            self.move_left(&mut point, &mode);
+        }
+
+        let keyword_type = is_in_keyword(buffer[index]);
+        while index > 0 {
+            let prev = buffer[index - 1];
+            if prev.is_whitespace() || is_in_keyword(buffer[index - 1]) != keyword_type {
+                return Some(point);
+            }
+            index -= 1;
+            point.column -= 1;
+        }
+
+        if index == 0 {
+            return Some(Point { row: 0, column: 0 });
+        } else {
+            return Some(point);
+        }
+    }
+
     pub fn clamp_column(&self, cursor: &mut Point, mode: &editor::Mode) {
         let line_end = if cursor.row + 1 < self.line_starts.len() {
             self.line_starts[cursor.row + 1] - 1
@@ -182,4 +262,8 @@ impl Buffer {
         }
         cursor.column = cursor.column.min(line_length);
     }
+}
+
+fn is_in_keyword(c: char) -> bool {
+    c.is_alphanumeric() || c == '_'
 }

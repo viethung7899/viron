@@ -81,6 +81,9 @@ pub enum Action {
     MoveToLineEnd,
     MoveToViewportCenter,
 
+    MoveToNextWord,
+    MoveToPreviousWord,
+
     ScrollUp,
     ScrollDown,
 
@@ -776,6 +779,18 @@ impl Editor {
                 self.offset.top = self.cursor.row.saturating_sub(height as usize / 2);
                 self.draw_viewport(buffer)?;
                 self.draw_gutter(buffer);
+            }
+            Action::MoveToNextWord => {
+                if let Some(point) = self.buffer.find_next_word(&self.cursor) {
+                    self.execute(&Action::MoveTo(point.row, point.column), buffer)
+                        .await?;
+                }
+            }
+            Action::MoveToPreviousWord => {
+                if let Some(point) = self.buffer.find_previous_word(&self.cursor) {
+                    self.execute(&Action::MoveTo(point.row, point.column), buffer)
+                        .await?;
+                }
             }
             Action::GotoLine(line) => {
                 let line = self.buffer.line_count().min(*line);

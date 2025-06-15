@@ -1,6 +1,8 @@
 theme = "themes/catppuchin/mocha.json"
 
 [keys.normal]
+"w" = "MoveToNextWord"
+"b" = "MoveToPreviousWord"
 "q" = "Quit"
 "u" = "Undo"
 "k" = "MoveUp"
