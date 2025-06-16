@@ -660,8 +660,8 @@ impl Editor {
         let format = if self.mode == Mode::Command {
             let command = self.command_center.buffer.clone();
             format!(":{command:<w$}", w = width as usize)
-        } else if let Some(ref error) = self.last_message {
-            format!("Error: {error:<w$}", w = width as usize)
+        } else if let Some(ref message) = self.last_message {
+            format!("{message:<w$}", w = width as usize)
         } else if let Some(c) = self.waiting_key_command {
             format!("{c:<w$}", w = width as usize)
         } else {
