@@ -1,6 +1,7 @@
 use anyhow::{Context, Result};
 use serde_json::{Value, json};
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::process;
 use std::{
     process::Stdio,
@@ -215,7 +216,7 @@ impl LspClient {
         log!("[lsp] did_open file: {}", file);
         let params = json!({
             "textDocument": {
-                "uri": format!("file:///{}", file),
+                "uri": format!("file://{}", absolutize(file)?.to_string_lossy()),
                 "languageId": "rust",
                 "version": 1,
                 "text": contents,
@@ -236,7 +237,7 @@ impl LspClient {
     ) -> anyhow::Result<i64> {
         let params = json!({
             "textDocument": {
-                "uri": format!("file:///{}", file),
+                "uri": format!("file://{}", absolutize(file)?.to_string_lossy()),
             },
             "position": {
                 "line": line,
@@ -379,6 +380,12 @@ pub fn process_response(response: &Value) -> Result<InboundMessage> {
             params,
         }))
     }
+}
+
+fn absolutize(path: &str) -> Result<PathBuf> {
+    let current = std::env::current_dir()?;
+    let full_path = std::fs::canonicalize(current.join(path))?;
+    Ok(full_path)
 }
 
 #[cfg(test)]
