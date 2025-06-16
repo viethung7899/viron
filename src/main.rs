@@ -24,6 +24,12 @@ async fn main() -> anyhow::Result<()> {
     let file = std::env::args().nth(1);
     let theme = theme::parse_vscode_theme(&config.theme)?;
 
+    if let Some(log_file) = &config.log_file {
+        LOGGER.get_or_init(|| Some(Logger::new(log_file)));
+    } else {
+        LOGGER.get_or_init(|| None);
+    }
+
     let mut lsp = LspClient::start().await?;
     lsp.initialize().await?;
 
@@ -41,12 +47,14 @@ async fn main() -> anyhow::Result<()> {
 }
 
 #[allow(unused)]
-static LOGGER: OnceCell<Logger> = OnceCell::new();
+static LOGGER: OnceCell<Option<Logger>> = OnceCell::new();
 
 #[macro_export]
 macro_rules! log {
     ($($args:tt)*) => {
         let message = format!($($args)*);
-        $crate::LOGGER.get_or_init(|| $crate::Logger::new("target/debug/viron.log")).log(&message);
+        if let Some(logger) = $crate::LOGGER.get_or_init(|| Some($crate::Logger::new("target/debug/viron.log"))) {
+            logger.log(&message);
+        }
     };
 }

@@ -15,6 +15,7 @@ pub enum KeyAction {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Config {
+    pub log_file: Option<String>,
     pub theme: String,
     pub keys: Keys,
     pub mouse_scroll_lines: Option<usize>,
