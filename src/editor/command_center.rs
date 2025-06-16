@@ -47,6 +47,7 @@ impl CommandCenter {
         match self.buffer.as_str() {
             "" => Ok(Action::EnterMode(Mode::Normal)),
             "q" => Ok(Action::Quit),
+            "w" => Ok(Action::Save),
             command => {
                 if let Ok(line_number) = command.parse::<usize>() {
                     Ok(Action::GotoLine(line_number.saturating_sub(1)))

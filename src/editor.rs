@@ -105,6 +105,7 @@ pub enum Action {
     Multiple(Vec<Action>),
 
     GotoDefinition,
+    Save,
 }
 
 #[derive(Debug, Default)]
@@ -156,7 +157,7 @@ pub struct Editor {
     waiting_key_action: Option<KeyMapping>,
     undo: UndoStack,
     command_center: CommandCenter,
-    last_error: Option<String>,
+    last_message: Option<String>,
 }
 
 impl Drop for Editor {
@@ -199,7 +200,7 @@ impl Editor {
             waiting_key_action: None,
             undo: UndoStack::default(),
             command_center: CommandCenter::default(),
-            last_error: None,
+            last_message: None,
         })
     }
 
@@ -264,7 +265,7 @@ impl Editor {
                         },
                         Some(std::result::Result::Ok(event)) => {
                             let current_buffer = buffer.clone();
-                            self.last_error = None;
+                            self.last_message = None;
                             if let Some(key_action) = self.handle_event(&event) {
                                 let quit = match key_action {
                                     KeyAction::Single(action) => self.execute(&action, &mut buffer).await?,
@@ -317,7 +318,7 @@ impl Editor {
     ) -> Option<Action> {
         match message {
             InboundMessage::ProcessingError(error) => {
-                self.last_error = Some(error.to_owned());
+                self.last_message = Some(error.to_owned());
             }
             InboundMessage::Notification(notification) => {
                 log!("got an unhandled notification: {notification:?}");
@@ -651,7 +652,7 @@ impl Editor {
         let format = if self.mode == Mode::Command {
             let command = self.command_center.buffer.clone();
             format!(":{command:<w$}", w = width as usize)
-        } else if let Some(ref error) = self.last_error {
+        } else if let Some(ref error) = self.last_message {
             format!("Error: {error:<w$}", w = width as usize)
         } else if let Some(c) = self.waiting_key_command {
             format!("{c:<w$}", w = width as usize)
@@ -936,7 +937,7 @@ impl Editor {
                         }
                     }
                     Err(error) => {
-                        self.last_error = Some(error);
+                        self.last_message = Some(error);
                     }
                 };
                 self.execute(&Action::EnterMode(Mode::Normal), buffer)
@@ -956,6 +957,21 @@ impl Editor {
                         .goto_definition(file, self.cursor.row, self.cursor.column)
                         .await?;
                 };
+            }
+            Action::Save => {
+                if let Some(file) = &self.file_name {
+                    let bytes = self.buffer.to_bytes();
+                    std::fs::write(file, &bytes)?;
+                    let message = format!(
+                        "{:?}, {}L, {}B written",
+                        file,
+                        self.buffer.line_count(),
+                        bytes.len()
+                    );
+                    self.last_message = Some(message);
+                } else {
+                    self.last_message = Some("No file name".into());
+                }
             }
         }
         Ok(false)
