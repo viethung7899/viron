@@ -52,6 +52,25 @@ impl Buffer {
         self.line_starts[cursor.row] + cursor.column
     }
 
+    pub fn get_content_line(&mut self, line: usize) -> String {
+        if line > self.line_count() {
+            return "".to_string();
+        }
+        let line_start = self.cursor_position(&Point {
+            row: line,
+            column: 0,
+        });
+        self.buffer.move_gap(line_start);
+        let line_end = if line + 1 < self.line_starts.len() {
+            self.line_starts[line + 1]
+        } else {
+            self.buffer.len_without_gap()
+        };
+        let index_end = line_end + self.buffer.gap_end - line_start;
+        let chars = &self.buffer.buffer[line_start..line_end];
+        chars.iter().collect()
+    }
+
     pub fn insert_char(&mut self, ch: char, cursor: &mut Point) {
         let position = self.cursor_position(cursor);
         self.buffer.move_gap(position);

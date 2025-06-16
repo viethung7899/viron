@@ -20,7 +20,7 @@ tab_size = 4
 "End" = "MoveToLineEnd"
 "G" = "MoveToBottom"
 "o" = [{ EnterMode = "Insert" }, "MoveToLineEnd", "InsertNewLineAtCursor"]
-"O" = [{ EnterMode = "Insert" }, "MoveToLineStart", "InsertNewLineAtCursor", "MoveUp"]
+"O" = "InsertNewLineAtCurrentLine"
 "x" = "DeleteCharAtCursor"
 "Ctrl-b" = "PageUp"
 "Ctrl-f" = "PageDown"

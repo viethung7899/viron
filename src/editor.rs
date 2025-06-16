@@ -92,6 +92,7 @@ pub enum Action {
 
     InsertCharAtCursor(char),
     InsertNewLineAtCursor,
+    InsertNewLineAtCurrentLine,
     InsertTabAtCursor,
     DeleteCharAtCursor,
     BackspaceCharAtCursor,
@@ -847,7 +848,27 @@ impl Editor {
                 self.draw_viewport(buffer)?;
             }
             Action::InsertNewLineAtCursor => {
+                let content = self.buffer.get_content_line(self.cursor.row);
+                log!("Before content: {content:?}");
+                let leading_spaces = content.chars().take_while(|c| c.is_whitespace()).count();
                 self.buffer.insert_char('\n', &mut self.cursor);
+                self.buffer
+                    .insert_string(&" ".repeat(leading_spaces), &mut self.cursor);
+                self.draw_viewport(buffer)?;
+                self.draw_gutter(buffer);
+            }
+            Action::InsertNewLineAtCurrentLine => {
+                let content = self.buffer.get_content_line(self.cursor.row);
+                log!("Before content: {content:?}");
+                let leading_spaces = content.chars().take_while(|c| c.is_whitespace()).count();
+                self.cursor.column = 0;
+                self.buffer
+                    .insert_string(&" ".repeat(leading_spaces), &mut self.cursor);
+                self.buffer.insert_char('\n', &mut self.cursor);
+                self.execute(&Action::EnterMode(Mode::Insert), buffer)
+                    .await?;
+                self.execute(&Action::MoveUp, buffer).await?;
+                self.execute(&Action::MoveToLineEnd, buffer).await?;
                 self.draw_viewport(buffer)?;
                 self.draw_gutter(buffer);
             }
