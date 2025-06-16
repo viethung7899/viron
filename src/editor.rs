@@ -95,9 +95,11 @@ pub enum Action {
     InsertNewLineAtCursor,
     InsertNewLineAtCurrentLine,
     InsertTabAtCursor,
-    DeleteCharAtCursor,
+
     BackspaceCharAtCursor,
+    DeleteCharAtCursor,
     DeleteCurrentLine,
+    DeleteWord,
 
     EnterMode(Mode),
 
@@ -927,8 +929,22 @@ impl Editor {
             },
             Action::DeleteCurrentLine => {
                 let _ = self.buffer.delete_current_line(&mut self.cursor);
+                while let Some(' ') = self.buffer.get_current_char(&self.cursor) {
+                    self.buffer.move_right(&mut self.cursor, &self.mode);
+                }
                 self.draw_gutter(buffer);
                 self.draw_viewport(buffer)?;
+            }
+            Action::DeleteWord => {
+                if self.cursor.column == 0
+                    && Some('\n') == self.buffer.get_current_char(&self.cursor)
+                {
+                    self.execute(&Action::DeleteCurrentLine, buffer).await?;
+                } else {
+                    self.buffer.delete_word_inline(&mut self.cursor);
+                    self.draw_gutter(buffer);
+                    self.draw_viewport(buffer)?;
+                }
             }
             Action::Undo => {
                 if let Some(action) = self.undo.pop() {

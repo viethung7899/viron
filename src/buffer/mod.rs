@@ -242,6 +242,42 @@ impl Buffer {
         Some(point)
     }
 
+    pub fn delete_word_inline(&mut self, cursor: &mut Point) -> String {
+        let position = self.cursor_position(cursor);
+        self.buffer.move_gap(position);
+        let mut index = self.buffer.gap_end;
+        let buffer = &self.buffer.buffer;
+        let length = buffer.len();
+
+        // Delete the current word
+        if index < length && !buffer[index].is_whitespace() {
+            let keyword_type = is_in_keyword(buffer[index]);
+
+            while index < length {
+                let c = buffer[index];
+                if c.is_whitespace() || is_in_keyword(c) != keyword_type {
+                    break;
+                }
+                index += 1;
+            }
+        }
+
+        // Delete the whitespace
+        while index < length && buffer[index].is_whitespace() && buffer[index] != '\n' {
+            index += 1;
+        }
+
+        let deleted = String::from_iter(&buffer[self.buffer.gap_end..index]);
+        let mut count = deleted.len();
+
+        while count > 0 {
+            self.delete_char(cursor, &Mode::Normal);
+            count -= 1;
+        }
+
+        deleted
+    }
+
     pub fn find_previous_word(&mut self, cursor: &Point) -> Option<Point> {
         self.buffer.move_gap(self.cursor_position(cursor));
         let mut point = cursor.clone();

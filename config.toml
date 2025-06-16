@@ -1,5 +1,6 @@
 theme = "themes/catppuchin/mocha.json"
 tab_size = 4
+log_file = "/tmp/viron.log"
 
 [keys.normal]
 "w" = "MoveToNextWord"
@@ -36,6 +37,7 @@ tab_size = 4
 
 [keys.normal.d]
 "d" = "DeleteCurrentLine"
+"w" = "DeleteWord"
 
 [keys.normal.z]
 "z" = "MoveToViewportCenter"
