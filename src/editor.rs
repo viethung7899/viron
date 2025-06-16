@@ -3,6 +3,7 @@ mod render_buffer;
 
 use std::{
     io::{Stdout, Write, stdout},
+    result::Result::Ok,
     str::from_utf8,
     time::{Duration, Instant},
 };
@@ -19,7 +20,7 @@ use crate::{
     lsp::{InboundMessage, LspClient},
     theme::{Style, Theme},
 };
-use anyhow::{Ok, Result};
+use anyhow::Result;
 use async_recursion::async_recursion;
 use crossterm::{
     ExecutableCommand, QueueableCommand, cursor,
@@ -936,7 +937,7 @@ impl Editor {
             }
             Action::ExecuteCommand => {
                 match self.command_center.parse_action() {
-                    std::result::Result::Ok(action) => {
+                    Ok(action) => {
                         if self.execute(&action, buffer).await? {
                             return Ok(true);
                         }
@@ -965,15 +966,14 @@ impl Editor {
             }
             Action::Save => {
                 if let Some(file) = &self.file_name {
-                    let bytes = self.buffer.to_bytes();
-                    std::fs::write(file, &bytes)?;
-                    let message = format!(
-                        "{:?}, {}L, {}B written",
-                        file,
-                        self.buffer.line_count(),
-                        bytes.len()
-                    );
-                    self.last_message = Some(message);
+                    match self.buffer.save(file) {
+                        Ok(message) => {
+                            self.last_message = Some(message);
+                        }
+                        Err(err) => {
+                            self.last_message = Some(err.to_string());
+                        }
+                    }
                 } else {
                     self.last_message = Some("No file name".into());
                 }

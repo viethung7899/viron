@@ -292,6 +292,19 @@ impl Buffer {
     pub fn is_dirty(&self) -> bool {
         self.dirty
     }
+
+    pub fn save(&mut self, file: &str) -> anyhow::Result<String> {
+        let bytes = self.to_bytes();
+        std::fs::write(file, &bytes)?;
+        let message = format!(
+            "{:?}, {}L, {}B written",
+            file,
+            self.line_count(),
+            bytes.len()
+        );
+        self.dirty = false;
+        Ok(message)
+    }
 }
 
 fn is_in_keyword(c: char) -> bool {
