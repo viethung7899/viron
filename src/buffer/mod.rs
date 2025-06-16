@@ -67,7 +67,7 @@ impl Buffer {
             self.buffer.len_without_gap()
         };
         let index_end = line_end + self.buffer.gap_end - line_start;
-        let chars = &self.buffer.buffer[line_start..line_end];
+        let chars = &self.buffer.buffer[line_start..index_end];
         chars.iter().collect()
     }
 

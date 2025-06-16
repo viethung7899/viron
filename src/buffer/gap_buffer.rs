@@ -5,7 +5,7 @@ pub struct GapBuffer<T> {
     pub(super) gap_end: usize,
 }
 
-const INITIAL_CAPACITY: usize = 1024;
+const INITIAL_CAPACITY: usize = 128;
 
 impl<T: Default + Clone> Default for GapBuffer<T> {
     fn default() -> Self {

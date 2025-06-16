@@ -497,38 +497,56 @@ impl Editor {
             })
             .peekable();
 
-        let mut end_row = 0;
-        let mut end_col = 0;
+        let mut position = Point { row: 0, column: 0 };
 
-        if let Some(info) = info_iter.peek() {
-            let mut row = 0;
-            let mut col = self.gutter_width as usize;
-            let bytes = &code[..info.byte_range.start];
-            if bytes.contains(&b'\n') {
-                let lines = bytes.split(|&b| b == b'\n').skip(self.offset.top);
-                for line in lines {
-                    let text = from_utf8(line)?;
-                    let formatted = format!("{text:<w$}", w = width as usize);
-                    buffer.set_text(row, col, &formatted, &self.theme.editor_style);
-                    row += 1;
-                    col = self.gutter_width as usize;
-                }
-            }
-            // Skip the first line
-            else {
-                buffer.set_text(row, col, from_utf8(bytes)?, &self.theme.editor_style);
-            }
+        let first = if let Some(info) = info_iter.peek() {
+            &code[..info.byte_range.start]
+        } else {
+            &code
         };
+
+        let mut lines = first
+            .split(|&b| b == b'\n')
+            .skip(self.offset.top)
+            .peekable();
+
+        while let Some(line) = lines.next() {
+            let text = from_utf8(line)?;
+            if lines.peek().is_some() {
+                let formatted = format!("{text:<w$}", w = width as usize);
+                buffer.set_text(
+                    position.row,
+                    position.column + self.gutter_width as usize,
+                    &formatted,
+                    &self.theme.editor_style,
+                );
+                if position.row + 1 >= height as usize {
+                    break;
+                }
+                position.row += 1;
+                position.column = 0;
+            } else {
+                buffer.set_text(
+                    position.row,
+                    position.column + self.gutter_width as usize,
+                    text,
+                    &self.theme.editor_style,
+                );
+                position.column += text.len();
+            }
+        }
 
         while let Some(info) = info_iter.next() {
             let style = self.theme.get_style(&info.scope);
             let bytes = &code[info.byte_range.start..info.byte_range.end];
-            end_row = info.end_position.row;
-            end_col = info.end_position.column;
+            position.row = info.end_position.row;
+            position.column = info.end_position.column;
 
             self.set_text_on_viewport(
-                info.start_position.row,
-                info.start_position.column,
+                &mut Point {
+                    row: info.start_position.row,
+                    column: info.start_position.column,
+                },
                 bytes,
                 buffer,
                 &style,
@@ -539,8 +557,7 @@ impl Editor {
                 Some(next) => {
                     if info.byte_range.end <= next.byte_range.start {
                         self.set_text_on_viewport(
-                            info.end_position.row,
-                            info.end_position.column,
+                            &mut position,
                             &code[info.byte_range.end..next.byte_range.start],
                             buffer,
                             &self.theme.editor_style,
@@ -550,8 +567,7 @@ impl Editor {
                 // Next highlight on the next line
                 None => {
                     self.set_text_on_viewport(
-                        info.end_position.row,
-                        info.end_position.column,
+                        &mut position,
                         &code[info.byte_range.end..],
                         buffer,
                         &self.theme.editor_style,
@@ -562,15 +578,15 @@ impl Editor {
 
         // Fill the remaining rows
         let empty = " ".repeat(width as usize);
-        while end_row < height as usize {
+        while position.row < height as usize {
             buffer.set_text(
-                end_row,
-                end_col + self.gutter_width as usize,
+                position.row,
+                position.column + self.gutter_width as usize,
                 &empty,
                 &self.theme.editor_style,
             );
-            end_row += 1;
-            end_col = 0;
+            position.row += 1;
+            position.column = 0;
         }
 
         Ok(())
@@ -578,8 +594,7 @@ impl Editor {
 
     fn set_text_on_viewport(
         &self,
-        row: usize,
-        col: usize,
+        position: &mut Point,
         bytes: &[u8],
         buffer: &mut RenderBuffer,
         style: &Style,
@@ -587,22 +602,21 @@ impl Editor {
         let gutter = self.gutter_width as usize;
         let (width, height) = self.get_viewport_size();
 
-        let is_multilines = bytes.contains(&b'\n');
-        if !is_multilines {
-            buffer.set_text(row, col + gutter, from_utf8(&bytes)?, style);
-        } else {
-            let mut lines = bytes.split(|&c| c == b'\n');
-            let mut current_row = row;
-            let mut current_col = col;
-            while let Some(line) = lines.next() {
-                let content = from_utf8(line)?;
-                let text = format!("{content:<w$}", w = width as usize);
-                buffer.set_text(current_row, current_col + gutter, &text, style);
-                current_row += 1;
-                current_col = 0;
-                if current_row >= height as usize {
+        let mut lines = bytes.split(|&c| c == b'\n').peekable();
+
+        while let Some(line) = lines.next() {
+            let text = from_utf8(&line)?;
+            if lines.peek().is_some() {
+                let text = format!("{text:<w$}", w = width as usize);
+                buffer.set_text(position.row, position.column + gutter, &text, style);
+                if position.row + 1 >= height as usize {
                     break;
                 }
+                position.row += 1;
+                position.column = 0;
+            } else {
+                buffer.set_text(position.row, position.column + gutter, text, style);
+                position.column += text.len();
             }
         }
         Ok(())
