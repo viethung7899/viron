@@ -626,7 +626,12 @@ impl Editor {
     fn draw_status_line(&mut self, buffer: &mut RenderBuffer) {
         let left = format!(" {} ", self.mode.to_name().to_uppercase());
         let right = format!(" {}:{} ", self.cursor.row + 1, self.cursor.column + 1);
-        let file = format!(" {}", self.file_name.as_deref().unwrap_or("new file"));
+        let dirty = if self.buffer.is_dirty() { " [+]" } else { "" };
+        let file = format!(
+            " {}{}",
+            self.file_name.as_deref().unwrap_or("new file"),
+            dirty
+        );
         let center_width = self.size.0 as usize - left.len() - right.len();
         let center = format!("{file:<center_width$}");
 

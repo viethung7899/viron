@@ -11,6 +11,7 @@ pub mod gap_buffer;
 pub struct Buffer {
     buffer: GapBuffer<char>,
     line_starts: Vec<usize>,
+    dirty: bool,
 }
 
 impl Default for Buffer {
@@ -18,6 +19,7 @@ impl Default for Buffer {
         Self {
             buffer: GapBuffer::default(),
             line_starts: vec![0],
+            dirty: false,
         }
     }
 }
@@ -38,6 +40,7 @@ impl Buffer {
         Self {
             buffer: GapBuffer::from_slice(&chars),
             line_starts: lines_start,
+            dirty: false,
         }
     }
 
@@ -87,6 +90,7 @@ impl Buffer {
         } else {
             cursor.column += 1;
         }
+        self.dirty = true;
     }
 
     pub fn insert_string(&mut self, string: &str, cursor: &mut Point) {
@@ -159,6 +163,7 @@ impl Buffer {
             cursor.row = cursor.row.saturating_sub(1);
         }
         self.clamp_column(cursor, mode);
+        self.dirty = true;
         Some(char)
     }
 
@@ -196,6 +201,7 @@ impl Buffer {
             self.line_starts[0] = 0;
             cursor.row = 0;
         }
+        self.dirty = true;
         Some(chars.into_iter().collect())
     }
 
@@ -206,8 +212,6 @@ impl Buffer {
         let buffer = &self.buffer.buffer;
         let length = buffer.len();
         let mode = Mode::Insert;
-
-        log!("[next word] before {point:?}");
 
         // Skip the current word
         if index < length && !buffer[index].is_whitespace() {
@@ -223,14 +227,11 @@ impl Buffer {
             }
         }
 
-        log!("[next word] first pass {point:?}");
-
         // Skip the whitespace
         let mut already_new_line = false;
         while index < length && buffer[index].is_whitespace() {
             let c = buffer[index];
             if c == '\n' && already_new_line {
-                log!("[next word] second new line");
                 return Some(point);
             }
             already_new_line = c == '\n';
@@ -286,6 +287,10 @@ impl Buffer {
             line_length = line_length.saturating_sub(1);
         }
         cursor.column = cursor.column.min(line_length);
+    }
+
+    pub fn is_dirty(&self) -> bool {
+        self.dirty
     }
 }
 
