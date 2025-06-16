@@ -91,7 +91,8 @@ pub enum Action {
     MoveTo(usize, usize),
 
     InsertCharAtCursor(char),
-    NewLineAtCursor,
+    InsertNewLineAtCursor,
+    InsertTabAtCursor,
     DeleteCharAtCursor,
     BackspaceCharAtCursor,
     DeleteCurrentLine,
@@ -845,8 +846,14 @@ impl Editor {
                 self.buffer.insert_char(*char, &mut self.cursor);
                 self.draw_viewport(buffer)?;
             }
-            Action::NewLineAtCursor => {
+            Action::InsertNewLineAtCursor => {
                 self.buffer.insert_char('\n', &mut self.cursor);
+                self.draw_viewport(buffer)?;
+                self.draw_gutter(buffer);
+            }
+            Action::InsertTabAtCursor => {
+                let tab = " ".repeat(self.config.tab_size);
+                self.buffer.insert_string(&tab, &mut self.cursor);
                 self.draw_viewport(buffer)?;
                 self.draw_gutter(buffer);
             }

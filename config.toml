@@ -1,4 +1,5 @@
 theme = "themes/catppuchin/mocha.json"
+tab_size = 4
 
 [keys.normal]
 "w" = "MoveToNextWord"
@@ -18,8 +19,8 @@ theme = "themes/catppuchin/mocha.json"
 "Home" = "MoveToLineStart"
 "End" = "MoveToLineEnd"
 "G" = "MoveToBottom"
-"o" = [{ EnterMode = "Insert" }, "MoveToLineEnd", "NewLineAtCursor"]
-"O" = [{ EnterMode = "Insert" }, "MoveToLineStart", "NewLineAtCursor", "MoveUp"]
+"o" = [{ EnterMode = "Insert" }, "MoveToLineEnd", "InsertNewLineAtCursor"]
+"O" = [{ EnterMode = "Insert" }, "MoveToLineStart", "InsertNewLineAtCursor", "MoveUp"]
 "x" = "DeleteCharAtCursor"
 "Ctrl-b" = "PageUp"
 "Ctrl-f" = "PageDown"
@@ -47,7 +48,8 @@ theme = "themes/catppuchin/mocha.json"
 "Right" = "MoveRight"
 "Delete" = "DeleteCharAtCursor"
 "Backspace" = "BackspaceCharAtCursor"
-"Enter" = "NewLineAtCursor"
+"Enter" = "InsertNewLineAtCursor"
+"Tab" = "InsertTabAtCursor"
 
 [keys.command]
 "Esc" = { EnterMode = "Normal" }

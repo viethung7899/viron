@@ -18,6 +18,7 @@ pub struct Config {
     pub theme: String,
     pub keys: Keys,
     pub mouse_scroll_lines: Option<usize>,
+    pub tab_size: usize,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

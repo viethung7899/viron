@@ -70,6 +70,12 @@ impl Buffer {
         }
     }
 
+    pub fn insert_string(&mut self, string: &str, cursor: &mut Point) {
+        for ch in string.chars() {
+            self.insert_char(ch, cursor);
+        }
+    }
+
     pub fn move_left(&self, cursor: &mut Point, mode: &editor::Mode) {
         if cursor.column > 0 {
             cursor.column -= 1;
@@ -212,7 +218,7 @@ impl Buffer {
             index += 1;
             self.move_right(&mut point, &mode);
         }
-        
+
         Some(point)
     }
 
