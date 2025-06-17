@@ -49,17 +49,15 @@ impl RenderBuffer {
     }
 
     pub(super) fn set_text(&mut self, row: usize, col: usize, text: &str, style: &Style) {
-        if col >= self.width || row >= self.height {
+        if row >= self.height {
             return;
         }
-        let content = if col + text.len() > self.width {
-            &text[..self.width - col]
-        } else {
-            text
-        };
         let position = row * self.width + col;
-        for (i, c) in content.chars().enumerate() {
-            if let Some(current) = self.cells.get_mut(position + i) {
+        for (index, c) in text.chars().enumerate() {
+            if index + col >= self.width {
+                break;
+            }
+            if let Some(current) = self.cells.get_mut(position + index) {
                 *current = Cell {
                     c,
                     style: style.clone(),

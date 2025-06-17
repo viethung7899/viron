@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use serde_repr::{Deserialize_repr, Serialize_repr};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TextDocumentPublishDiagnostics {
@@ -10,7 +11,8 @@ pub struct TextDocumentPublishDiagnostics {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Diagnostic {
     pub range: Range,
-    // pub severity: Option<DiagnosticSeverity>,
+    #[serde(default)]
+    pub severity: DiagnosticSeverity,
     pub code: Option<DiagnosticCode>,
     // pub code_description: Option<DiagnosticCodeDescription>,
     // pub source: Option<String>,
@@ -42,13 +44,14 @@ pub struct Position {
     pub character: usize,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(untagged)]
+#[derive(Debug, Clone, Serialize_repr, Deserialize_repr, Default)]
+#[repr(usize)]
 pub enum DiagnosticSeverity {
-    Error,
-    Warning,
-    Information,
-    Hint,
+    #[default]
+    Error = 1,
+    Warning = 2,
+    Information = 3,
+    Hint = 4,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

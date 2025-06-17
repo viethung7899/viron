@@ -2,7 +2,6 @@ use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::collections::HashMap;
-use std::path::PathBuf;
 use std::process;
 use std::{
     process::Stdio,
@@ -19,7 +18,7 @@ use tokio::{
 pub use crate::lsp::types::{Diagnostic, TextDocumentPublishDiagnostics};
 use crate::{log, utils};
 
-mod types;
+pub mod types;
 
 static ID: AtomicUsize = AtomicUsize::new(1);
 
@@ -109,7 +108,6 @@ pub async fn start_lsp() -> Result<LspClient> {
     tokio::spawn(async move {
         let mut writer = BufWriter::new(stdin);
         while let Some(message) = request_rx.recv().await {
-            log!("[lsp] editor requested to send message: {message:#?}");
             match message {
                 OutboundMessage::Request(request) => {
                     if let Err(error) = lsp_send_request(&mut writer, &request).await {
@@ -141,10 +139,7 @@ pub async fn start_lsp() -> Result<LspClient> {
                         .unwrap();
                     continue;
                 }
-                Ok(value) => {
-                    log!("[lsp] incoming message: {value:#?}");
-                    value
-                }
+                Ok(value) => value,
             };
 
             match process_response(&response) {
@@ -167,7 +162,6 @@ pub async fn start_lsp() -> Result<LspClient> {
         let mut line = String::new();
         while let Ok(read) = reader.read_line(&mut line).await {
             if read > 0 {
-                log!("[lsp] incoming stderr: {line:?}");
                 rtx.send(InboundMessage::ProcessingError(line.clone()))
                     .await
                     .unwrap();
@@ -222,7 +216,6 @@ impl LspClient {
     }
 
     pub async fn did_open(&mut self, file: &str, contents: &str) -> anyhow::Result<()> {
-        log!("[lsp] did_open file: {file}");
         let params = json!({
             "textDocument": {
                 "uri": format!("file://{}", utils::absolutize(file)?.to_string_lossy()),
@@ -263,8 +256,6 @@ impl LspClient {
 
         self.pending_responses.insert(id, method.to_string());
         self.request_tx.send(OutboundMessage::Request(req)).await?;
-
-        log!("[lsp] request {id} sent: {method:?}");
         Ok(id)
     }
 

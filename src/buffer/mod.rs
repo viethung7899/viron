@@ -5,7 +5,7 @@ use crate::{
     buffer::gap_buffer::GapBuffer,
     editor::{self, Mode},
     log,
-    lsp::{Diagnostic, LspClient, TextDocumentPublishDiagnostics},
+    lsp::{Diagnostic, TextDocumentPublishDiagnostics},
     utils,
 };
 
@@ -383,7 +383,6 @@ impl Buffer {
         };
 
         if let Some(diagnostics_uri) = &message.uri {
-            log!("Current URI {uri}, diagnostics URI {diagnostics_uri}");
             if &uri != diagnostics_uri {
                 return Ok(());
             }

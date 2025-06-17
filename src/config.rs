@@ -18,8 +18,19 @@ pub struct Config {
     pub log_file: Option<String>,
     pub theme: String,
     pub keys: Keys,
-    pub mouse_scroll_lines: Option<usize>,
     pub tab_size: usize,
+    #[serde(default = "default_mouse_scroll_line")]
+    pub mouse_scroll_lines: usize,
+    #[serde(default = "default_show_diagnostics")]
+    pub show_diagnostics: bool,
+}
+
+fn default_mouse_scroll_line() -> usize {
+    3
+}
+
+fn default_show_diagnostics() -> bool {
+    true
 }
 
 #[derive(Debug, Serialize, Deserialize)]

@@ -5,7 +5,7 @@ use crossterm::style::Color;
 use once_cell::sync::Lazy;
 use serde::Deserialize;
 
-use crate::theme::{StatusLineStyle, Style, Theme, TokenStyle};
+use crate::theme::{DiagnosticStyles, StatusLineStyle, Style, Theme, TokenStyle};
 
 static TRANSLATION_MAP: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| {
     HashMap::from([
@@ -183,6 +183,41 @@ impl From<&VsCodeTheme> for StatusLineStyle {
     }
 }
 
+impl From<&VsCodeTheme> for DiagnosticStyles {
+    fn from(theme: &VsCodeTheme) -> Self {
+        let error = Style {
+            foreground: theme.get_color("errorLens.errorForeground"),
+            italic: true,
+            ..Style::default()
+        };
+
+        let hint = Style {
+            foreground: theme.get_color("errorLens.hintForeground"),
+            italic: true,
+            ..Style::default()
+        };
+
+        let warning = Style {
+            foreground: theme.get_color("errorLens.warningForeground"),
+            italic: true,
+            ..Style::default()
+        };
+
+        let info = Style {
+            foreground: theme.get_color("errorLens.infoForeground"),
+            italic: true,
+            ..Style::default()
+        };
+
+        DiagnosticStyles {
+            error,
+            hint,
+            warning,
+            info,
+        }
+    }
+}
+
 fn parse_rgb(s: &str) -> Result<Color> {
     if !s.starts_with('#') {
         bail!("Invalid hex string");
@@ -214,7 +249,9 @@ pub fn parse_vscode_theme(file: &str) -> Result<Theme> {
     let editor_background = vscode.get_color("editor.background");
     let gutter_foreground = vscode.get_color("editorLineNumber.foreground");
     let gutter_background = vscode.get_color("editorLineNumber.background");
+
     let status_line_style = StatusLineStyle::from(&vscode);
+    let diagnostic_styles = DiagnosticStyles::from(&vscode);
 
     let token_styles = vscode
         .token_colors
@@ -235,6 +272,7 @@ pub fn parse_vscode_theme(file: &str) -> Result<Theme> {
         },
         status_line_style,
         token_styles,
+        diagnostic_styles,
     })
 }
 

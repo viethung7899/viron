@@ -256,7 +256,6 @@ impl Editor {
                     if let Some((msg, method)) = self.lsp.recv_response().await? {
                         if let Some(action) = self.handle_lsp_message(&msg, method) {
                             let current_buffer = buffer.clone();
-                            log!("executing action from lsp: {action:?}");
                             if self.execute(&action, &mut buffer).await? {
                                 break;
                             }
@@ -327,12 +326,8 @@ impl Editor {
             InboundMessage::ProcessingError(error) => {
                 self.last_message = Some(error.to_owned());
             }
-            InboundMessage::UnknownNotification(notification) => {
-                log!("got an unhandled notification: {notification:#?}");
-            }
-            InboundMessage::Error(error_msg) => {
-                log!("got an error: {error_msg:#?}");
-            }
+            InboundMessage::UnknownNotification(notification) => {}
+            InboundMessage::Error(error_msg) => {}
             InboundMessage::Message(message) => {
                 let Some(method) = method else {
                     return None;
@@ -681,16 +676,10 @@ impl Editor {
     }
 
     fn draw_diagnostics(&mut self, buffer: &mut RenderBuffer) {
+        if !self.config.show_diagnostics {
+            return;
+        }
         let (_, height) = self.get_viewport_size();
-        let hint_style = Style {
-            foreground: Some(style::Color::Rgb {
-                r: 115,
-                g: 121,
-                b: 148,
-            }),
-            italic: true,
-            ..Default::default()
-        };
         let visible_diagnostics = self
             .buffer
             .diagnostics_for_lines(self.offset.top, self.offset.top + height as usize);
@@ -702,7 +691,8 @@ impl Editor {
             let line = diagnostics.range.start.line;
             let row = diagnostics.range.start.line - self.offset.top;
             let column = self.buffer.get_line_length(line) + self.gutter_width as usize + 3;
-            buffer.set_text(row, column, &formatted, &hint_style);
+            let style = self.theme.get_diagnostic_style(&diagnostics.severity);
+            buffer.set_text(row, column, &formatted, &style);
         }
     }
 
@@ -869,7 +859,7 @@ impl Editor {
             }
             Action::ScrollUp => {
                 let (_, height) = self.get_viewport_size();
-                let scroll_lines = self.config.mouse_scroll_lines.unwrap_or(3);
+                let scroll_lines = self.config.mouse_scroll_lines;
                 self.offset.top = self.offset.top.saturating_sub(scroll_lines);
                 let end_row = self.offset.top + height as usize - 1;
                 if self.cursor.row > end_row {
@@ -881,7 +871,7 @@ impl Editor {
             }
             Action::ScrollDown => {
                 let lines = self.buffer.line_count().saturating_sub(1);
-                let scroll_lines = self.config.mouse_scroll_lines.unwrap_or(3);
+                let scroll_lines = self.config.mouse_scroll_lines;
                 self.offset.top = lines.min(self.offset.top + scroll_lines);
                 if self.cursor.row < self.offset.top {
                     self.cursor.row = self.offset.top;
