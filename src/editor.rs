@@ -328,41 +328,42 @@ impl Editor {
     ) -> Option<Action> {
         match message {
             InboundMessage::ProcessingError(error) => {
-                self.last_message = Some(error.to_owned());
-            }
-            InboundMessage::Notification(notification) => {
-                log!("got an unhandled notification: {notification:?}");
-            }
+                        self.last_message = Some(error.to_owned());
+                    }
+            InboundMessage::UnknownNotification(notification) => {
+                        log!("got an unhandled notification: {notification:#?}");
+                    }
             InboundMessage::Error(error_msg) => {
-                log!("got an error: {error_msg:?}");
-            }
+                        log!("got an error: {error_msg:#?}");
+                    }
             InboundMessage::Message(message) => {
-                let Some(method) = method else {
-                    return None;
-                };
-                match method.as_str() {
-                    "textDocument/definition" => {
-                        let result = match message.result {
-                            serde_json::Value::Array(ref arr) => arr[0].as_object().unwrap(),
-                            serde_json::Value::Object(ref obj) => obj,
-                            _ => return None,
-                        };
-                        let Some(start) = result.get("range").and_then(|range| range.get("start"))
-                        else {
+                        let Some(method) = method else {
                             return None;
                         };
-                        if let (Some(line), Some(character)) = (
-                            start.get("line").and_then(|line| line.as_u64()),
-                            start
-                                .get("character")
-                                .and_then(|character| character.as_u64()),
-                        ) {
-                            return Some(Action::MoveTo(line as usize, character as usize));
+                        match method.as_str() {
+                            "textDocument/definition" => {
+                                let result = match message.result {
+                                    serde_json::Value::Array(ref arr) => arr[0].as_object().unwrap(),
+                                    serde_json::Value::Object(ref obj) => obj,
+                                    _ => return None,
+                                };
+                                let Some(start) = result.get("range").and_then(|range| range.get("start"))
+                                else {
+                                    return None;
+                                };
+                                if let (Some(line), Some(character)) = (
+                                    start.get("line").and_then(|line| line.as_u64()),
+                                    start
+                                        .get("character")
+                                        .and_then(|character| character.as_u64()),
+                                ) {
+                                    return Some(Action::MoveTo(line as usize, character as usize));
+                                }
+                            }
+                            _ => {}
                         }
                     }
-                    _ => {}
-                }
-            }
+            InboundMessage::Notification(notification_kind) => todo!(),
         }
         None
     }
@@ -888,7 +889,6 @@ impl Editor {
             }
             Action::InsertNewLineAtCursor => {
                 let content = self.buffer.get_content_line(self.cursor.row);
-                log!("Before content: {content:?}");
                 let leading_spaces = content.chars().take_while(|c| c.is_whitespace()).count();
                 self.buffer.insert_char('\n', &mut self.cursor);
                 self.buffer
@@ -899,7 +899,6 @@ impl Editor {
             }
             Action::InsertNewLineAtCurrentLine => {
                 let content = self.buffer.get_content_line(self.cursor.row);
-                log!("Before content: {content:?}");
                 let leading_spaces = content.chars().take_while(|c| c.is_whitespace()).count();
                 self.cursor.column = 0;
                 self.buffer
@@ -997,7 +996,6 @@ impl Editor {
             }
             Action::GotoDefinition => {
                 if let Some(file) = &self.file_name {
-                    log!("going to definition for {file}");
                     self.lsp
                         .goto_definition(file, self.cursor.row, self.cursor.column)
                         .await?;
