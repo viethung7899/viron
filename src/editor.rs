@@ -19,7 +19,7 @@ use crate::{
     },
     highlighter::Highlighter,
     log,
-    lsp::{InboundMessage, LspClient},
+    lsp::{InboundMessage, LspClient, NotificationKind},
     theme::{Style, Theme},
 };
 use anyhow::Result;
@@ -151,7 +151,6 @@ impl UndoStack {
 pub struct Editor {
     config: Config,
     theme: Theme,
-    file_name: Option<String>,
     highlighter: Highlighter,
     lsp: LspClient,
     gutter_width: u16,
@@ -184,7 +183,6 @@ impl Editor {
         config: Config,
         theme: Theme,
         lsp: LspClient,
-        file_name: Option<String>,
         buffer: Buffer,
     ) -> Result<Self> {
         let stdout = stdout();
@@ -195,7 +193,6 @@ impl Editor {
         Ok(Self {
             config,
             theme,
-            file_name,
             buffer,
             highlighter,
             lsp,
@@ -223,12 +220,12 @@ impl Editor {
         let buffer = if let Some(file) = &file_name {
             let content = std::fs::read_to_string(file).unwrap_or_default();
             lsp.did_open(file, &content).await?;
-            Buffer::from_str(&content)
+            Buffer::from_content(&content, Some(file.to_owned()))
         } else {
             Buffer::default()
         };
 
-        Self::new_with_size(terminal::size()?, config, theme, lsp, file_name, buffer)
+        Self::new_with_size(terminal::size()?, config, theme, lsp, buffer)
     }
 
     pub async fn run(&mut self) -> Result<()> {
@@ -328,42 +325,46 @@ impl Editor {
     ) -> Option<Action> {
         match message {
             InboundMessage::ProcessingError(error) => {
-                        self.last_message = Some(error.to_owned());
-                    }
+                self.last_message = Some(error.to_owned());
+            }
             InboundMessage::UnknownNotification(notification) => {
-                        log!("got an unhandled notification: {notification:#?}");
-                    }
+                log!("got an unhandled notification: {notification:#?}");
+            }
             InboundMessage::Error(error_msg) => {
-                        log!("got an error: {error_msg:#?}");
-                    }
+                log!("got an error: {error_msg:#?}");
+            }
             InboundMessage::Message(message) => {
-                        let Some(method) = method else {
+                let Some(method) = method else {
+                    return None;
+                };
+                match method.as_str() {
+                    "textDocument/definition" => {
+                        let result = match message.result {
+                            serde_json::Value::Array(ref arr) => arr[0].as_object().unwrap(),
+                            serde_json::Value::Object(ref obj) => obj,
+                            _ => return None,
+                        };
+                        let Some(start) = result.get("range").and_then(|range| range.get("start"))
+                        else {
                             return None;
                         };
-                        match method.as_str() {
-                            "textDocument/definition" => {
-                                let result = match message.result {
-                                    serde_json::Value::Array(ref arr) => arr[0].as_object().unwrap(),
-                                    serde_json::Value::Object(ref obj) => obj,
-                                    _ => return None,
-                                };
-                                let Some(start) = result.get("range").and_then(|range| range.get("start"))
-                                else {
-                                    return None;
-                                };
-                                if let (Some(line), Some(character)) = (
-                                    start.get("line").and_then(|line| line.as_u64()),
-                                    start
-                                        .get("character")
-                                        .and_then(|character| character.as_u64()),
-                                ) {
-                                    return Some(Action::MoveTo(line as usize, character as usize));
-                                }
-                            }
-                            _ => {}
+                        if let (Some(line), Some(character)) = (
+                            start.get("line").and_then(|line| line.as_u64()),
+                            start
+                                .get("character")
+                                .and_then(|character| character.as_u64()),
+                        ) {
+                            return Some(Action::MoveTo(line as usize, character as usize));
                         }
                     }
-            InboundMessage::Notification(notification_kind) => todo!(),
+                    _ => {}
+                }
+            }
+            InboundMessage::Notification(kind) => match kind {
+                NotificationKind::PublishDiagnostics(message) => {
+                    self.buffer.offer_diagnostics(message).ok()?;
+                }
+            },
         }
         None
     }
@@ -436,6 +437,7 @@ impl Editor {
         self.stdout.execute(cursor::Hide)?;
         self.draw_status_line(buffer);
         self.draw_command_line(buffer);
+        self.draw_diagnostics(buffer);
         self.render_diff(buffer.diff(&current_buffer))?;
         self.draw_cursor()?;
         self.stdout.execute(cursor::Show)?;
@@ -640,7 +642,7 @@ impl Editor {
         let dirty = if self.buffer.is_dirty() { " [+]" } else { "" };
         let file = format!(
             " {}{}",
-            self.file_name.as_deref().unwrap_or("new file"),
+            self.buffer.file.as_deref().unwrap_or("new file"),
             dirty
         );
         let center_width = self.size.0 as usize - left.len() - right.len();
@@ -676,6 +678,32 @@ impl Editor {
             " ".repeat(width as usize)
         };
         buffer.set_text(height as usize - 1, 0, &format, &self.theme.editor_style);
+    }
+
+    fn draw_diagnostics(&mut self, buffer: &mut RenderBuffer) {
+        let (_, height) = self.get_viewport_size();
+        let hint_style = Style {
+            foreground: Some(style::Color::Rgb {
+                r: 115,
+                g: 121,
+                b: 148,
+            }),
+            italic: true,
+            ..Default::default()
+        };
+        let visible_diagnostics = self
+            .buffer
+            .diagnostics_for_lines(self.offset.top, self.offset.top + height as usize);
+        for diagnostics in visible_diagnostics {
+            let Some(message) = diagnostics.message.lines().next() else {
+                continue;
+            };
+            let formatted = format!("■  {message}");
+            let line = diagnostics.range.start.line;
+            let row = diagnostics.range.start.line - self.offset.top;
+            let column = self.buffer.get_line_length(line) + self.gutter_width as usize + 3;
+            buffer.set_text(row, column, &formatted, &hint_style);
+        }
     }
 
     fn handle_event(&mut self, event: &Event) -> Option<KeyAction> {
@@ -995,26 +1023,20 @@ impl Editor {
                 }
             }
             Action::GotoDefinition => {
-                if let Some(file) = &self.file_name {
+                if let Some(file) = &self.buffer.file {
                     self.lsp
                         .goto_definition(file, self.cursor.row, self.cursor.column)
                         .await?;
                 };
             }
-            Action::Save => {
-                if let Some(file) = &self.file_name {
-                    match self.buffer.save(file) {
-                        Ok(message) => {
-                            self.last_message = Some(message);
-                        }
-                        Err(err) => {
-                            self.last_message = Some(err.to_string());
-                        }
-                    }
-                } else {
-                    self.last_message = Some("No file name".into());
+            Action::Save => match self.buffer.save() {
+                Ok(message) => {
+                    self.last_message = Some(message);
                 }
-            }
+                Err(err) => {
+                    self.last_message = Some(err.to_string());
+                }
+            },
             Action::Find(term) => match self.search_box.search(term, &self.buffer) {
                 Err(err) => {
                     self.last_message = err.to_string().into();

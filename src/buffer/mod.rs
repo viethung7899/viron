@@ -1,24 +1,32 @@
+use anyhow::{Context, Result};
 use tree_sitter::Point;
 
 use crate::{
     buffer::gap_buffer::GapBuffer,
     editor::{self, Mode},
+    log,
+    lsp::{Diagnostic, LspClient, TextDocumentPublishDiagnostics},
+    utils,
 };
 
 pub mod gap_buffer;
 
 pub struct Buffer {
+    pub file: Option<String>,
     buffer: GapBuffer<char>,
     line_starts: Vec<usize>,
     dirty: bool,
+    pub diagnostics: Vec<Diagnostic>,
 }
 
 impl Default for Buffer {
     fn default() -> Self {
         Self {
+            file: None,
             buffer: GapBuffer::default(),
             line_starts: vec![0],
             dirty: false,
+            diagnostics: Vec::new(),
         }
     }
 }
@@ -28,8 +36,8 @@ impl Buffer {
         self.line_starts.len()
     }
 
-    pub fn from_str(s: &str) -> Self {
-        let chars = s.chars().collect::<Vec<_>>();
+    pub fn from_content(content: &str, file: Option<String>) -> Self {
+        let chars = content.chars().collect::<Vec<_>>();
         let mut lines_start = vec![0];
         for (i, &char) in chars.iter().enumerate() {
             if char == '\n' {
@@ -39,7 +47,8 @@ impl Buffer {
         Self {
             buffer: GapBuffer::from_slice(&chars),
             line_starts: lines_start,
-            dirty: false,
+            file,
+            ..Default::default()
         }
     }
 
@@ -74,6 +83,18 @@ impl Buffer {
         let index_end = line_end + self.buffer.gap_end - line_start;
         let chars = &self.buffer.buffer[line_start..index_end];
         chars.iter().collect()
+    }
+
+    pub fn get_line_length(&self, line: usize) -> usize {
+        if line > self.line_count() {
+            return 0;
+        }
+        let line_end = if line + 1 < self.line_starts.len() {
+            self.line_starts[line + 1]
+        } else {
+            self.buffer.len_without_gap()
+        };
+        line_end - self.line_starts[line]
     }
 
     pub fn insert_char(&mut self, ch: char, cursor: &mut Point) {
@@ -217,11 +238,11 @@ impl Buffer {
 
         // Skip the current word
         if index < length && !buffer[index].is_whitespace() {
-            let keyword_type = is_in_keyword(buffer[index]);
+            let keyword_type = is_keyword(buffer[index]);
 
             while index < length {
                 let c = buffer[index];
-                if c.is_whitespace() || is_in_keyword(c) != keyword_type {
+                if c.is_whitespace() || is_keyword(c) != keyword_type {
                     break;
                 }
                 index += 1;
@@ -253,11 +274,11 @@ impl Buffer {
 
         // Delete the current word
         if index < length && !buffer[index].is_whitespace() {
-            let keyword_type = is_in_keyword(buffer[index]);
+            let keyword_type = is_keyword(buffer[index]);
 
             while index < length {
                 let c = buffer[index];
-                if c.is_whitespace() || is_in_keyword(c) != keyword_type {
+                if c.is_whitespace() || is_keyword(c) != keyword_type {
                     break;
                 }
                 index += 1;
@@ -297,10 +318,10 @@ impl Buffer {
             self.move_left(&mut point, &mode);
         }
 
-        let keyword_type = is_in_keyword(buffer[index]);
+        let keyword_type = is_keyword(buffer[index]);
         while index > 0 {
             let prev = buffer[index - 1];
-            if prev.is_whitespace() || is_in_keyword(buffer[index - 1]) != keyword_type {
+            if prev.is_whitespace() || is_keyword(buffer[index - 1]) != keyword_type {
                 return Some(point);
             }
             index -= 1;
@@ -331,7 +352,8 @@ impl Buffer {
         self.dirty
     }
 
-    pub fn save(&mut self, file: &str) -> anyhow::Result<String> {
+    pub fn save(&mut self) -> Result<String> {
+        let file = &self.file.as_ref().context("No file name")?;
         let bytes = self.to_bytes();
         std::fs::write(file, &bytes)?;
         let message = format!(
@@ -343,8 +365,56 @@ impl Buffer {
         self.dirty = false;
         Ok(message)
     }
+
+    pub fn uri(&self) -> Result<Option<String>> {
+        match &self.file {
+            Some(file) => Ok(format!(
+                "file://{}",
+                utils::absolutize(file)?.to_string_lossy().to_string()
+            )
+            .into()),
+            None => Ok(None),
+        }
+    }
+
+    pub fn offer_diagnostics(&mut self, message: &TextDocumentPublishDiagnostics) -> Result<()> {
+        let Some(uri) = self.uri()? else {
+            return Ok(());
+        };
+
+        if let Some(diagnostics_uri) = &message.uri {
+            log!("Current URI {uri}, diagnostics URI {diagnostics_uri}");
+            if &uri != diagnostics_uri {
+                return Ok(());
+            }
+        }
+
+        self.diagnostics.extend(
+            message
+                .diagnostics
+                .iter()
+                .filter(|d| d.is_for(&uri))
+                .map(|d| d.clone()),
+        );
+
+        Ok(())
+    }
+
+    pub fn diagnostics_for_lines(
+        &self,
+        starting_line: usize,
+        ending_line: usize,
+    ) -> Vec<&Diagnostic> {
+        self.diagnostics
+            .iter()
+            .filter(|d| {
+                let start = &d.range.start;
+                start.line >= starting_line && start.line < ending_line
+            })
+            .collect::<Vec<_>>()
+    }
 }
 
-fn is_in_keyword(c: char) -> bool {
+fn is_keyword(c: char) -> bool {
     c.is_alphanumeric() || c == '_'
 }

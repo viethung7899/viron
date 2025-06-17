@@ -5,6 +5,7 @@ mod highlighter;
 mod logger;
 mod lsp;
 mod theme;
+mod utils;
 
 use std::{io::stdout, panic};
 
