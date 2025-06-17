@@ -44,11 +44,14 @@ impl Buffer {
         }
     }
 
-    pub fn to_bytes(&self) -> Vec<u8> {
+    pub fn to_string(&self) -> String {
         let prefix = &self.buffer.buffer[..self.buffer.gap_start];
         let suffix = &self.buffer.buffer[self.buffer.gap_end..];
-        let content: String = prefix.iter().chain(suffix.iter()).collect();
-        content.into_bytes()
+        prefix.iter().chain(suffix.iter()).collect()
+    }
+
+    pub fn to_bytes(&self) -> Vec<u8> {
+        self.to_string().into_bytes()
     }
 
     pub fn cursor_position(&self, cursor: &Point) -> usize {

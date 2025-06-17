@@ -30,6 +30,9 @@ log_file = "/tmp/viron.log"
 "a" = [{ EnterMode = "Insert" }, "MoveRight"]
 
 ":" = { EnterMode = "Command" }
+"/" = { EnterMode = "Search" }
+"n" = "FindNext"
+"N" = "FindPrevious"
 
 [keys.normal.g]
 "g" = "MoveToTop"

@@ -1,5 +1,6 @@
-mod command_center;
+mod command;
 mod render_buffer;
+mod search;
 
 use std::{
     io::{Stdout, Write, stdout},
@@ -12,8 +13,9 @@ use crate::{
     buffer::Buffer,
     config::{Config, KeyAction, KeyMapping, get_key_action},
     editor::{
-        command_center::CommandCenter,
+        command::CommandCenter,
         render_buffer::{Change, RenderBuffer},
+        search::SearchBox,
     },
     highlighter::Highlighter,
     log,
@@ -45,6 +47,7 @@ pub enum Mode {
     Normal,
     Insert,
     Command,
+    Search,
 }
 
 impl Mode {
@@ -52,13 +55,13 @@ impl Mode {
         match self {
             Mode::Normal => "Normal",
             Mode::Insert => "Insert",
-            Mode::Command => "Command",
+            Mode::Command | Mode::Search => "Command",
         }
     }
     fn set_cursor_style(&self) -> cursor::SetCursorStyle {
         match self {
-            Mode::Normal | Mode::Command => cursor::SetCursorStyle::SteadyBlock,
             Mode::Insert => cursor::SetCursorStyle::SteadyBar,
+            _ => cursor::SetCursorStyle::SteadyBlock,
         }
     }
 }
@@ -67,6 +70,8 @@ impl Mode {
 pub enum Action {
     Quit,
     Undo,
+    Save,
+    EnterMode(Mode),
 
     MoveUp,
     MoveDown,
@@ -101,14 +106,14 @@ pub enum Action {
     DeleteCurrentLine,
     DeleteWord,
 
-    EnterMode(Mode),
-
     ExecuteCommand,
 
     Multiple(Vec<Action>),
 
     GotoDefinition,
-    Save,
+    Find(String),
+    FindNext,
+    FindPrevious,
 }
 
 #[derive(Debug, Default)]
@@ -160,6 +165,7 @@ pub struct Editor {
     waiting_key_action: Option<KeyMapping>,
     undo: UndoStack,
     command_center: CommandCenter,
+    search_box: SearchBox,
     last_message: Option<String>,
 }
 
@@ -203,6 +209,7 @@ impl Editor {
             waiting_key_action: None,
             undo: UndoStack::default(),
             command_center: CommandCenter::default(),
+            search_box: SearchBox::default(),
             last_message: None,
         })
     }
@@ -457,8 +464,8 @@ impl Editor {
             Some(_) => cursor::SetCursorStyle::SteadyUnderScore,
             None => self.mode.set_cursor_style(),
         };
-        let (row, col) = if self.mode == Mode::Command {
-            (self.size.0 - 1, self.command_center.position as u16 + 1)
+        let (row, col) = if self.mode == Mode::Command || self.mode == Mode::Search {
+            (self.size.0 - 1, self.command_center.position as u16)
         } else {
             self.get_current_screen_position()
         };
@@ -641,7 +648,7 @@ impl Editor {
         let outer_style = match self.mode {
             Mode::Insert => &self.theme.status_line_style.insert,
             Mode::Normal => &self.theme.status_line_style.normal,
-            Mode::Command => &self.theme.status_line_style.command,
+            Mode::Command | Mode::Search => &self.theme.status_line_style.command,
         };
 
         let height = self.get_viewport_size().1 as usize;
@@ -657,9 +664,9 @@ impl Editor {
 
     fn draw_command_line(&mut self, buffer: &mut RenderBuffer) {
         let (width, height) = self.size;
-        let format = if self.mode == Mode::Command {
-            let command = self.command_center.buffer.clone();
-            format!(":{command:<w$}", w = width as usize)
+        let format = if self.mode == Mode::Command || self.mode == Mode::Search {
+            let command = self.command_center.command.clone();
+            format!("{command:<w$}", w = width as usize)
         } else if let Some(ref message) = self.last_message {
             format!("{message:<w$}", w = width as usize)
         } else if let Some(c) = self.waiting_key_command {
@@ -686,7 +693,7 @@ impl Editor {
         let action = match &self.mode {
             Mode::Insert => self.handle_insert_event(&event),
             Mode::Normal => self.handle_normal_event(&event),
-            Mode::Command => self.handle_command_event(&event),
+            Mode::Command | Mode::Search => self.handle_command_event(&event),
         };
 
         if action.is_some() {
@@ -765,11 +772,11 @@ impl Editor {
             Action::MoveDown => self.buffer.move_down(&mut self.cursor, &self.mode),
             Action::MoveLeft => match self.mode {
                 Mode::Normal | Mode::Insert => self.buffer.move_left(&mut self.cursor, &self.mode),
-                Mode::Command => self.command_center.move_left(),
+                Mode::Command | Mode::Search => self.command_center.move_left(),
             },
             Action::MoveRight => match self.mode {
                 Mode::Normal | Mode::Insert => self.buffer.move_right(&mut self.cursor, &self.mode),
-                Mode::Command => self.command_center.move_right(),
+                Mode::Command | Mode::Search => self.command_center.move_right(),
             },
             Action::PageUp => {
                 let (_, height) = self.get_viewport_size();
@@ -859,8 +866,16 @@ impl Editor {
                     (Mode::Insert, Mode::Normal) => {
                         self.undo.batch();
                     }
-                    (Mode::Command, _) => {
+                    (Mode::Command, _) | (Mode::Search, _) => {
                         self.command_center.reset();
+                    }
+                    (_, Mode::Command) => {
+                        self.command_center.reset();
+                        self.command_center.insert(':');
+                    }
+                    (_, Mode::Search) => {
+                        self.command_center.reset();
+                        self.command_center.insert('/');
                     }
                     _ => {}
                 }
@@ -869,6 +884,7 @@ impl Editor {
             Action::InsertCharAtCursor(char) => {
                 self.buffer.insert_char(*char, &mut self.cursor);
                 self.draw_viewport(buffer)?;
+                self.search_box.clear();
             }
             Action::InsertNewLineAtCursor => {
                 let content = self.buffer.get_content_line(self.cursor.row);
@@ -879,6 +895,7 @@ impl Editor {
                     .insert_string(&" ".repeat(leading_spaces), &mut self.cursor);
                 self.draw_viewport(buffer)?;
                 self.draw_gutter(buffer);
+                self.search_box.clear();
             }
             Action::InsertNewLineAtCurrentLine => {
                 let content = self.buffer.get_content_line(self.cursor.row);
@@ -894,14 +911,17 @@ impl Editor {
                 self.execute(&Action::MoveToLineEnd, buffer).await?;
                 self.draw_viewport(buffer)?;
                 self.draw_gutter(buffer);
+                self.search_box.clear();
             }
             Action::InsertTabAtCursor => {
                 let tab = " ".repeat(self.config.tab_size);
                 self.buffer.insert_string(&tab, &mut self.cursor);
                 self.draw_viewport(buffer)?;
                 self.draw_gutter(buffer);
+                self.search_box.clear();
             }
             Action::DeleteCharAtCursor => {
+                self.search_box.clear();
                 if let Some(char) = self.buffer.get_current_char(&self.cursor) {
                     if char != '\n' || self.mode == Mode::Insert {
                         self.buffer.delete_char(&mut self.cursor, &self.mode);
@@ -914,12 +934,13 @@ impl Editor {
             }
             Action::BackspaceCharAtCursor => match &self.mode {
                 Mode::Insert | Mode::Normal => {
+                    self.search_box.clear();
                     if self.cursor.row != 0 || self.cursor.column != 0 {
                         self.execute(&Action::MoveLeft, buffer).await?;
                         self.execute(&Action::DeleteCharAtCursor, buffer).await?;
                     }
                 }
-                Mode::Command => {
+                Mode::Command | Mode::Search => {
                     let sucess = self.command_center.backspace();
                     if !sucess {
                         self.execute(&Action::EnterMode(Mode::Normal), buffer)
@@ -928,6 +949,7 @@ impl Editor {
                 }
             },
             Action::DeleteCurrentLine => {
+                self.search_box.clear();
                 let _ = self.buffer.delete_current_line(&mut self.cursor);
                 while let Some(' ') = self.buffer.get_current_char(&self.cursor) {
                     self.buffer.move_right(&mut self.cursor, &self.mode);
@@ -936,6 +958,7 @@ impl Editor {
                 self.draw_viewport(buffer)?;
             }
             Action::DeleteWord => {
+                self.search_box.clear();
                 if self.cursor.column == 0
                     && Some('\n') == self.buffer.get_current_char(&self.cursor)
                 {
@@ -994,6 +1017,44 @@ impl Editor {
                     self.last_message = Some("No file name".into());
                 }
             }
+            Action::Find(term) => match self.search_box.search(term, &self.buffer) {
+                Err(err) => {
+                    self.last_message = err.to_string().into();
+                }
+                Ok(()) => {
+                    self.execute(&Action::FindNext, buffer).await?;
+                }
+            },
+            Action::FindNext => match self.search_box.find_next(&self.cursor) {
+                Some((index, position)) => {
+                    self.execute(&Action::MoveTo(position.row, position.column), buffer)
+                        .await?;
+                    self.last_message = Some(format!(
+                        "/{} [{}, {}]",
+                        self.search_box.term.as_ref().unwrap().to_string(),
+                        index + 1,
+                        self.search_box.count()
+                    ));
+                }
+                None => {
+                    self.last_message = "No match found".to_string().into();
+                }
+            },
+            Action::FindPrevious => match self.search_box.find_previous(&self.cursor) {
+                Some((index, position)) => {
+                    self.execute(&Action::MoveTo(position.row, position.column), buffer)
+                        .await?;
+                    self.last_message = Some(format!(
+                        "/{} [{}, {}]",
+                        self.search_box.term.as_ref().unwrap().to_string(),
+                        index + 1,
+                        self.search_box.count()
+                    ));
+                }
+                None => {
+                    self.last_message = "No match found".to_string().into();
+                }
+            },
         }
         Ok(false)
     }
