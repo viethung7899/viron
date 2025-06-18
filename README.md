@@ -1,6 +1,6 @@
 # viron 📝⚡️
 
-**viron** is a modern, fast, and extensible text editor inspired by Vim, written in Rust. It aims to provide a familiar modal editing experience with a focus on performance, reliability, and customization. 🦀
+**viron** is an attempt to recreate the Vim code editor in Rust. 🦀
 
 ## Features ✨
 
