@@ -2,6 +2,8 @@
 
 **viron** is an attempt to recreate the Vim code editor in Rust. 🦀
 
+![viron screenshot](./docs/screenshot.png)
+
 ## Features ✨
 
 - **Vim-like modal editing**: Efficient keyboard-driven editing with normal, insert, and visual modes. ⌨️
