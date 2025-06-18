@@ -272,6 +272,16 @@ impl Editor {
                         Some(std::result::Result::Ok(event)) => {
                             let current_buffer = buffer.clone();
                             self.last_message = None;
+                            if let Event::Resize(width, height) = event {
+                                self.size = (width, height);
+                                buffer = RenderBuffer::new(
+                                    width as usize,
+                                    height as usize,
+                                    self.theme.editor_style.clone().into()
+                                );
+                                self.render(&mut buffer)?;
+                                continue;
+                            }
                             if let Some(key_action) = self.handle_event(&event) {
                                 let quit = match key_action {
                                     KeyAction::Single(action) => self.execute(&action, &mut buffer).await?,
@@ -697,11 +707,6 @@ impl Editor {
     }
 
     fn handle_event(&mut self, event: &Event) -> Option<KeyAction> {
-        if let Event::Resize(width, height) = event {
-            self.size = (*width, *height);
-            return None;
-        }
-
         if let Some(mapping) = &self.waiting_key_action {
             let action = get_key_action(mapping, &event);
             self.waiting_key_command = None;
