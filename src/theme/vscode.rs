@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, u8};
 
 use anyhow::{Error, Result, bail};
 use crossterm::style::Color;
@@ -118,6 +118,12 @@ impl VsCodeTheme {
             .get(key)
             .and_then(|s| parse_rgb(s.as_str()).ok())
     }
+
+    pub fn get_color_with_alpha(&self, key: &str, background: Option<&Color>) -> Option<Color> {
+        self.colors
+            .get(key)
+            .and_then(|s| parse_rgba(s.as_str(), background).ok())
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -185,26 +191,34 @@ impl From<&VsCodeTheme> for StatusLineStyle {
 
 impl From<&VsCodeTheme> for DiagnosticStyles {
     fn from(theme: &VsCodeTheme) -> Self {
+        let background = theme.get_color("editor.background");
+
         let error = Style {
             foreground: theme.get_color("errorLens.errorForeground"),
+            background: theme
+                .get_color_with_alpha("errorLens.errorBackground", background.as_ref()),
             italic: true,
             ..Style::default()
         };
 
         let hint = Style {
             foreground: theme.get_color("errorLens.hintForeground"),
+            background: theme.get_color_with_alpha("errorLens.hintBackground", background.as_ref()),
             italic: true,
             ..Style::default()
         };
 
         let warning = Style {
             foreground: theme.get_color("errorLens.warningForeground"),
+            background: theme
+                .get_color_with_alpha("errorLens.warningBackground", background.as_ref()),
             italic: true,
             ..Style::default()
         };
 
         let info = Style {
             foreground: theme.get_color("errorLens.infoForeground"),
+            background: theme.get_color_with_alpha("errorLens.infoBackground", background.as_ref()),
             italic: true,
             ..Style::default()
         };
@@ -219,18 +233,47 @@ impl From<&VsCodeTheme> for DiagnosticStyles {
 }
 
 fn parse_rgb(s: &str) -> Result<Color> {
-    if !s.starts_with('#') {
+    parse_rgba(s, None)
+}
+
+fn parse_rgba(s: &str, background: Option<&Color>) -> Result<Color> {
+    let Some(color) = s.strip_prefix("#") else {
         bail!("Invalid hex string");
+    };
+
+    if color.len() != 6 && color.len() != 8 {
+        bail!("Invalid hex string, got #{color}");
     }
 
-    let s = &s[1..];
-    if s.len() != 6 {
-        bail!("Invalid hex string, got #{s}");
-    }
+    let r = u8::from_str_radix(&color[0..2], 16)?;
+    let g = u8::from_str_radix(&color[2..4], 16)?;
+    let b = u8::from_str_radix(&color[4..6], 16)?;
 
-    let r = u8::from_str_radix(&s[0..2], 16)?;
-    let g = u8::from_str_radix(&s[2..4], 16)?;
-    let b = u8::from_str_radix(&s[4..6], 16)?;
+    let Some(Color::Rgb {
+        r: bg_r,
+        g: bg_g,
+        b: bg_b,
+    }) = background
+    else {
+        return Ok(Color::Rgb { r, g, b });
+    };
+
+    let a = if color.len() == 8 {
+        u8::from_str_radix(&s[6..8], 16)?
+    } else {
+        u8::MAX
+    };
+
+    if a == u8::MAX {
+        return Ok(Color::Rgb { r, g, b });
+    };
+
+    let alpha = a as f32 / 255.0;
+    let [r, g, b] = [(r, bg_r), (g, bg_g), (b, bg_b)].map(|(fg, bg)| {
+        let fg = fg as f32 * alpha;
+        let bg = *bg as f32 * (1.0 - alpha);
+        (fg + bg).floor() as u8
+    });
 
     Ok(Color::Rgb { r, g, b })
 }
