@@ -153,7 +153,6 @@ pub struct Editor {
     theme: Theme,
     highlighter: Highlighter,
     lsp: LspClient,
-    gutter_width: u16,
     buffer: Buffer,
     stdout: Stdout,
     offset: Offset,
@@ -187,7 +186,6 @@ impl Editor {
     ) -> Result<Self> {
         let stdout = stdout();
         terminal::enable_raw_mode().unwrap();
-        let gutter_width = buffer.line_count().to_string().len() as u16 + 2;
         let highlighter = Highlighter::new()?;
 
         Ok(Self {
@@ -197,7 +195,6 @@ impl Editor {
             highlighter,
             lsp,
             stdout,
-            gutter_width,
             offset: Offset { top: 0, left: 0 },
             cursor: Point { row: 0, column: 0 },
             mode: Mode::Normal,
@@ -374,15 +371,19 @@ impl Editor {
         None
     }
 
+    fn gutter_width(&self) -> usize {
+        self.buffer.line_count().to_string().len() + 2
+    }
+
     fn get_viewport_size(&self) -> (u16, u16) {
         let (width, height) = self.size;
-        (width - self.gutter_width, height - 2)
+        (width - self.gutter_width() as u16, height - 2)
     }
 
     fn get_current_screen_position(&self) -> (u16, u16) {
         let row = self.cursor.row - self.offset.top;
         let col = self.cursor.column - self.offset.left;
-        (row as u16, col as u16 + self.gutter_width)
+        (row as u16, col as u16 + self.gutter_width() as u16)
     }
 
     fn reset_bounds(&mut self) -> bool {
@@ -488,10 +489,10 @@ impl Editor {
         for i in 0..height {
             let line_number = self.offset.top + i as usize + 1;
             let content = if line_number <= self.buffer.line_count() {
-                let w = (self.gutter_width - 1) as usize;
+                let w = self.gutter_width() - 1;
                 format!("{line_number:>w$} ")
             } else {
-                " ".repeat(self.gutter_width as usize)
+                " ".repeat(self.gutter_width())
             };
             buffer.set_text(i as usize, 0, &content, &self.theme.gutter_style);
         }
@@ -535,7 +536,7 @@ impl Editor {
                 let formatted = format!("{text:<w$}", w = width as usize);
                 buffer.set_text(
                     position.row,
-                    position.column + self.gutter_width as usize,
+                    position.column + self.gutter_width(),
                     &formatted,
                     &self.theme.editor_style,
                 );
@@ -547,7 +548,7 @@ impl Editor {
             } else {
                 buffer.set_text(
                     position.row,
-                    position.column + self.gutter_width as usize,
+                    position.column + self.gutter_width(),
                     text,
                     &self.theme.editor_style,
                 );
@@ -600,7 +601,7 @@ impl Editor {
         while position.row < height as usize {
             buffer.set_text(
                 position.row,
-                position.column + self.gutter_width as usize,
+                position.column + self.gutter_width(),
                 &empty,
                 &self.theme.editor_style,
             );
@@ -618,7 +619,7 @@ impl Editor {
         buffer: &mut RenderBuffer,
         style: &Style,
     ) -> Result<()> {
-        let gutter = self.gutter_width as usize;
+        let gutter = self.gutter_width();
         let (width, height) = self.get_viewport_size();
 
         let mut lines = bytes.split(|&c| c == b'\n').peekable();
@@ -700,7 +701,7 @@ impl Editor {
             let formatted = format!("■  {message}");
             let line = diagnostics.range.start.line;
             let row = diagnostics.range.start.line - self.offset.top;
-            let column = self.buffer.get_line_length(line) + self.gutter_width as usize + 3;
+            let column = self.buffer.get_line_length(line) + self.gutter_width() + 3;
             let style = self.theme.get_diagnostic_style(&diagnostics.severity);
             buffer.set_text(row, column, &formatted, &style);
         }
@@ -737,12 +738,12 @@ impl Editor {
         match mouse_event.kind {
             MouseEventKind::Down(MouseButton::Left) => {
                 let (_, height) = self.get_viewport_size();
-                if column < self.gutter_width || row >= height {
+                if (column as usize) < self.gutter_width() || row >= height {
                     return None;
                 }
                 Some(KeyAction::Single(Action::MoveTo(
                     row as usize + self.offset.top,
-                    (column - self.gutter_width) as usize,
+                    column as usize - self.gutter_width(),
                 )))
             }
             MouseEventKind::ScrollUp => Some(KeyAction::Single(Action::ScrollUp)),

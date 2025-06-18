@@ -16,7 +16,7 @@ use tokio::{
 };
 
 pub use crate::lsp::types::{Diagnostic, TextDocumentPublishDiagnostics};
-use crate::{log, utils};
+use crate::utils;
 
 pub mod types;
 

@@ -4,7 +4,6 @@ use tree_sitter::Point;
 use crate::{
     buffer::gap_buffer::GapBuffer,
     editor::{self, Mode},
-    log,
     lsp::{Diagnostic, TextDocumentPublishDiagnostics},
     utils,
 };
