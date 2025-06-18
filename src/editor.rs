@@ -276,6 +276,9 @@ impl Editor {
                                     height as usize,
                                     self.theme.editor_style.clone().into()
                                 );
+                                let viewport_height = self.get_viewport_size().1 as usize;
+                                self.cursor.row = self.cursor.row.min(self.offset.top + viewport_height - 1);
+                                self.buffer.clamp_column(&mut self.cursor, &self.mode);
                                 self.render(&mut buffer)?;
                                 continue;
                             }
