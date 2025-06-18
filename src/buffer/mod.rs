@@ -20,9 +20,11 @@ pub struct Buffer {
 
 impl Default for Buffer {
     fn default() -> Self {
+        let mut buffer = GapBuffer::default();
+        buffer.insert_single('\n');
         Self {
             file: None,
-            buffer: GapBuffer::default(),
+            buffer,
             line_starts: vec![0],
             dirty: false,
             diagnostics: Vec::new(),
