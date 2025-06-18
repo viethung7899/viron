@@ -169,6 +169,7 @@ impl Buffer {
     }
 
     pub fn delete_char(&mut self, cursor: &mut Point, mode: &editor::Mode) -> Option<char> {
+        self.dirty = true;
         let position = self.cursor_position(cursor);
         self.buffer.move_gap(position);
 
@@ -182,10 +183,8 @@ impl Buffer {
 
         if char == '\n' {
             self.line_starts.remove(cursor.row + 1);
-            cursor.row = cursor.row.saturating_sub(1);
         }
         self.clamp_column(cursor, mode);
-        self.dirty = true;
         Some(char)
     }
 

@@ -905,6 +905,7 @@ impl Editor {
                     _ => {}
                 }
                 self.mode = mode.to_owned();
+                self.buffer.clamp_column(&mut self.cursor, &self.mode);
             }
             Action::InsertCharAtCursor(char) => {
                 self.buffer.insert_char(*char, &mut self.cursor);
@@ -913,7 +914,7 @@ impl Editor {
             }
             Action::InsertNewLineAtCursor => {
                 let content = self.buffer.get_content_line(self.cursor.row);
-                let leading_spaces = content.chars().take_while(|c| c.is_whitespace()).count();
+                let leading_spaces = content.chars().take_while(|c| *c == ' ').count();
                 self.buffer.insert_char('\n', &mut self.cursor);
                 self.buffer
                     .insert_string(&" ".repeat(leading_spaces), &mut self.cursor);
@@ -964,12 +965,13 @@ impl Editor {
                     }
                 }
                 Mode::Command | Mode::Search => {
-                    let sucess = self.command_center.backspace();
-                    if !sucess {
+                    let success = self.command_center.backspace();
+                    if !success {
                         self.execute(&Action::EnterMode(Mode::Normal), buffer)
                             .await?;
                     }
                 }
+                _ => {}
             },
             Action::DeleteCurrentLine => {
                 self.search_box.clear();
