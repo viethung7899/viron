@@ -1,5 +1,6 @@
 # Keybindings for normal mode
 [normal_mode]
+"q" = { type = "Quit" }
 "h" = { type = "MoveLeft", params = { count = 1 } }
 "j" = { type = "MoveDown", params = { count = 1 } }
 "k" = { type = "MoveUp", params = { count = 1 } }

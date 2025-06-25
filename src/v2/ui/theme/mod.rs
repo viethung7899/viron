@@ -25,13 +25,12 @@ pub struct ThemeColors {
     pub command_background: Color,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct SyntaxStyle {
     pub foreground: Option<Color>,
     pub background: Option<Color>,
-    pub bold: Option<bool>,
-    pub italic: Option<bool>,
-    pub underline: Option<bool>,
+    pub bold: bool,
+    pub italic: bool,
 }
 
 impl Theme {

@@ -22,13 +22,10 @@ async fn main() -> Result<()> {
     let args: Vec<String> = env::args().collect();
 
     // Create and initialize editor
-    let mut editor = match Editor::new() {
-        Ok(editor) => editor,
-        Err(e) => {
-            eprintln!("Error initializing editor: {}", e);
-            process::exit(1);
-        }
-    };
+    let mut editor = Editor::new()?;
+
+    // Load the config
+    editor.load_config("config.v2.toml")?;
 
     // Set up error handling for the editor's run method
     let result = run_editor(&mut editor, &args);
