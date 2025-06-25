@@ -18,7 +18,8 @@ impl MoveLeft {
 impl Action for MoveLeft {
     fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         for _ in 0..self.count {
-            ctx.cursor.move_left(ctx.buffer, ctx.mode);
+            ctx.cursor
+                .move_left(ctx.buffer_manager.current_buffer(), ctx.mode);
         }
         Ok(())
     }
@@ -46,7 +47,8 @@ impl MoveRight {
 impl Action for MoveRight {
     fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         for _ in 0..self.count {
-            ctx.cursor.move_right(ctx.buffer, ctx.mode);
+            ctx.cursor
+                .move_right(ctx.buffer_manager.current_buffer(), ctx.mode);
         }
         Ok(())
     }
@@ -74,7 +76,8 @@ impl MoveUp {
 impl Action for MoveUp {
     fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         for _ in 0..self.count {
-            ctx.cursor.move_up(ctx.buffer, ctx.mode);
+            ctx.cursor
+                .move_up(ctx.buffer_manager.current_buffer(), ctx.mode);
         }
         Ok(())
     }
@@ -102,7 +105,8 @@ impl MoveDown {
 impl Action for MoveDown {
     fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         for _ in 0..self.count {
-            ctx.cursor.move_down(ctx.buffer, ctx.mode);
+            ctx.cursor
+                .move_down(ctx.buffer_manager.current_buffer(), ctx.mode);
         }
         Ok(())
     }
@@ -139,7 +143,8 @@ pub struct MoveToLineEnd {}
 
 impl Action for MoveToLineEnd {
     fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
-        ctx.cursor.move_to_line_end(ctx.buffer, ctx.mode);
+        ctx.cursor
+            .move_to_line_end(ctx.buffer_manager.current_buffer(), ctx.mode);
         Ok(())
     }
 

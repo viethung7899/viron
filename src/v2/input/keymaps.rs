@@ -1,5 +1,5 @@
 use anyhow::Result;
-use crossterm::event::{KeyCode, KeyModifiers};
+use crossterm::event::{KeyCode, KeyEvent as CrosstermKeyEvent, KeyModifiers};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
@@ -13,6 +13,15 @@ use crate::input::actions::{Action, ActionDefinition, create_action_from_definit
 pub struct KeyEvent {
     pub code: KeyCode,
     pub modifiers: KeyModifiers,
+}
+
+impl From<CrosstermKeyEvent> for KeyEvent {
+    fn from(event: CrosstermKeyEvent) -> Self {
+        Self {
+            code: event.code,
+            modifiers: event.modifiers,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

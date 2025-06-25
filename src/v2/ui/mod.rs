@@ -1,4 +1,6 @@
-mod renderer;
-mod status_line;
-mod command_line;
-mod gutter;
+pub mod command_line;
+pub mod gutter;
+pub mod message;
+pub mod renderer;
+pub mod status_line;
+pub mod theme;

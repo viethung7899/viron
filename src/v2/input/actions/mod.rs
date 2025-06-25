@@ -22,7 +22,6 @@ pub use movement::*;
 // Context passed to actions when they execute
 pub struct ActionContext<'a> {
     pub buffer_manager: &'a mut BufferManager,
-    pub buffer: &'a mut Buffer,
     pub cursor: &'a mut Cursor,
     pub viewport: &'a mut Viewport,
     pub mode: &'a mut Mode,

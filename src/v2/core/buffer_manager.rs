@@ -73,9 +73,10 @@ impl BufferManager {
     }
 
     /// Save the current buffer to its file
-    pub fn save_current(&mut self) -> Result<()> {
+    pub fn save_current(&mut self) -> Result<String> {
         let document = self.current_mut();
-        document.save()
+        document.save()?;
+        document.file_name().context("No file name")
     }
 
     /// Save the current buffer to a specific path

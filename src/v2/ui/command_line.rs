@@ -72,7 +72,7 @@ impl CommandLine {
         }
     }
 
-    pub fn get_command(&self) -> &str {
-        &self.command
+    pub fn get_command(&self) -> String {
+        self.command.to_string()
     }
 }

@@ -86,4 +86,16 @@ impl<W: Write> Renderer<W> {
     pub fn dimensions(&self) -> (usize, usize) {
         (self.screen_width, self.screen_height)
     }
+
+    pub fn writer(&mut self) -> &mut W {
+        &mut self.writer
+    }
+
+    pub fn width(&self) -> usize {
+        self.screen_width
+    }
+
+    pub fn height(&self) -> usize {
+        self.screen_height
+    }
 }
