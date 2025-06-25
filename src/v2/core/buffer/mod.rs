@@ -381,7 +381,7 @@ impl Buffer {
     }
 
     /// Convert position to a Point
-    fn point_at_position(&self, position: usize) -> Point {
+    pub fn point_at_position(&self, position: usize) -> Point {
         let row = self.row_at_position(position);
         let column = position - self.line_starts[row];
         Point { row, column }
