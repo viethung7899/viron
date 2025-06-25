@@ -1,0 +1,15 @@
+# Keybindings for normal mode
+[normal_mode]
+"h" = { type = "MoveLeft", params = { count = 1 } }
+"j" = { type = "MoveDown", params = { count = 1 } }
+"k" = { type = "MoveUp", params = { count = 1 } }
+"l" = { type = "MoveRight", params = { count = 1 } }
+"i" = { type = "EnterMode", params = { mode = "insert" } }
+"$" = { type = "MoveToLineEnd" }
+"0" = { type = "MoveToLineStart" }
+
+# Keybindings for insert mode
+[insert_mode]
+"<Esc>" = { type = "EnterMode", params = { mode = "normal" } }
+"<Backspace>" = { type = "Backspace" }
+"<Enter>" = { type = "InsertNewLine" }
