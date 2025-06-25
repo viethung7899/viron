@@ -21,15 +21,13 @@ use crate::input::{
     actions::ActionContext,
     events::{EventHandler, InputEvent},
 };
-use crate::ui::message::{MessageArea, MessageType};
-use crate::ui::theme::Theme;
 use crate::ui::{
     command_line::CommandLine,
     gutter::Gutter,
-    // message::{MessageArea, MessageType},
+    message::{MessageArea, MessageType},
     renderer::Renderer,
     status_line::StatusLine,
-    // theme::Theme,
+    theme::Theme,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -433,6 +431,7 @@ impl Editor {
     }
 
     pub fn cleanup(&mut self) -> Result<()> {
+        // Restore terminal state
         execute!(
             self.renderer.writer(),
             style::ResetColor,
@@ -442,5 +441,9 @@ impl Editor {
         terminal::disable_raw_mode()?;
 
         Ok(())
+    }
+
+    pub fn buffer_manager_mut(&mut self) -> &mut BufferManager {
+        &mut self.buffer_manager
     }
 }
