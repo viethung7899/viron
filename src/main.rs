@@ -1,22 +1,14 @@
-mod buffer;
-mod config;
-mod editor;
-mod highlighter;
-mod logger;
-mod lsp;
-mod theme;
-mod utils;
-
+mod v1;
 
 use std::{io::stdout, panic};
 
-use config::Config;
 use crossterm::{ExecutableCommand, event, terminal};
-use editor::Editor;
-use logger::Logger;
 use once_cell::sync::OnceCell;
-
-use crate::lsp::LspClient;
+use v1::config::Config;
+use v1::editor::Editor;
+use v1::logger::Logger;
+use v1::lsp::LspClient;
+use v1::theme;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {

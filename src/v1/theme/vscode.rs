@@ -5,7 +5,7 @@ use crossterm::style::Color;
 use once_cell::sync::Lazy;
 use serde::Deserialize;
 
-use crate::theme::{DiagnosticStyles, StatusLineStyle, Style, Theme, TokenStyle};
+use crate::v1::theme::{DiagnosticStyles, StatusLineStyle, Style, Theme, TokenStyle};
 
 static TRANSLATION_MAP: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| {
     HashMap::from([

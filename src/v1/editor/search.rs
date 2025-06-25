@@ -1,7 +1,7 @@
 use regex::Regex;
 use tree_sitter::Point;
 
-use crate::buffer::Buffer;
+use crate::v1::buffer::Buffer;
 
 #[derive(Default)]
 pub struct SearchBox {
