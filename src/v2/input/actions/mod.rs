@@ -1,23 +1,27 @@
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
+use std::path::PathBuf;
 
+use crate::core::buffer_manager::BufferManager;
 use crate::core::{buffer::Buffer, cursor::Cursor, document::Document, viewport::Viewport};
 use crate::editor::Mode;
 
 pub type ActionResult = Result<()>;
 
+mod buffer;
 mod editing;
 mod mode;
 mod movement;
 
+pub use buffer::*;
 pub use editing::*;
 pub use mode::*;
 pub use movement::*;
 
 // Context passed to actions when they execute
 pub struct ActionContext<'a> {
-    pub document: &'a mut Document,
+    pub buffer_manager: &'a mut BufferManager,
     pub buffer: &'a mut Buffer,
     pub cursor: &'a mut Cursor,
     pub viewport: &'a mut Viewport,
@@ -114,22 +118,31 @@ pub enum ActionDefinition {
         description: String,
         actions: Vec<ActionDefinition>,
     },
+
+    NextBuffer,
+    PreviousBuffer,
+    OpenBuffer {
+        path: String,
+    },
 }
 
 pub fn create_action_from_definition(definition: &ActionDefinition) -> Box<dyn Action> {
     match definition {
+        // Movement actions
         ActionDefinition::MoveLeft { count } => move_left(*count),
         ActionDefinition::MoveRight { count } => move_right(*count),
         ActionDefinition::MoveUp { count } => move_up(*count),
         ActionDefinition::MoveDown { count } => move_down(*count),
-        ActionDefinition::MoveToLineStart {} => move_to_line_start(),
-        ActionDefinition::MoveToLineEnd {} => move_to_line_end(),
+        ActionDefinition::MoveToLineStart => move_to_line_start(),
+        ActionDefinition::MoveToLineEnd => move_to_line_end(),
 
+        // Editing actions
         ActionDefinition::InsertChar { ch } => insert_char(*ch),
-        ActionDefinition::DeleteChar {} => delete_char(),
-        ActionDefinition::Backspace {} => backspace(),
-        ActionDefinition::InsertNewLine {} => insert_new_line(),
+        ActionDefinition::DeleteChar => delete_char(),
+        ActionDefinition::Backspace => backspace(),
+        ActionDefinition::InsertNewLine => insert_new_line(),
 
+        // Mode actions
         ActionDefinition::EnterMode { mode } => match mode.as_str() {
             "normal" => enter_normal_mode(),
             "insert" => enter_insert_mode(),
@@ -137,6 +150,11 @@ pub fn create_action_from_definition(definition: &ActionDefinition) -> Box<dyn A
             "search" => enter_search_mode(),
             _ => enter_normal_mode(), // Default fallback
         },
+
+        // Buffer actions
+        ActionDefinition::NextBuffer => next_buffer(),
+        ActionDefinition::PreviousBuffer => previous_buffer(),
+        ActionDefinition::OpenBuffer { path } => open_buffer(PathBuf::from(path)),
 
         ActionDefinition::Composite {
             description,
