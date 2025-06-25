@@ -68,6 +68,25 @@ impl Action for OpenBuffer {
     }
 }
 
+#[derive(Debug)]
+pub struct QuitEditor;
+
+impl Action for QuitEditor {
+    fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+        // Access to the editor's running state
+        *ctx.running = false;
+        Ok(())
+    }
+
+    fn describe(&self) -> &str {
+        "Quit the editor"
+    }
+
+    fn to_serializable(&self) -> ActionDefinition {
+        ActionDefinition::Quit
+    }
+}
+
 pub fn open_buffer(path: PathBuf) -> Box<dyn Action> {
     Box::new(OpenBuffer::new(path))
 }
@@ -78,4 +97,8 @@ pub fn next_buffer() -> Box<dyn Action> {
 
 pub fn previous_buffer() -> Box<dyn Action> {
     Box::new(PreviousBuffer)
+}
+
+pub fn quit_editor() -> Box<dyn Action> {
+    Box::new(QuitEditor)
 }

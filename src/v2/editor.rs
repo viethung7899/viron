@@ -1,7 +1,7 @@
 use anyhow::Result;
 use crossterm::style;
 use std::io::{self, Stdout, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 use crossterm::{
@@ -153,6 +153,10 @@ impl Editor {
         })
     }
 
+    pub fn load_config(&mut self, path: impl AsRef<Path>) -> Result<()> {
+        self.keymap.load_from_file(path)
+    }
+
     pub fn run(&mut self) -> Result<()> {
         // Main event loop
         while self.running {
@@ -239,6 +243,7 @@ impl Editor {
                 cursor: &mut self.cursor,
                 viewport: &mut self.viewport,
                 mode: &mut self.mode,
+                running: &mut self.running,
             };
 
             if let Err(e) = action.execute(&mut context) {

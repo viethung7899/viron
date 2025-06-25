@@ -25,6 +25,7 @@ pub struct ActionContext<'a> {
     pub cursor: &'a mut Cursor,
     pub viewport: &'a mut Viewport,
     pub mode: &'a mut Mode,
+    pub running: &'a mut bool,
 }
 
 // The Action trait defines what all actions must implement
@@ -123,6 +124,8 @@ pub enum ActionDefinition {
     OpenBuffer {
         path: String,
     },
+
+    Quit,
 }
 
 pub fn create_action_from_definition(definition: &ActionDefinition) -> Box<dyn Action> {
@@ -154,6 +157,7 @@ pub fn create_action_from_definition(definition: &ActionDefinition) -> Box<dyn A
         ActionDefinition::NextBuffer => next_buffer(),
         ActionDefinition::PreviousBuffer => previous_buffer(),
         ActionDefinition::OpenBuffer { path } => open_buffer(PathBuf::from(path)),
+        ActionDefinition::Quit => quit_editor(),
 
         ActionDefinition::Composite {
             description,
