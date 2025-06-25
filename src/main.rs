@@ -7,6 +7,7 @@ mod lsp;
 mod theme;
 mod utils;
 
+
 use std::{io::stdout, panic};
 
 use config::Config;
