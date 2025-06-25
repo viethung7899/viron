@@ -1,6 +1,6 @@
 use crossterm::style::{Attribute, Attributes, Color, ContentStyle};
 
-use crate::lsp::types::DiagnosticSeverity;
+use crate::v1::lsp::types::DiagnosticSeverity;
 
 mod vscode;
 

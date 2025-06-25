@@ -1,4 +1,4 @@
-use crate::editor::Action;
+use crate::v1::editor::Action;
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

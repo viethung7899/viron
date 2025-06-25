@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use tree_sitter::Point;
 
-use crate::{
+use crate::v1::{
     buffer::gap_buffer::GapBuffer,
     editor::{self, Mode},
     lsp::{Diagnostic, TextDocumentPublishDiagnostics},

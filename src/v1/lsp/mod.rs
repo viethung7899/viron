@@ -15,8 +15,8 @@ use tokio::{
     sync::mpsc,
 };
 
-pub use crate::lsp::types::{Diagnostic, TextDocumentPublishDiagnostics};
-use crate::utils;
+pub use crate::v1::lsp::types::{Diagnostic, TextDocumentPublishDiagnostics};
+use crate::v1::utils;
 
 pub mod types;
 

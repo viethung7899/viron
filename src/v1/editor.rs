@@ -10,17 +10,19 @@ use std::{
 };
 
 use crate::{
-    buffer::Buffer,
-    config::{Config, KeyAction, KeyMapping, get_key_action},
-    editor::{
-        command::CommandCenter,
-        render_buffer::{Change, RenderBuffer},
-        search::SearchBox,
-    },
-    highlighter::Highlighter,
     log,
-    lsp::{InboundMessage, LspClient, NotificationKind},
-    theme::{Style, Theme},
+    v1::{
+        buffer::Buffer,
+        config::{Config, KeyAction, KeyMapping, get_key_action},
+        editor::{
+            command::CommandCenter,
+            render_buffer::{Change, RenderBuffer},
+            search::SearchBox,
+        },
+        highlighter::Highlighter,
+        lsp::{InboundMessage, LspClient, NotificationKind},
+        theme::{Style, Theme},
+    },
 };
 use anyhow::Result;
 use async_recursion::async_recursion;

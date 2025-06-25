@@ -1,4 +1,4 @@
-use crate::editor::{Action, Mode};
+use super::{Action, Mode};
 
 #[derive(Default)]
 pub struct CommandCenter {
