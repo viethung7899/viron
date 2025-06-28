@@ -1,73 +1,41 @@
 use anyhow::Result;
-use crossterm::{
-    cursor, queue,
-    style::{Color, PrintStyledContent, Stylize},
-};
-use std::io::Write;
-
-use crate::core::buffer::Buffer;
-use crate::core::viewport::Viewport;
+use crate::ui::render_buffer::RenderBuffer;
+use crate::ui::{Drawable, RenderContext};
+use crate::ui::theme::Style;
 
 pub struct Gutter {
-    width: usize,
-    show_line_numbers: bool,
+    pub width: usize,
 }
 
 impl Gutter {
     pub fn new() -> Self {
         Self {
             width: 4,
-            show_line_numbers: true,
         }
     }
 
-    pub fn with_options(width: usize, show_line_numbers: bool) -> Self {
+    pub fn with_options(width: usize) -> Self {
         Self {
             width,
-            show_line_numbers,
         }
     }
+}
 
-    pub fn render<W: Write>(
-        &self,
-        writer: &mut W,
-        buffer: &Buffer,
-        viewport: &Viewport,
-    ) -> Result<()> {
-        if !self.show_line_numbers {
-            return Ok(());
-        }
+impl Drawable for Gutter {
+    fn draw(&self, buffer: &mut RenderBuffer, context: &RenderContext) {
+        let top_line = context.viewport.top_line();
+        let style = Style::from(context.theme.colors.gutter);
 
-        let top_line = viewport.top_line();
-
-        for i in 0..viewport.height() {
+        for i in 0..context.viewport.height() {
             let buffer_line = top_line + i;
-            if buffer_line >= buffer.line_count() {
+            if buffer_line >= context.document.buffer.line_count() {
                 break;
             }
 
             let line_number = buffer_line + 1; // 1-indexed line numbers
             let line_text = format!("{:width$}", line_number, width = self.width);
 
-            queue!(
-                writer,
-                cursor::MoveTo(0, i as u16),
-                PrintStyledContent(line_text.stylize().with(Color::DarkGrey))
-            )?;
+            buffer.set_text(i, 0, &line_text, &style);
         }
-
-        Ok(())
-    }
-
-    pub fn width(&self) -> usize {
-        if self.show_line_numbers {
-            self.width
-        } else {
-            0
-        }
-    }
-
-    pub fn toggle_line_numbers(&mut self) {
-        self.show_line_numbers = !self.show_line_numbers;
     }
 }

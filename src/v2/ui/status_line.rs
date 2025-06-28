@@ -1,60 +1,48 @@
-use anyhow::Result;
-use crossterm::{
-    cursor, queue,
-    style::{Color, PrintStyledContent, Stylize},
-};
-use std::io::Write;
-
-use crate::core::document::Document;
 use crate::editor::Mode;
+use crate::ui::{Drawable, RenderContext};
+use crate::ui::render_buffer::RenderBuffer;
+use crate::ui::theme::{Style, Theme};
 
 pub struct StatusLine {
     height: usize,
-    width: usize,
+    offset_bottom: usize,
 }
 
 impl StatusLine {
-    pub fn new(width: usize) -> Self {
-        Self { height: 1, width }
+    pub fn new() -> Self {
+        Self { height: 1, offset_bottom: 1 }
     }
+}
 
-    pub fn render<W: Write>(
-        &self,
-        writer: &mut W,
-        document: &Document,
-        mode: &Mode,
-        cursor_pos: &tree_sitter::Point,
-        screen_height: usize,
-    ) -> Result<()> {
-        // Position at the bottom of the screen
-        let status_line_row = screen_height - self.height;
-        queue!(writer, cursor::MoveTo(0, status_line_row as u16))?;
+impl Drawable for StatusLine {
+    fn draw(&self, buffer: &mut RenderBuffer, context: &RenderContext) {
+        let row = buffer.height - self.height - self.offset_bottom;
 
-        // Build status line content
-        let mode_str = format!("{:10}", mode.to_name());
+        let left = format!(" {} ", context.mode.to_name().to_uppercase());
+        
+        let cursor = context.cursor.get_position();
+        let right = format!(" {}:{} ", cursor.row + 1, cursor.column + 1);
+        
+        let file = format!(
+            " {}{}",
+            context.document.file_name().as_deref().unwrap_or("new file"),
+            if context.document.modified { " [+]" } else { "" }
+        );
+        let center_width = buffer.width - left.len() - right.len();
+        let center = format!("{file:<center_width$}");
 
-        let file_name = document
-            .file_name()
-            .unwrap_or_else(|| "[No Name]".to_string());
-        let modified_indicator = if document.modified { "[+]" } else { "" };
+        let colors = match context.mode {
+            Mode::Normal => context.theme.colors.status.normal,
+            Mode::Insert => context.theme.colors.status.insert,
+            _ => context.theme.colors.status.command
+        };
 
-        let file_info = format!("{}{}", file_name, modified_indicator);
+        let mut outer = Style::from(colors);
+        outer.bold = true;
+        let inner = Style::from(context.theme.colors.status.inner);
 
-        let cursor_info = format!("{}:{}", cursor_pos.row + 1, cursor_pos.column + 1);
-
-        // Calculate spacing to right-align cursor position
-        let padding_length = self
-            .width
-            .saturating_sub(mode_str.len() + file_info.len() + cursor_info.len() + 2);
-        let padding = " ".repeat(padding_length);
-
-        let status = format!("{} {} {}{}", mode_str, file_info, padding, cursor_info);
-
-        // Render with inverted colors
-        let styled_status = status.stylize().with(Color::Black).on(Color::White);
-
-        queue!(writer, PrintStyledContent(styled_status))?;
-
-        Ok(())
+        buffer.set_text(row, 0, &left, &outer);
+        buffer.set_text(row, left.len(), &center, &inner);
+        buffer.set_text(row, left.len() + center_width, &right, &outer);
     }
 }

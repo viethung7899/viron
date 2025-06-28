@@ -116,13 +116,15 @@ impl KeyMap {
         false
     }
 
-    pub fn load_from_file(&mut self, path: impl AsRef<Path>) -> Result<()> {
+    pub fn load_from_file(path: impl AsRef<Path>) -> Result<Self> {
         let content = fs::read_to_string(path)?;
         let config: toml::Value = toml::from_str(&content)?;
         let keymap = config.get("keymap").ok_or(anyhow!("Missing keymap"))?;
-        let config = keymap.clone().try_into()?;
 
-        self.load_from_config(config)
+        let mut result = Self::new();
+        let config = keymap.clone().try_into()?;
+        result.load_from_config(config)?;
+        Ok(result)
     }
 
     pub fn load_from_config(&mut self, config: KeyMapConfig) -> Result<()> {
@@ -285,8 +287,7 @@ mod test {
 
     #[test]
     fn test_from_file() {
-        let mut keymap = KeyMap::new();
-        keymap.load_from_file("config.v2.toml").unwrap();
+        let keymap = KeyMap::load_from_file("config.v2.toml").unwrap();
         println!("{keymap:?}");
     }
 }

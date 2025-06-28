@@ -1,26 +1,26 @@
 use anyhow::Result;
-use crossterm::{
-    cursor, queue,
-    style::{PrintStyledContent, Stylize},
-    terminal,
-};
+use crossterm::{cursor, queue, style, terminal, QueueableCommand};
 use std::io::Write;
 
-use crate::core::{buffer::Buffer, cursor::Cursor, viewport::Viewport};
+use crate::core::{cursor::Cursor, viewport::Viewport};
+use crate::core::buffer::Buffer;
+use crate::ui::render_buffer::RenderBuffer;
+use crate::ui::theme::{Style, Theme};
 
 pub struct Renderer<W: Write> {
     writer: W,
-    screen_width: usize,
-    screen_height: usize,
+    buffer: RenderBuffer,
+    style: Style,
 }
 
 impl<W: Write> Renderer<W> {
-    pub fn new(writer: W) -> Result<Self> {
-        let (width, height) = terminal::size()?;
+    pub fn new(writer: W, width: usize, height: usize, theme: &Theme) -> Result<Self> {
+        let style = Style::from(theme.colors.editor);
+        let buffer = RenderBuffer::new(width, height, &style);
         Ok(Self {
             writer,
-            screen_width: width as usize,
-            screen_height: height as usize,
+            buffer,
+            style
         })
     }
 
@@ -33,32 +33,28 @@ impl<W: Write> Renderer<W> {
         Ok(())
     }
 
-    pub fn render_buffer(&mut self, buffer: &mut Buffer, viewport: &Viewport) -> Result<()> {
-        // Get visible content from viewport
-        let top_line = viewport.top_line();
-
-        for line_idx in 0..viewport.height() {
-            let buffer_line = top_line + line_idx;
-            if buffer_line >= buffer.line_count() {
-                break;
-            }
-
-            let content = buffer.get_content_line(buffer_line);
-            let offset = viewport.offset();
-            let visible_content = if offset.column < content.len() {
-                &content[offset.column..]
-            } else {
-                ""
-            };
-
-            // Move to line position and print content
-            queue!(
-                self.writer,
-                cursor::MoveTo(0, line_idx as u16),
-                PrintStyledContent(visible_content.stylize())
-            )?;
+    // Output the render buffer
+    pub fn render(&mut self) -> Result<()> {
+        self.writer.queue(cursor::MoveTo(0, 0))?;
+        for cell in self.buffer.cells.iter() {
+            let style = cell.style.to_content_style(&self.style);
+            let content = style::StyledContent::new(style, cell.c);
+            self.writer.queue(style::Print(content))?;
         }
+        Ok(())
+    }
 
+    // Compare the updated buffer with the old buffer,
+    // and only updated cells
+    pub fn render_diff(&mut self, updated: RenderBuffer) -> Result<()> {
+        for change in self.buffer.diff(&updated) {
+            let style = change.cell.style.to_content_style(&self.style);
+            let content = style::StyledContent::new(style, change.cell.c);
+            self.writer
+                .queue(cursor::MoveTo(change.x as u16, change.y as u16))?
+                .queue(style::Print(content))?;
+        }
+        self.buffer = updated;
         Ok(())
     }
 
@@ -69,7 +65,7 @@ impl<W: Write> Renderer<W> {
             (cursor_pos.row - viewport.top_line()) as u16,
         );
 
-        queue!(self.writer, cursor::MoveTo(screen_pos.0, screen_pos.1))?;
+        self.writer.queue(cursor::MoveTo(screen_pos.0, screen_pos.1))?;
         Ok(())
     }
 
@@ -78,24 +74,15 @@ impl<W: Write> Renderer<W> {
         Ok(())
     }
 
-    pub fn resize(&mut self, width: usize, height: usize) {
-        self.screen_width = width;
-        self.screen_height = height;
-    }
-
-    pub fn dimensions(&self) -> (usize, usize) {
-        (self.screen_width, self.screen_height)
-    }
-
     pub fn writer(&mut self) -> &mut W {
         &mut self.writer
     }
 
     pub fn width(&self) -> usize {
-        self.screen_width
+        self.buffer.width
     }
 
     pub fn height(&self) -> usize {
-        self.screen_height
+        self.buffer.height
     }
 }
