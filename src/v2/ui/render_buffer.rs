@@ -1,4 +1,6 @@
-use super::theme::Style;
+use crossterm::{cursor, style, QueueableCommand};
+use std::io::Write;
+use super::theme::{Style, Theme};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct Cell {
@@ -16,16 +18,16 @@ pub(super) struct Change<'a> {
 #[derive(Debug, Clone)]
 pub(super) struct RenderBuffer {
     pub(super) cells: Vec<Cell>,
-    width: usize,
-    height: usize,
+    pub(super) width: usize,
+    pub(super) height: usize,
 }
 
 impl RenderBuffer {
-    pub(super) fn new(width: usize, height: usize) -> Self {
+    pub(super) fn new(width: usize, height: usize, fallback: &Style) -> Self {
         let cells = vec![
             Cell {
                 c: ' ',
-                style: Style::default()
+                style: fallback.clone(),
             };
             width * height
         ];

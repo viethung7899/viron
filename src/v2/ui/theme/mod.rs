@@ -15,14 +15,24 @@ pub struct Style {
     pub italic: bool,
 }
 
+impl From<Colors> for Style {
+    fn from(colors: Colors) -> Self {
+        Self {
+            foreground: colors.foreground,
+            background: colors.background,
+            ..Default::default()
+        }
+    }
+}
+
 impl Style {
-    pub fn to_content_style(&self, fallback: Option<&Style>) -> ContentStyle {
+    pub fn to_content_style(&self, fallback: &Style) -> ContentStyle {
         let foreground_color = self
             .foreground
-            .or(fallback.and_then(|style| style.foreground));
+            .or(fallback.foreground);
         let background_color = self
             .background
-            .or(fallback.and_then(|style| style.background));
+            .or(fallback.background);
         let mut attributes = Attributes::default();
 
         if self.italic {
@@ -68,7 +78,7 @@ impl Default for ThemeColors {
 #[derive(Debug, Clone)]
 pub struct StatusColors {
     pub normal: Colors,
-    pub edit: Colors,
+    pub insert: Colors,
     pub command: Colors,
     pub inner: Colors,
 }
@@ -77,7 +87,7 @@ impl Default for StatusColors {
     fn default() -> Self {
         Self {
             normal: default_colors(),
-            edit: default_colors(),
+            insert: default_colors(),
             command: default_colors(),
             inner: default_colors(),
         }
@@ -140,7 +150,7 @@ impl From<&VsCodeTheme> for StatusColors {
 
         StatusColors {
             normal,
-            edit,
+            insert: edit,
             command,
             inner,
         }
@@ -192,7 +202,7 @@ impl From<&VsCodeTheme> for Theme {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_load_from_file() {
         let theme = Theme::load_from_file("themes/catppuchin/mocha.json").unwrap();
