@@ -71,10 +71,18 @@ pub struct KeyMap {
 
 #[derive(Debug, Serialize, Deserialize, Default)]
 pub struct KeyMapConfig {
+    #[serde(default = "default_map")]
     pub normal_mode: HashMap<String, ActionDefinition>,
+    #[serde(default = "default_map")]
     pub insert_mode: HashMap<String, ActionDefinition>,
+    #[serde(default = "default_map")]
     pub command_mode: HashMap<String, ActionDefinition>,
+    #[serde(default = "default_map")]
     pub search_mode: HashMap<String, ActionDefinition>,
+}
+
+fn default_map() -> HashMap<String, ActionDefinition> {
+    HashMap::new()
 }
 
 impl KeyMap {
@@ -266,5 +274,17 @@ impl KeySequence {
         }
 
         Ok(KeySequence::from_keys(keys))
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::input::keymaps::KeyMap;
+
+    #[test]
+    fn test_from_file() {
+        let mut keymap = KeyMap::new();
+        keymap.load_from_file("config.v2.toml").unwrap();
+        println!("{keymap:?}");
     }
 }
