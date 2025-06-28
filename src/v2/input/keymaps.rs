@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use crossterm::event::{KeyCode, KeyEvent as CrosstermKeyEvent, KeyModifiers};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -63,22 +63,22 @@ impl KeySequence {
 
 #[derive(Debug, Default)]
 pub struct KeyMap {
-    normal_mode: HashMap<KeySequence, Box<dyn Action>>,
-    insert_mode: HashMap<KeySequence, Box<dyn Action>>,
-    command_mode: HashMap<KeySequence, Box<dyn Action>>,
-    search_mode: HashMap<KeySequence, Box<dyn Action>>,
+    normal: HashMap<KeySequence, Box<dyn Action>>,
+    insert: HashMap<KeySequence, Box<dyn Action>>,
+    command: HashMap<KeySequence, Box<dyn Action>>,
+    search: HashMap<KeySequence, Box<dyn Action>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Default)]
 pub struct KeyMapConfig {
     #[serde(default = "default_map")]
-    pub normal_mode: HashMap<String, ActionDefinition>,
+    pub normal: HashMap<String, ActionDefinition>,
     #[serde(default = "default_map")]
-    pub insert_mode: HashMap<String, ActionDefinition>,
+    pub insert: HashMap<String, ActionDefinition>,
     #[serde(default = "default_map")]
-    pub command_mode: HashMap<String, ActionDefinition>,
+    pub command: HashMap<String, ActionDefinition>,
     #[serde(default = "default_map")]
-    pub search_mode: HashMap<String, ActionDefinition>,
+    pub search: HashMap<String, ActionDefinition>,
 }
 
 fn default_map() -> HashMap<String, ActionDefinition> {
@@ -92,19 +92,19 @@ impl KeyMap {
 
     pub fn get_action(&self, mode: &Mode, sequence: &KeySequence) -> Option<&Box<dyn Action>> {
         match mode {
-            Mode::Normal => self.normal_mode.get(sequence),
-            Mode::Insert => self.insert_mode.get(sequence),
-            Mode::Command => self.command_mode.get(sequence),
-            Mode::Search => self.search_mode.get(sequence),
+            Mode::Normal => self.normal.get(sequence),
+            Mode::Insert => self.insert.get(sequence),
+            Mode::Command => self.command.get(sequence),
+            Mode::Search => self.search.get(sequence),
         }
     }
 
     pub fn is_partial_match(&self, mode: &Mode, sequence: &KeySequence) -> bool {
         let map = match mode {
-            Mode::Normal => &self.normal_mode,
-            Mode::Insert => &self.insert_mode,
-            Mode::Command => &self.command_mode,
-            Mode::Search => &self.search_mode,
+            Mode::Normal => &self.normal,
+            Mode::Insert => &self.insert,
+            Mode::Command => &self.command,
+            Mode::Search => &self.search,
         };
 
         for key in map.keys() {
@@ -118,44 +118,46 @@ impl KeyMap {
 
     pub fn load_from_file(&mut self, path: impl AsRef<Path>) -> Result<()> {
         let content = fs::read_to_string(path)?;
-        let config: KeyMapConfig = toml::from_str(&content)?;
+        let config: toml::Value = toml::from_str(&content)?;
+        let keymap = config.get("keymap").ok_or(anyhow!("Missing keymap"))?;
+        let config = keymap.clone().try_into()?;
 
         self.load_from_config(config)
     }
 
     pub fn load_from_config(&mut self, config: KeyMapConfig) -> Result<()> {
         // Clear existing mappings
-        self.normal_mode.clear();
-        self.insert_mode.clear();
-        self.command_mode.clear();
-        self.search_mode.clear();
+        self.normal.clear();
+        self.insert.clear();
+        self.command.clear();
+        self.search.clear();
 
         // Load normal mode mappings
-        for (key_str, action_def) in config.normal_mode {
+        for (key_str, action_def) in config.normal {
             let sequence = KeySequence::from_string(&key_str)?;
             let action = create_action_from_definition(&action_def);
-            self.normal_mode.insert(sequence, action);
+            self.normal.insert(sequence, action);
         }
 
         // Load insert mode mappings
-        for (key_str, action_def) in config.insert_mode {
+        for (key_str, action_def) in config.insert {
             let sequence = KeySequence::from_string(&key_str)?;
             let action = create_action_from_definition(&action_def);
-            self.insert_mode.insert(sequence, action);
+            self.insert.insert(sequence, action);
         }
 
         // Load command mode mappings
-        for (key_str, action_def) in config.command_mode {
+        for (key_str, action_def) in config.command {
             let sequence = KeySequence::from_string(&key_str)?;
             let action = create_action_from_definition(&action_def);
-            self.command_mode.insert(sequence, action);
+            self.command.insert(sequence, action);
         }
 
         // Load search mode mappings
-        for (key_str, action_def) in config.search_mode {
+        for (key_str, action_def) in config.search {
             let sequence = KeySequence::from_string(&key_str)?;
             let action = create_action_from_definition(&action_def);
-            self.search_mode.insert(sequence, action);
+            self.search.insert(sequence, action);
         }
 
         Ok(())
@@ -174,27 +176,27 @@ impl KeyMap {
         let mut command_mode = HashMap::new();
         let mut search_mode = HashMap::new();
 
-        for (seq, action) in &self.normal_mode {
+        for (seq, action) in &self.normal {
             normal_mode.insert(seq.to_string(), action.to_serializable());
         }
 
-        for (seq, action) in &self.insert_mode {
+        for (seq, action) in &self.insert {
             insert_mode.insert(seq.to_string(), action.to_serializable());
         }
 
-        for (seq, action) in &self.command_mode {
+        for (seq, action) in &self.command {
             command_mode.insert(seq.to_string(), action.to_serializable());
         }
 
-        for (seq, action) in &self.search_mode {
+        for (seq, action) in &self.search {
             search_mode.insert(seq.to_string(), action.to_serializable());
         }
 
         KeyMapConfig {
-            normal_mode,
-            insert_mode,
-            command_mode,
-            search_mode,
+            normal: normal_mode,
+            insert: insert_mode,
+            command: command_mode,
+            search: search_mode,
         }
     }
 }

@@ -1,5 +1,5 @@
 # Keybindings for normal mode
-[normal_mode]
+[keymap.normal]
 "q" = { type = "Quit" }
 "h" = { type = "MoveLeft", params = { count = 1 } }
 "j" = { type = "MoveDown", params = { count = 1 } }
@@ -10,7 +10,7 @@
 "0" = { type = "MoveToLineStart" }
 
 # Keybindings for insert mode
-[insert_mode]
+[keymap.insert]
 "<Esc>" = { type = "EnterMode", params = { mode = "normal" } }
 "<Backspace>" = { type = "Backspace" }
 "<Enter>" = { type = "InsertNewLine" }
