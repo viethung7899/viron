@@ -51,6 +51,7 @@ pub struct Theme {
 pub struct ThemeColors {
     pub editor: Colors,
     pub gutter: Colors,
+    pub status: StatusColors,
 }
 
 impl Default for ThemeColors {
@@ -58,6 +59,26 @@ impl Default for ThemeColors {
         Self {
             editor: default_colors(),
             gutter: default_colors(),
+            status: Default::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct StatusColors {
+    pub normal: Colors,
+    pub edit: Colors,
+    pub command: Colors,
+    pub inner: Colors,
+}
+
+impl Default for StatusColors {
+    fn default() -> Self {
+        Self {
+            normal: default_colors(),
+            edit: default_colors(),
+            command: default_colors(),
+            inner: default_colors(),
         }
     }
 }
@@ -86,39 +107,77 @@ impl Theme {
     }
 }
 
-fn parse_vscode_theme_colors(vscode: &VsCodeTheme) -> ThemeColors {
-    ThemeColors {
-        editor: Colors {
-            foreground: vscode.get_color("editor.foreground"),
-            background: vscode.get_color("editor.background"),
-        },
-        gutter: Colors {
-            foreground: vscode.get_color("editorLineNumber.foreground"),
-            background: vscode.get_color("editorLineNumber.background"),
-        },
+impl From<&VsCodeTheme> for StatusColors {
+    fn from(vscode: &VsCodeTheme) -> Self {
+        let inner = Colors {
+            background: vscode.get_color("statusBar.background"),
+            foreground: vscode.get_color("statusBar.foreground"),
+        };
+
+        let outer_foreground = vscode.get_color("statusBar.background");
+
+        let normal = Colors {
+            foreground: outer_foreground,
+            background: vscode.get_color("terminal.ansiBlue"),
+        };
+
+        let edit = Colors {
+            foreground: outer_foreground,
+            background: vscode.get_color("terminal.ansiGreen"),
+        };
+
+        let command = Colors {
+            foreground: outer_foreground,
+            background: vscode.get_color("terminal.ansiYellow"),
+        };
+
+        StatusColors {
+            normal,
+            edit,
+            command,
+            inner,
+        }
     }
 }
 
-pub fn parse_vscode_theme(vscode: &VsCodeTheme) -> Theme {
-    let colors = parse_vscode_theme_colors(vscode);
-    let token_colors = &vscode.token_colors;
-    let token_styles = token_colors
-        .into_iter()
-        .filter_map(|token_color| {
-            let style: Style = token_color.settings.to_style().ok()?;
-            Some(
-                token_color
-                    .scope
-                    .translate()
-                    .iter()
-                    .map(|key| (key.clone(), style.clone()))
-                    .collect::<Vec<_>>(),
-            )
-        })
-        .flatten()
-        .collect::<HashMap<_, _>>();
-    Theme {
-        colors,
-        token_styles,
+impl From<&VsCodeTheme> for ThemeColors {
+    fn from(vscode: &VsCodeTheme) -> Self {
+        ThemeColors {
+            editor: Colors {
+                foreground: vscode.get_color("editor.foreground"),
+                background: vscode.get_color("editor.background"),
+            },
+            gutter: Colors {
+                foreground: vscode.get_color("editorLineNumber.foreground"),
+                background: vscode.get_color("editorLineNumber.background"),
+            },
+            status: StatusColors::from(vscode),
+        }
+    }
+}
+
+impl From<&VsCodeTheme> for Theme {
+    fn from(vscode: &VsCodeTheme) -> Self {
+        let colors = ThemeColors::from(vscode);
+        let token_colors = &vscode.token_colors;
+        let token_styles = token_colors
+            .into_iter()
+            .filter_map(|token_color| {
+                let style: Style = token_color.settings.to_style().ok()?;
+                Some(
+                    token_color
+                        .scope
+                        .translate()
+                        .iter()
+                        .map(|key| (key.clone(), style.clone()))
+                        .collect::<Vec<_>>(),
+                )
+            })
+            .flatten()
+            .collect();
+        Theme {
+            colors,
+            token_styles,
+        }
     }
 }
