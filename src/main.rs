@@ -12,7 +12,7 @@ use v1::theme;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let toml = std::fs::read_to_string("config.toml")?;
+    let toml = std::fs::read_to_string("config.v2.toml")?;
     let config: Config = toml::from_str(&toml)?;
 
     let file = std::env::args().nth(1);
