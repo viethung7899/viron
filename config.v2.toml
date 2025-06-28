@@ -1,3 +1,5 @@
+theme = "themes/catppuchin/mocha.json"
+
 # Keybindings for normal mode
 [keymap.normal]
 "q" = { type = "Quit" }

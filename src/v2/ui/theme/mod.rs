@@ -1,8 +1,9 @@
-use anyhow::Error;
+use anyhow::Result;
 use crossterm::style::{Attribute, Attributes, Color, Colors, ContentStyle};
 use std::collections::HashMap;
-
-use crate::ui::theme::vscode::{VsCodeTheme, VsCodeTokenColor, VsCodeTokenColorSettings};
+use std::fs;
+use std::io::BufReader;
+use crate::ui::theme::vscode::{VsCodeTheme};
 
 pub mod vscode;
 
@@ -105,6 +106,12 @@ impl Theme {
 
         style
     }
+
+    pub fn load_from_file(path: impl AsRef<std::path::Path>) -> Result<Theme> {
+        let reader = BufReader::new(fs::File::open(path)?);
+        let vscode: VsCodeTheme = serde_json::from_reader(reader)?;
+        Ok(Theme::from(&vscode))
+    }
 }
 
 impl From<&VsCodeTheme> for StatusColors {
@@ -179,5 +186,16 @@ impl From<&VsCodeTheme> for Theme {
             colors,
             token_styles,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    
+    #[test]
+    fn test_load_from_file() {
+        let theme = Theme::load_from_file("themes/catppuchin/mocha.json").unwrap();
+        println!("{:#?}", theme);
     }
 }
