@@ -120,7 +120,7 @@ impl Editor {
         let command_line = CommandLine::new(width as usize);
         let message_area = MessageArea::new(width as usize);
         let gutter = Gutter::new();
-        let theme = Theme::default_dark();
+        let theme = Theme::default();
 
         // Create input handling
         let keymap = KeyMap::new();

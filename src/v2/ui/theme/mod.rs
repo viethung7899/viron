@@ -1,73 +1,124 @@
-use crossterm::style::{Color, ContentStyle};
+use anyhow::Error;
+use crossterm::style::{Attribute, Attributes, Color, Colors, ContentStyle};
 use std::collections::HashMap;
 
-#[derive(Debug, Clone)]
-pub struct Theme {
-    pub name: String,
-    pub author: Option<String>,
-    pub colors: ThemeColors,
-    pub syntax: HashMap<String, SyntaxStyle>,
-}
+use crate::ui::theme::vscode::{VsCodeTheme, VsCodeTokenColor, VsCodeTokenColorSettings};
 
-#[derive(Debug, Clone)]
-pub struct ThemeColors {
-    pub editor_background: Color,
-    pub editor_foreground: Color,
-    pub status_background: Color,
-    pub status_foreground: Color,
-    pub selection_background: Color,
-    pub selection_foreground: Color,
-    pub gutter_background: Color,
-    pub gutter_foreground: Color,
-    pub line_highlight: Color,
-    pub cursor: Color,
-    pub command_foreground: Color,
-    pub command_background: Color,
-}
+pub mod vscode;
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub struct SyntaxStyle {
+pub struct Style {
     pub foreground: Option<Color>,
     pub background: Option<Color>,
     pub bold: bool,
     pub italic: bool,
 }
 
-impl Theme {
-    pub fn default_dark() -> Self {
-        Self {
-            name: "Default Dark".to_string(),
-            author: Some("Viron".to_string()),
-            colors: ThemeColors {
-                editor_background: Color::Black,
-                editor_foreground: Color::White,
-                status_background: Color::Blue,
-                status_foreground: Color::White,
-                selection_background: Color::DarkBlue,
-                selection_foreground: Color::White,
-                gutter_background: Color::Black,
-                gutter_foreground: Color::DarkGrey,
-                line_highlight: Color::Grey,
-                cursor: Color::White,
-                command_foreground: Color::White,
-                command_background: Color::Black,
-            },
-            syntax: HashMap::new(),
+impl Style {
+    pub fn to_content_style(&self, fallback: Option<&Style>) -> ContentStyle {
+        let foreground_color = self
+            .foreground
+            .or(fallback.and_then(|style| style.foreground));
+        let background_color = self
+            .background
+            .or(fallback.and_then(|style| style.background));
+        let mut attributes = Attributes::default();
+
+        if self.italic {
+            attributes.set(Attribute::Italic);
+        }
+
+        if self.bold {
+            attributes.set(Attribute::Bold);
+        }
+
+        ContentStyle {
+            foreground_color,
+            background_color,
+            attributes,
+            ..Default::default()
         }
     }
+}
 
+#[derive(Debug, Clone, Default)]
+pub struct Theme {
+    pub colors: ThemeColors,
+    pub token_styles: HashMap<String, Style>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ThemeColors {
+    pub editor: Colors,
+    pub gutter: Colors,
+}
+
+impl Default for ThemeColors {
+    fn default() -> Self {
+        Self {
+            editor: default_colors(),
+            gutter: default_colors(),
+        }
+    }
+}
+
+fn default_colors() -> Colors {
+    Colors {
+        foreground: None,
+        background: None,
+    }
+}
+
+impl Theme {
     pub fn style_for_token(&self, token_type: &str) -> ContentStyle {
         let mut style = ContentStyle::default();
 
-        if let Some(syntax_style) = self.syntax.get(token_type) {
-            if let Some(fg) = syntax_style.foreground {
+        if let Some(token_style) = self.token_styles.get(token_type) {
+            if let Some(fg) = token_style.foreground {
                 style.background_color = fg.into();
             }
-            if let Some(bg) = syntax_style.background {
+            if let Some(bg) = token_style.background {
                 style.background_color = bg.into();
             }
         }
 
         style
+    }
+}
+
+fn parse_vscode_theme_colors(vscode: &VsCodeTheme) -> ThemeColors {
+    ThemeColors {
+        editor: Colors {
+            foreground: vscode.get_color("editor.foreground"),
+            background: vscode.get_color("editor.background"),
+        },
+        gutter: Colors {
+            foreground: vscode.get_color("editorLineNumber.foreground"),
+            background: vscode.get_color("editorLineNumber.background"),
+        },
+    }
+}
+
+pub fn parse_vscode_theme(vscode: &VsCodeTheme) -> Theme {
+    let colors = parse_vscode_theme_colors(vscode);
+    let token_colors = &vscode.token_colors;
+    let token_styles = token_colors
+        .into_iter()
+        .filter_map(|token_color| {
+            let style: Style = token_color.settings.to_style().ok()?;
+            Some(
+                token_color
+                    .scope
+                    .translate()
+                    .iter()
+                    .map(|key| (key.clone(), style.clone()))
+                    .collect::<Vec<_>>(),
+            )
+        })
+        .flatten()
+        .collect::<HashMap<_, _>>();
+    Theme {
+        colors,
+        token_styles,
     }
 }

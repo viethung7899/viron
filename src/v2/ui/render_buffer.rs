@@ -1,9 +1,9 @@
-use super::theme::SyntaxStyle;
+use super::theme::Style;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct Cell {
     pub(super) c: char,
-    pub(super) style: SyntaxStyle,
+    pub(super) style: Style,
 }
 
 #[derive(Debug, Clone)]
@@ -25,7 +25,7 @@ impl RenderBuffer {
         let cells = vec![
             Cell {
                 c: ' ',
-                style: SyntaxStyle::default()
+                style: Style::default()
             };
             width * height
         ];
@@ -36,7 +36,7 @@ impl RenderBuffer {
         }
     }
 
-    pub(super) fn set_cell(&mut self, row: usize, col: usize, c: char, style: &SyntaxStyle) {
+    pub(super) fn set_cell(&mut self, row: usize, col: usize, c: char, style: &Style) {
         if col >= self.width || row >= self.height {
             return;
         }
@@ -48,7 +48,7 @@ impl RenderBuffer {
         }
     }
 
-    pub(super) fn set_text(&mut self, row: usize, col: usize, text: &str, style: &SyntaxStyle) {
+    pub(super) fn set_text(&mut self, row: usize, col: usize, text: &str, style: &Style) {
         if row >= self.height {
             return;
         }
