@@ -1,20 +1,18 @@
+use anyhow::Ok;
+
 use crate::editor::Mode;
 use crate::ui::render_buffer::RenderBuffer;
 use crate::ui::theme::Style;
-use crate::ui::{Drawable, RenderContext};
+use crate::ui::{Bounds, Drawable, RenderContext};
 
 pub struct StatusLine {
     id: String,
-    height: usize,
-    offset_bottom: usize,
 }
 
 impl StatusLine {
     pub fn new() -> Self {
         Self {
             id: "status_line".to_string(),
-            height: 1,
-            offset_bottom: 1,
         }
     }
 }
@@ -24,8 +22,8 @@ impl Drawable for StatusLine {
         &self.id
     }
 
-    fn draw(&self, buffer: &mut RenderBuffer, context: &RenderContext) {
-        let row = buffer.height - self.height - self.offset_bottom;
+    fn draw(&self, buffer: &mut RenderBuffer, context: &RenderContext) -> anyhow::Result<()> {
+        let Bounds { start_row, width, .. } = self.bounds(buffer.get_size(), context);
 
         let left = format!(" {} ", context.mode.to_name().to_uppercase());
 
@@ -45,7 +43,7 @@ impl Drawable for StatusLine {
                 ""
             }
         );
-        let center_width = buffer.width - left.len() - right.len();
+        let center_width = width - left.len() - right.len();
         let center = format!("{file:<center_width$}");
 
         let colors = match context.mode {
@@ -58,8 +56,21 @@ impl Drawable for StatusLine {
         outer.bold = true;
         let inner = Style::from(context.theme.colors.status.inner);
 
-        buffer.set_text(row, 0, &left, &outer);
-        buffer.set_text(row, left.len(), &center, &inner);
-        buffer.set_text(row, left.len() + center_width, &right, &outer);
+        buffer.set_text(start_row, 0, &left, &outer);
+        buffer.set_text(start_row, left.len(), &center, &inner);
+        buffer.set_text(start_row, left.len() + center_width, &right, &outer);
+
+        Ok(())
+    }
+
+    fn bounds(&self, size: (usize, usize), _context: &RenderContext) -> Bounds {
+        let (width, height) = size;
+        let start_row = height - 2;
+        Bounds {
+            start_row,
+            start_col: 0,
+            width,
+            height: 1
+        }
     }
 }

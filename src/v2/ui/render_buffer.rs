@@ -126,4 +126,8 @@ impl RenderBuffer {
         }
         Ok(())
     }
+    
+    pub fn get_size(&self) -> (usize, usize) {
+        (self.width, self.height)
+    }
 }

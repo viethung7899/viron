@@ -1,10 +1,10 @@
+use crate::ui::render_buffer::RenderBuffer;
+use crate::ui::theme::Style;
+use crate::ui::{Drawable, RenderContext};
 use anyhow::{Result, anyhow};
 use std::collections::HashSet;
 use std::hash::Hash;
 use std::io::Write;
-use crate::ui::render_buffer::RenderBuffer;
-use crate::ui::theme::Style;
-use crate::ui::{Drawable, RenderContext};
 
 type Component<'a> = Box<dyn Drawable + 'a>;
 
