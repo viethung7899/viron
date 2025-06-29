@@ -16,6 +16,7 @@ pub struct RenderContext<'a> {
     pub cursor: &'a Cursor,
     pub mode: &'a Mode,
     pub theme: &'a Theme,
+    pub gutter_width: usize,
 }
 
 pub struct Bounds {
