@@ -17,6 +17,8 @@ impl EnterMode {
 impl Action for EnterMode {
     fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         *ctx.mode = self.mode.clone();
+        ctx.compositor
+            .mark_dirty(&ctx.component_ids.status_line_id)?;
         Ok(())
     }
 

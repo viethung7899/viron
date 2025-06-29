@@ -34,12 +34,12 @@ impl Cursor {
                 self.position.column = self.position.column.saturating_sub(1);
             }
         }
-        self.preferred_column = self.position.column;
     }
 
     /// Move cursor one character to the right
     pub fn move_right(&mut self, buffer: &Buffer, mode: &Mode) {
-        let line_length = buffer.get_line_length(self.position.row);
+        let line_length = buffer.get_line_length(self.position.row).saturating_sub(1);
+
         let at_end_of_line = if *mode == Mode::Insert {
             self.position.column >= line_length
         } else {
@@ -182,7 +182,7 @@ impl Cursor {
         let max_column = if *mode == Mode::Insert {
             line_length
         } else {
-            line_length.saturating_sub(1).max(0)
+            line_length.saturating_sub(1)
         };
 
         // Try to maintain the preferred column if possible

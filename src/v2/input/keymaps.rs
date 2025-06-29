@@ -244,6 +244,10 @@ impl KeySequence {
                         "Backspace" => KeyCode::Backspace,
                         "Tab" => KeyCode::Tab,
                         "Space" => KeyCode::Char(' '),
+                        "Left" => KeyCode::Left,
+                        "Right" => KeyCode::Right,
+                        "Up" => KeyCode::Up,
+                        "Down" => KeyCode::Down,
                         // Add more special keys as needed
                         _ => continue, // Skip unknown keys
                     };

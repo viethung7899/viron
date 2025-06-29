@@ -78,7 +78,7 @@ impl Buffer {
             return 0;
         }
         let line_end = if line + 1 < self.line_starts.len() {
-            self.line_starts[line + 1]
+            self.line_starts[line + 1] - 1
         } else {
             self.buffer.len_without_gap()
         };
