@@ -3,6 +3,7 @@ mod language;
 use std::{collections::HashMap, ops::Range};
 
 use anyhow::{Ok, Result};
+use log::info;
 use tree_sitter::{Parser, Point, Query, QueryCursor, StreamingIterator};
 
 pub use language::LanguageType;
@@ -39,6 +40,8 @@ impl SyntaxHighlighter {
             self.parser.reset();
             return Ok(());
         };
+
+        self.parser.set_language(&ts_language)?;
 
         if !self.queries.contains_key(&language) {
             if let Some(source) = language.get_highlight_query() {
