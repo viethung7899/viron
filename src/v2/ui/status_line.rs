@@ -23,7 +23,7 @@ impl Drawable for StatusLine {
     fn id(&self) -> &str {
         &self.id
     }
-    
+
     fn draw(&self, buffer: &mut RenderBuffer, context: &RenderContext) {
         let row = buffer.height - self.height - self.offset_bottom;
 

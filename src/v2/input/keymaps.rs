@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result};
 use crossterm::event::{KeyCode, KeyEvent as CrosstermKeyEvent, KeyModifiers};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -116,53 +116,38 @@ impl KeyMap {
         false
     }
 
-    pub fn load_from_file(path: impl AsRef<Path>) -> Result<Self> {
-        let content = fs::read_to_string(path)?;
-        let config: toml::Value = toml::from_str(&content)?;
-        let keymap = config.get("keymap").ok_or(anyhow!("Missing keymap"))?;
-
-        let mut result = Self::new();
-        let config = keymap.clone().try_into()?;
-        result.load_from_config(config)?;
-        Ok(result)
-    }
-
-    pub fn load_from_config(&mut self, config: KeyMapConfig) -> Result<()> {
-        // Clear existing mappings
-        self.normal.clear();
-        self.insert.clear();
-        self.command.clear();
-        self.search.clear();
+    pub fn load_from_config(config: &KeyMapConfig) -> Result<Self> {
+        let mut keymap = Self::new();
 
         // Load normal mode mappings
-        for (key_str, action_def) in config.normal {
+        for (key_str, action_def) in &config.normal {
             let sequence = KeySequence::from_string(&key_str)?;
             let action = create_action_from_definition(&action_def);
-            self.normal.insert(sequence, action);
+            keymap.normal.insert(sequence, action);
         }
 
         // Load insert mode mappings
-        for (key_str, action_def) in config.insert {
+        for (key_str, action_def) in &config.insert {
             let sequence = KeySequence::from_string(&key_str)?;
             let action = create_action_from_definition(&action_def);
-            self.insert.insert(sequence, action);
+            keymap.insert.insert(sequence, action);
         }
 
         // Load command mode mappings
-        for (key_str, action_def) in config.command {
+        for (key_str, action_def) in &config.command {
             let sequence = KeySequence::from_string(&key_str)?;
             let action = create_action_from_definition(&action_def);
-            self.command.insert(sequence, action);
+            keymap.command.insert(sequence, action);
         }
 
         // Load search mode mappings
-        for (key_str, action_def) in config.search {
+        for (key_str, action_def) in &config.search {
             let sequence = KeySequence::from_string(&key_str)?;
             let action = create_action_from_definition(&action_def);
-            self.search.insert(sequence, action);
+            keymap.search.insert(sequence, action);
         }
 
-        Ok(())
+        Ok(keymap)
     }
 
     pub fn save_to_file(&self, path: impl AsRef<Path>) -> Result<()> {
@@ -278,16 +263,5 @@ impl KeySequence {
         }
 
         Ok(KeySequence::from_keys(keys))
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use crate::input::keymaps::KeyMap;
-
-    #[test]
-    fn test_from_file() {
-        let keymap = KeyMap::load_from_file("config.v2.toml").unwrap();
-        println!("{keymap:?}");
     }
 }

@@ -1,3 +1,4 @@
+mod config;
 mod core;
 mod editor;
 mod input;
@@ -6,10 +7,13 @@ mod ui;
 mod utils;
 
 use anyhow::Result;
+use crossterm::terminal::ClearType;
+use crossterm::{cursor, terminal};
 use editor::Editor;
-use std::env;
 use std::path::Path;
-use std::process;
+use std::{env, io::stdout, panic};
+
+use crate::config::Config;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -25,7 +29,7 @@ async fn main() -> Result<()> {
     let mut editor = Editor::new()?;
 
     // Load the config
-    editor.load_config("config.v2.toml")?;
+    editor.load_config(&Config::load_from_file("config.v2.toml")?)?;
 
     // Set up error handling for the editor's run method
     let result = run_editor(&mut editor, &args);
@@ -34,6 +38,18 @@ async fn main() -> Result<()> {
     if let Err(e) = editor.cleanup() {
         eprintln!("Error cleaning up terminal: {}", e);
     }
+
+    panic::set_hook(Box::new(|info| {
+        let mut stdout = stdout();
+        _ = crossterm::execute!(
+            stdout,
+            terminal::Clear(ClearType::All),
+            cursor::Show,
+            terminal::LeaveAlternateScreen,
+        );
+        _ = terminal::disable_raw_mode();
+        eprintln!("{}", info);
+    }));
 
     // Return the result from run_editor
     result

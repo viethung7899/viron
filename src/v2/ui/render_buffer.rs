@@ -28,7 +28,7 @@ impl<'a> Change<'a> {
 }
 
 #[derive(Debug, Clone)]
-pub(super) struct RenderBuffer {
+pub struct RenderBuffer {
     pub(super) cells: Vec<Cell>,
     pub style: Style,
     pub(super) width: usize,
