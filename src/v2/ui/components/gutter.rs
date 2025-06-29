@@ -8,14 +8,7 @@ pub struct Gutter {
 }
 
 impl Gutter {
-    pub fn new() -> Self {
-        Self {
-            id: "gutter".to_string(),
-            width: 4,
-        }
-    }
-
-    pub fn with_options(width: usize) -> Self {
+    pub fn with_size(width: usize) -> Self {
         Self {
             id: "gutter".to_string(),
             width,
@@ -42,7 +35,7 @@ impl Drawable for Gutter {
             }
 
             let line_number = buffer_line + 1; // 1-indexed line numbers
-            let line_text = format!("{:width$}", line_number);
+            let line_text = format!("{line_number:width$ }", width = width - 2);
 
             buffer.set_text(i, start_col, &line_text, &style);
         }

@@ -1,3 +1,4 @@
+use log::info;
 use tree_sitter::Point;
 
 use crate::core::buffer::gap_buffer::GapBuffer;
@@ -66,8 +67,9 @@ impl Buffer {
         } else {
             self.buffer.len_without_gap()
         };
+        let index_start = self.buffer.gap_end;
         let index_end = line_end + self.buffer.gap_end - line_start;
-        let chars = &self.buffer.buffer[line_start..index_end];
+        let chars = &self.buffer.buffer[index_start..index_end];
         chars.iter().collect()
     }
 
