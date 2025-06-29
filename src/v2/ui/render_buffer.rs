@@ -1,4 +1,5 @@
-use super::theme::{Style, Theme};
+use std::fmt::{Debug, Write as DebugWrite};
+use super::theme::{Style};
 use anyhow::Result;
 use crossterm::{QueueableCommand, cursor, style};
 use std::io::Write;
@@ -27,12 +28,28 @@ impl<'a> Change<'a> {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct RenderBuffer {
     pub(super) cells: Vec<Cell>,
     pub style: Style,
     pub(super) width: usize,
     pub(super) height: usize,
+}
+
+impl Debug for RenderBuffer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("RenderBuffer\n")?;
+        for i in 0..self.height {
+            let start = i * self.width;
+            let end = start + self.width;
+            for cell in &self.cells[start..end] {
+                let format = if cell.c == ' ' { '·' } else { cell.c };
+                f.write_char(format)?;
+            }
+            f.write_str("\n")?
+        }
+        Ok(())
+    }
 }
 
 impl RenderBuffer {
@@ -101,11 +118,12 @@ impl RenderBuffer {
     }
 
     pub(super) fn flush<W: Write>(&self, writer: &mut W) -> Result<()> {
-        writer.queue(cursor::MoveTo(0, 0))?;
-        for cell in self.cells.iter() {
+        for (pos, cell) in self.cells.iter().enumerate() {
+            let x = pos % self.width;
+            let y = pos / self.width;
             let style = cell.style.to_content_style(&self.style);
             let content = style::StyledContent::new(style, cell.c);
-            writer.queue(style::Print(content))?;
+            writer.queue(cursor::MoveTo(x as u16, y as u16))?.queue(style::Print(content))?;
         }
         Ok(())
     }
