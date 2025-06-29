@@ -46,13 +46,7 @@ impl<W: Write> Renderer<W> {
     // Compare the updated buffer with the old buffer,
     // and only updated cells
     pub fn render_diff(&mut self, updated: RenderBuffer) -> Result<()> {
-        for change in self.buffer.diff(&updated) {
-            let style = change.cell.style.to_content_style(&self.style);
-            let content = style::StyledContent::new(style, change.cell.c);
-            self.writer
-                .queue(cursor::MoveTo(change.x as u16, change.y as u16))?
-                .queue(style::Print(content))?;
-        }
+        
         self.buffer = updated;
         Ok(())
     }
