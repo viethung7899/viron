@@ -1,5 +1,5 @@
 use anyhow::Result;
-use crossterm::style;
+use crossterm::{QueueableCommand, queue, style};
 use crossterm::{
     cursor,
     event::{KeyCode, KeyEvent, KeyModifiers},
@@ -7,7 +7,7 @@ use crossterm::{
     terminal::{self, ClearType},
 };
 use serde::{Deserialize, Serialize};
-use std::io::{self, Stdout};
+use std::io::{self, Stdout, Write};
 
 use crate::config::Config;
 use crate::core::buffer_manager::BufferManager;
@@ -20,7 +20,7 @@ use crate::input::{
     actions::ActionContext,
     events::{EventHandler, InputEvent},
 };
-use crate::ui::components::{BufferView, Gutter, StatusLine};
+use crate::ui::components::{BufferView, ComponentIds, Gutter, StatusLine};
 use crate::ui::compositor::Compositor;
 use crate::ui::{RenderContext, theme::Theme};
 
@@ -69,12 +69,10 @@ pub struct Editor {
     stdout: Stdout,
 
     // UI Components
-    compositor: Compositor<'static>,
+    compositor: Compositor,
     gutter_size: usize,
     theme: Theme,
-    gutter_id: String,
-    status_line_id: String,
-    buffer_view_id: String,
+    component_ids: ComponentIds,
 
     // Input handling
     keymap: KeyMap,
@@ -113,6 +111,11 @@ impl Editor {
         let status_line_id = compositor.add_component(Box::new(StatusLine::new()))?;
         let gutter_id = compositor.add_component(Box::new(Gutter::with_size(GUTTER_SIZE)))?;
         let buffer_view_id = compositor.add_component(Box::new(BufferView::new()))?;
+        let component_ids = ComponentIds {
+            status_line_id,
+            gutter_id,
+            buffer_view_id,
+        };
 
         // Create input handling
         let keymap = KeyMap::new();
@@ -129,9 +132,7 @@ impl Editor {
             theme,
             gutter_size: GUTTER_SIZE,
             compositor,
-            status_line_id,
-            gutter_id,
-            buffer_view_id,
+            component_ids,
 
             keymap,
             pending_keys,
@@ -160,8 +161,14 @@ impl Editor {
                 viewport: &self.viewport,
             };
 
-            // Handle events
+            self.stdout.queue(cursor::Hide)?;
             self.compositor.render(&mut context, &mut self.stdout)?;
+
+            self.show_cursor()?;
+
+            self.stdout.flush()?;
+
+            // Handle events
             match self.event_handler.next()? {
                 InputEvent::Key(key) => {
                     if let Some(action) = self.handle_key(key) {
@@ -171,6 +178,8 @@ impl Editor {
                             buffer_manager: &mut self.buffer_manager,
                             cursor: &mut self.cursor,
                             running: &mut self.running,
+                            compositor: &mut self.compositor,
+                            component_ids: &mut self.component_ids,
                         })?
                     }
                 }
@@ -181,6 +190,26 @@ impl Editor {
             }
         }
 
+        Ok(())
+    }
+
+    fn show_cursor(&mut self) -> Result<()> {
+        let cursor = self.cursor.get_position();
+        let viewport = &self.viewport;
+
+        let screen_row = cursor.row - viewport.top_line();
+        let screen_col = cursor.column - viewport.left_column() + self.gutter_size;
+
+        if screen_row < viewport.height() && screen_col < viewport.width() {
+            queue!(
+                self.stdout,
+                self.mode.set_cursor_style(),
+                cursor::MoveTo(screen_col as u16, screen_row as u16),
+                cursor::Show,
+            )?;
+        } else {
+            queue!(self.stdout, cursor::Hide)?;
+        }
         Ok(())
     }
 

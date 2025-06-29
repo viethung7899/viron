@@ -22,10 +22,6 @@ impl ActionImpl for MoveLeft {
         Ok(())
     }
 
-    fn describe_impl(&self) -> &str {
-        "Move cursor left"
-    }
-
     fn to_serializable_impl(&self) -> ActionDefinition {
         ActionDefinition::MoveLeft { count: self.count }
     }
@@ -49,10 +45,6 @@ impl ActionImpl for MoveRight {
                 .move_right(ctx.buffer_manager.current_buffer(), ctx.mode);
         }
         Ok(())
-    }
-
-    fn describe_impl(&self) -> &str {
-        "Move cursor right"
     }
 
     fn to_serializable_impl(&self) -> ActionDefinition {
@@ -80,10 +72,6 @@ impl ActionImpl for MoveUp {
         Ok(())
     }
 
-    fn describe_impl(&self) -> &str {
-        "Move cursor up"
-    }
-
     fn to_serializable_impl(&self) -> ActionDefinition {
         ActionDefinition::MoveUp { count: self.count }
     }
@@ -109,10 +97,6 @@ impl ActionImpl for MoveDown {
         Ok(())
     }
 
-    fn describe_impl(&self) -> &str {
-        "Move cursor down"
-    }
-
     fn to_serializable_impl(&self) -> ActionDefinition {
         ActionDefinition::MoveDown { count: self.count }
     }
@@ -125,10 +109,6 @@ impl ActionImpl for MoveToLineStart {
     fn execute_impl(&self, ctx: &mut ActionContext) -> ActionResult {
         ctx.cursor.move_to_line_start();
         Ok(())
-    }
-
-    fn describe_impl(&self) -> &str {
-        "Move to start of line"
     }
 
     fn to_serializable_impl(&self) -> ActionDefinition {
@@ -146,21 +126,17 @@ impl ActionImpl for MoveToLineEnd {
         Ok(())
     }
 
-    fn describe_impl(&self) -> &str {
-        "Move to end of line"
-    }
-
     fn to_serializable_impl(&self) -> ActionDefinition {
         ActionDefinition::MoveToLineEnd
     }
 }
 
-impl_action!(MoveLeft);
-impl_action!(MoveRight);
-impl_action!(MoveUp);
-impl_action!(MoveDown);
-impl_action!(MoveToLineStart);
-impl_action!(MoveToLineEnd);
+impl_action!(MoveLeft, "Move cursor left");
+impl_action!(MoveRight, "Move cursor right");
+impl_action!(MoveUp, "Move cursor up");
+impl_action!(MoveDown, "Move cursor down");
+impl_action!(MoveToLineStart, "Move to line start");
+impl_action!(MoveToLineEnd, "Move to line end");
 
 // Convenience functions for creating movement actions
 pub fn move_left(count: usize) -> Box<dyn Action> {

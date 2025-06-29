@@ -6,6 +6,8 @@ use std::path::PathBuf;
 use crate::core::buffer_manager::BufferManager;
 use crate::core::{cursor::Cursor, viewport::Viewport};
 use crate::editor::Mode;
+use crate::ui::compositor::Compositor;
+use crate::ui::components::ComponentIds;
 
 pub type ActionResult = Result<()>;
 
@@ -26,13 +28,15 @@ pub struct ActionContext<'a> {
     pub viewport: &'a mut Viewport,
     pub mode: &'a mut Mode,
     pub running: &'a mut bool,
+
+    pub compositor: &'a mut Compositor,
+    pub component_ids: &'a ComponentIds
 }
 
 // The Action trait defines what all actions must implement
 pub trait Action: Debug + Send + Sync {
     fn execute(&self, ctx: &mut ActionContext) -> ActionResult;
     fn describe(&self) -> &str;
-
     fn to_serializable(&self) -> ActionDefinition;
     fn clone_box(&self) -> Box<dyn Action>;
 }
@@ -93,13 +97,12 @@ impl Action for CompositeAction {
 
 pub(super) trait ActionImpl: Debug + Clone + Send + Sync {
     fn execute_impl(&self, ctx: &mut ActionContext) -> ActionResult;
-    fn describe_impl(&self) -> &str;
     fn to_serializable_impl(&self) -> ActionDefinition;
 }
 
 #[macro_export]
 macro_rules! impl_action {
-    ($action_type:ty) => {
+    ($action_type:ty, $description:expr) => {
         impl Action for $action_type {
             fn clone_box(&self) -> Box<dyn Action> {
                 Box::new(self.clone())
@@ -111,7 +114,7 @@ macro_rules! impl_action {
             }
 
             fn describe(&self) -> &str {
-                self.describe_impl()
+                $description
             }
 
             fn to_serializable(&self) -> ActionDefinition {

@@ -12,10 +12,6 @@ impl ActionImpl for NextBuffer {
         Ok(())
     }
 
-    fn describe_impl(&self) -> &str {
-        "Switch to next buffer"
-    }
-
     fn to_serializable_impl(&self) -> ActionDefinition {
         ActionDefinition::NextBuffer
     }
@@ -28,10 +24,6 @@ impl ActionImpl for PreviousBuffer {
     fn execute_impl(&self, ctx: &mut ActionContext) -> ActionResult {
         ctx.buffer_manager.previous_buffer();
         Ok(())
-    }
-
-    fn describe_impl(&self) -> &str {
-        "Switch to previous buffer"
     }
 
     fn to_serializable_impl(&self) -> ActionDefinition {
@@ -56,10 +48,6 @@ impl ActionImpl for OpenBuffer {
         Ok(())
     }
 
-    fn describe_impl(&self) -> &str {
-        "Open buffer from file"
-    }
-
     fn to_serializable_impl(&self) -> ActionDefinition {
         ActionDefinition::OpenBuffer {
             path: self.path.to_string_lossy().to_string(),
@@ -77,19 +65,15 @@ impl ActionImpl for QuitEditor {
         Ok(())
     }
 
-    fn describe_impl(&self) -> &str {
-        "Quit the editor"
-    }
-
     fn to_serializable_impl(&self) -> ActionDefinition {
         ActionDefinition::Quit
     }
 }
 
-impl_action!(OpenBuffer);
-impl_action!(QuitEditor);
-impl_action!(PreviousBuffer);
-impl_action!(NextBuffer);
+impl_action!(OpenBuffer, "Open buffer from file");
+impl_action!(QuitEditor, "Quit the editor");
+impl_action!(PreviousBuffer, "Previous buffer");
+impl_action!(NextBuffer, "Next buffer");
 
 pub fn open_buffer(path: PathBuf) -> Box<dyn Action> {
     Box::new(OpenBuffer::new(path))
