@@ -2,7 +2,6 @@ use anyhow::{Result, anyhow};
 use std::collections::HashSet;
 use std::hash::Hash;
 use std::io::Write;
-
 use crate::ui::render_buffer::RenderBuffer;
 use crate::ui::theme::Style;
 use crate::ui::{Drawable, RenderContext};
@@ -82,9 +81,6 @@ impl<'a> Compositor<'a> {
 
     // Render using diff
     pub fn render<W: Write>(&mut self, context: &RenderContext, writer: &mut W) -> Result<()> {
-        // Clear current buffer
-        self.current_buffer.clear();
-
         // Render all components to the current buffer
         let components = self
             .components
@@ -106,6 +102,7 @@ impl<'a> Compositor<'a> {
         }
 
         // Store current buffer as previous for next diff
+        writer.flush()?;
         self.previous_buffer = Some(self.current_buffer.clone());
         self.dirty_set.clear();
 
