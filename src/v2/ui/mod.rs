@@ -9,10 +9,10 @@ use crate::ui::theme::Theme;
 pub mod command_line;
 pub mod compositor;
 pub mod gutter;
+pub mod render_buffer;
 pub mod renderer;
 pub mod status_line;
 pub mod theme;
-pub mod render_buffer;
 
 pub struct RenderContext<'a> {
     pub viewport: &'a Viewport,

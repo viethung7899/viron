@@ -1,30 +1,27 @@
 use anyhow::Result;
 use crossterm::style;
-use std::io::{self, Stdout, Write};
-use std::path::{Path, PathBuf};
-use std::time::{Duration, Instant};
-
 use crossterm::{
     cursor,
-    event::{self, Event, KeyCode, KeyEvent, KeyModifiers},
-    execute, queue,
+    event::{KeyCode, KeyEvent, KeyModifiers},
+    execute,
     terminal::{self, ClearType},
 };
-
 use serde::{Deserialize, Serialize};
+use std::io::{self, Stdout};
 
+use crate::config::Config;
 use crate::core::buffer_manager::BufferManager;
 use crate::core::cursor::Cursor;
 use crate::core::viewport::Viewport;
+use crate::input::actions::Action;
 use crate::input::keymaps::{KeyEvent as VironKeyEvent, KeyMap, KeySequence};
 use crate::input::{
+    actions,
     actions::ActionContext,
     events::{EventHandler, InputEvent},
 };
-use crate::ui::{
-    command_line::CommandLine, gutter::Gutter, renderer::Renderer, status_line::StatusLine,
-    theme::Theme,
-};
+use crate::ui::compositor::Compositor;
+use crate::ui::{RenderContext, gutter::Gutter, status_line::StatusLine, theme::Theme};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Mode {
@@ -66,12 +63,13 @@ pub struct Editor {
     cursor: Cursor,
     viewport: Viewport,
     mode: Mode,
+    stdout: Stdout,
 
-    // UI components
-    renderer: Renderer<Stdout>,
-    status_line: StatusLine,
-    gutter: Gutter,
+    // UI Components
+    compositor: Compositor<'static>,
     theme: Theme,
+    status_line_id: String,
+    gutter_id: String,
 
     // Input handling
     keymap: KeyMap,
@@ -105,9 +103,10 @@ impl Editor {
 
         // Create UI components
         let theme = Theme::default();
-        let renderer = Renderer::new(stdout, width as usize, height as usize, &theme)?;
-        let status_line = StatusLine::new();
-        let gutter = Gutter::new();
+        let mut compositor =
+            Compositor::new(width as usize, height as usize, &theme.editor_style());
+        let status_line_id = compositor.add_component(Box::new(StatusLine::new()))?;
+        let gutter_id = compositor.add_component(Box::new(Gutter::new()))?;
 
         // Create input handling
         let keymap = KeyMap::new();
@@ -119,11 +118,13 @@ impl Editor {
             cursor,
             viewport,
             mode: Mode::Normal,
+            stdout,
 
-            renderer,
-            status_line,
-            gutter,
             theme,
+            compositor,
+            status_line_id,
+            gutter_id,
+
             keymap,
             pending_keys,
             event_handler,
@@ -134,23 +135,39 @@ impl Editor {
         })
     }
 
-    pub fn load_config(&mut self, path: impl AsRef<Path>) -> Result<()> {
-        self.keymap = KeyMap::load_from_file(path.as_ref())?;
-        self.theme = Theme::load_from_file(path.as_ref())?;
+    pub fn load_config(&mut self, config: &Config) -> Result<()> {
+        self.keymap = KeyMap::load_from_config(&config.keymap)?;
+        self.theme = Theme::load_from_file(&config.theme)?;
         Ok(())
     }
 
     pub fn run(&mut self) -> Result<()> {
         // Main event loop
-        self.render()?;
         while self.running {
+            let context = RenderContext {
+                theme: &self.theme,
+                cursor: &self.cursor,
+                document: &self.buffer_manager.current(),
+                mode: &self.mode,
+                viewport: &self.viewport,
+            };
+
             // Handle events
+            self.compositor.render(&context, &mut self.stdout)?;
             match self.event_handler.next()? {
                 InputEvent::Key(key) => {
-                    self.handle_key(key)?;
+                    if let Some(action) = self.handle_key(key) {
+                        action.execute(&mut ActionContext {
+                            mode: &mut self.mode,
+                            viewport: &mut self.viewport,
+                            buffer_manager: &mut self.buffer_manager,
+                            cursor: &mut self.cursor,
+                            running: &mut self.running,
+                        })?
+                    }
                 }
                 InputEvent::Resize(width, height) => {
-                    self.handle_resize(width, height)?;
+                    self.compositor.resize(width as usize, height as usize);
                 }
                 _ => {}
             }
@@ -159,158 +176,47 @@ impl Editor {
         Ok(())
     }
 
-    fn handle_key(&mut self, key: KeyEvent) -> Result<()> {
+    fn handle_key(&mut self, key: KeyEvent) -> Option<Box<dyn Action>> {
         // Convert to our key event type
         let key_event = VironKeyEvent::from(key);
+        self.pending_keys.add(key_event.clone());
+        let action = self
+            .keymap
+            .get_action(&self.mode, &self.pending_keys)
+            .cloned();
 
-        // Special handling for command and search modes
-        // match self.mode {
-        //     Mode::Command => {
-        //         if key.code == KeyCode::Esc {
-        //             self.mode = Mode::Normal;
-        //             self.command_line.clear();
-        //             return Ok(());
-        //         } else if key.code == KeyCode::Enter {
-        //             self.execute_command(&self.command_line.get_command())?;
-        //             self.command_line.clear();
-        //             self.mode = Mode::Normal;
-        //             return Ok(());
-        //         } else {
-        //             // Handle normal command line editing
-        //             match key.code {
-        //                 KeyCode::Backspace => self.command_line.backspace(),
-        //                 KeyCode::Char(c) => self.command_line.insert(c),
-        //                 _ => {}
-        //             }
-        //             return Ok(());
-        //         }
-        //     }
-        //     Mode::Search => {
-        //         if key.code == KeyCode::Esc {
-        //             self.mode = Mode::Normal;
-        //             self.command_line.clear();
-        //             return Ok(());
-        //         } else if key.code == KeyCode::Enter {
-        //             self.search(&self.command_line.get_command())?;
-        //             self.command_line.clear();
-        //             self.mode = Mode::Normal;
-        //             return Ok(());
-        //         } else {
-        //             // Handle normal search line editing
-        //             match key.code {
-        //                 KeyCode::Backspace => self.command_line.backspace(),
-        //                 KeyCode::Char(c) => self.command_line.insert(c),
-        //                 _ => {}
-        //             }
-        //             return Ok(());
-        //         }
-        //     }
-        //     _ => {}
-        // }
-        //
-        // // Add key to pending sequence
-        self.pending_keys.add(key_event);
-        //
-        // Check if we have an action for this sequence
-        if let Some(action) = self.keymap.get_action(&self.mode, &self.pending_keys) {
-            let mut context = ActionContext {
-                buffer_manager: &mut self.buffer_manager,
-                cursor: &mut self.cursor,
-                viewport: &mut self.viewport,
-                mode: &mut self.mode,
-                running: &mut self.running,
-            };
-
-            action.execute(&mut context)?;
+        if action.is_some() {
             self.pending_keys.clear();
+            return action;
         }
-        // else if !self.keymap.is_partial_match(&self.mode, &self.pending_keys) {
-        //     // No matching action and not a prefix of a longer sequence
-        //     self.pending_keys.clear();
-        //
-        //     // For insert mode, default to inserting the character
-        //     if let KeyCode::Char(c) = key.code {
-        //         if self.mode == Mode::Insert && key.modifiers == KeyModifiers::NONE {
-        //             let position = self
-        //                 .buffer_manager
-        //                 .current_buffer()
-        //                 .cursor_position(&self.cursor.get_position());
-        //             let new_position = self
-        //                 .buffer_manager
-        //                 .current_buffer_mut()
-        //                 .insert_char(position, c);
-        //             self.cursor.set_position(
-        //                 self.buffer_manager
-        //                     .current_buffer()
-        //                     .point_at_position(new_position),
-        //             );
-        //         }
-        //     }
-        // }
 
-        Ok(())
+        if self.keymap.is_partial_match(&self.mode, &self.pending_keys) {
+            return None;
+        }
+
+        self.pending_keys.clear();
+        match &self.mode {
+            Mode::Insert => self.handle_default_insert_event(&key_event),
+            _ => None,
+        }
     }
 
-    fn handle_resize(&mut self, width: u16, height: u16) -> Result<()> {
-        // Update component dimensions
-
-        Ok(())
-    }
-
-    fn render(&mut self) -> Result<()> {
-        // Make sure cursor is visible
-        self.viewport
-            .scroll_to_cursor(&self.cursor, self.buffer_manager.current_buffer());
-
-        // // Calculate offset for gutter
-        // let gutter_width = self.gutter.width;
-        //
-        // // Render buffer content
-        // self.renderer
-        //     .render_buffer(self.buffer_manager.current_buffer_mut(), &self.viewport)?;
-        //
-        // let screen_height = self.renderer.height();
-        //
-        // // Render status line at bottom
-        // self.status_line.render(
-        //     self.renderer.writer(),
-        //     self.buffer_manager.current(),
-        //     &self.mode,
-        //     &self.cursor.get_position(),
-        // )?;
-        //
-        //
-        // // If we're in command or search mode, render the command line
-        // if self.mode == Mode::Command || self.mode == Mode::Search {
-        //     self.command_line
-        //         .render(self.renderer.writer(), screen_height)?;
-        // }
-        //
-        // // Position cursor
-        // if let Some((row, col)) = self
-        //     .viewport
-        //     .buffer_to_viewport(&self.cursor.get_position())
-        // {
-        //     let screen_row = row as u16;
-        //     let screen_col = (col + gutter_width) as u16; // Add gutter width
-        //     queue!(
-        //         self.renderer.writer(),
-        //         cursor::MoveTo(screen_col, screen_row),
-        //         self.mode.set_cursor_style(),
-        //         cursor::Show
-        //     )?;
-        // }
-        //
-        // // Flush all output
-        self.renderer.flush()?;
-
-        Ok(())
+    fn handle_default_insert_event(
+        &mut self,
+        key_event: &VironKeyEvent,
+    ) -> Option<Box<dyn Action>> {
+        let code = key_event.code;
+        let modifiers = key_event.modifiers;
+        match (code, modifiers) {
+            (KeyCode::Char(ch), KeyModifiers::NONE) => Some(actions::insert_char(ch)),
+            _ => None,
+        }
     }
 
     pub fn cleanup(&mut self) -> Result<()> {
         // Restore terminal state
         execute!(
-            self.renderer.writer(),
+            self.stdout,
             style::ResetColor,
             cursor::Show,
             terminal::LeaveAlternateScreen
