@@ -7,13 +7,16 @@ theme = "themes/catppuchin/mocha.json"
 "j" = { type = "MoveDown", params = { count = 1 } }
 "k" = { type = "MoveUp", params = { count = 1 } }
 "l" = { type = "MoveRight", params = { count = 1 } }
-"i" = { type = "EnterMode", params = { mode = "insert" } }
 "$" = { type = "MoveToLineEnd" }
 "0" = { type = "MoveToLineStart" }
 "<Left>" = { type = "MoveLeft", params = { count = 1 } }
 "<Right>" = { type = "MoveRight", params = { count = 1 } }
 "<Up>" = { type = "MoveUp", params = { count = 1 } }
 "<Down>" = { type = "MoveDown", params = { count = 1 } }
+
+"i" = { type = "EnterMode", params = { mode = "insert" } }
+":" = { type = "EnterMode", params = { mode = "command" } }
+"/" = { type = "EnterMode", params = { mode = "search" } }
 
 # Keybindings for insert mode
 [keymap.insert]
@@ -24,3 +27,9 @@ theme = "themes/catppuchin/mocha.json"
 "<Right>" = { type = "MoveRight", params = { count = 1 } }
 "<Up>" = { type = "MoveUp", params = { count = 1 } }
 "<Down>" = { type = "MoveDown", params = { count = 1 } }
+
+[keymap.command]
+"<Esc>" = { type = "EnterMode", params = { mode = "normal" } }
+
+[keymap.search]
+"<Esc>" = { type = "EnterMode", params = { mode = "normal" } }
