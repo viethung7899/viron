@@ -12,7 +12,6 @@ use crossterm::{cursor, terminal};
 use editor::Editor;
 use std::path::Path;
 use std::{env, io::stdout, panic};
-
 use crate::config::Config;
 
 #[tokio::main]
@@ -21,6 +20,7 @@ async fn main() -> Result<()> {
     better_panic::install();
 
     // Initialize logging if needed
+    setup_log()?;
 
     // Parse command line arguments
     let args: Vec<String> = env::args().collect();
@@ -53,6 +53,20 @@ async fn main() -> Result<()> {
 
     // Return the result from run_editor
     result
+}
+
+fn setup_log() -> Result<()> {
+    use env_logger::{Builder, Target};
+    use std::fs::File;
+    use log::LevelFilter;
+
+    let file = File::create("/tmp/viron.log")?;
+    Builder::new()
+        .target(Target::Pipe(Box::new(file)))
+        .filter(None, LevelFilter::Info)
+        .init();
+
+    Ok(())
 }
 
 fn run_editor(editor: &mut Editor, args: &[String]) -> Result<()> {
