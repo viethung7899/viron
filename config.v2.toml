@@ -10,9 +10,17 @@ theme = "themes/catppuchin/mocha.json"
 "i" = { type = "EnterMode", params = { mode = "insert" } }
 "$" = { type = "MoveToLineEnd" }
 "0" = { type = "MoveToLineStart" }
+"<Left>" = { type = "MoveLeft", params = { count = 1 } }
+"<Right>" = { type = "MoveRight", params = { count = 1 } }
+"<Up>" = { type = "MoveUp", params = { count = 1 } }
+"<Down>" = { type = "MoveDown", params = { count = 1 } }
 
 # Keybindings for insert mode
 [keymap.insert]
 "<Esc>" = { type = "EnterMode", params = { mode = "normal" } }
 "<Backspace>" = { type = "Backspace" }
 "<Enter>" = { type = "InsertNewLine" }
+"<Left>" = { type = "MoveLeft", params = { count = 1 } }
+"<Right>" = { type = "MoveRight", params = { count = 1 } }
+"<Up>" = { type = "MoveUp", params = { count = 1 } }
+"<Down>" = { type = "MoveDown", params = { count = 1 } }

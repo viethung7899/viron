@@ -1,6 +1,6 @@
-use std::fmt::Debug;
 use crate::impl_action;
 use crate::input::actions::{Action, ActionContext, ActionDefinition, ActionImpl, ActionResult};
+use std::fmt::Debug;
 
 #[derive(Debug, Clone)]
 pub struct MoveLeft {
@@ -19,6 +19,8 @@ impl ActionImpl for MoveLeft {
             ctx.cursor
                 .move_left(ctx.buffer_manager.current_buffer(), ctx.mode);
         }
+        ctx.compositor
+            .mark_dirty(&ctx.component_ids.status_line_id)?;
         Ok(())
     }
 
@@ -44,6 +46,8 @@ impl ActionImpl for MoveRight {
             ctx.cursor
                 .move_right(ctx.buffer_manager.current_buffer(), ctx.mode);
         }
+        ctx.compositor
+            .mark_dirty(&ctx.component_ids.status_line_id)?;
         Ok(())
     }
 
@@ -69,6 +73,8 @@ impl ActionImpl for MoveUp {
             ctx.cursor
                 .move_up(ctx.buffer_manager.current_buffer(), ctx.mode);
         }
+        ctx.compositor
+            .mark_dirty(&ctx.component_ids.status_line_id)?;
         Ok(())
     }
 
@@ -108,6 +114,8 @@ pub struct MoveToLineStart {}
 impl ActionImpl for MoveToLineStart {
     fn execute_impl(&self, ctx: &mut ActionContext) -> ActionResult {
         ctx.cursor.move_to_line_start();
+        ctx.compositor
+            .mark_dirty(&ctx.component_ids.status_line_id)?;
         Ok(())
     }
 
@@ -123,6 +131,8 @@ impl ActionImpl for MoveToLineEnd {
     fn execute_impl(&self, ctx: &mut ActionContext) -> ActionResult {
         ctx.cursor
             .move_to_line_end(ctx.buffer_manager.current_buffer(), ctx.mode);
+        ctx.compositor
+            .mark_dirty(&ctx.component_ids.status_line_id)?;
         Ok(())
     }
 
