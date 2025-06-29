@@ -12,6 +12,8 @@ impl ActionImpl for InsertChar {
         let new_position = buffer.insert_char(position, self.0);
         ctx.cursor
             .set_position(buffer.point_at_position(new_position));
+        ctx.compositor.mark_dirty(&ctx.component_ids.buffer_view_id)?;
+        ctx.compositor.mark_dirty(&ctx.component_ids.status_line_id)?;
         Ok(())
     }
 
@@ -30,6 +32,8 @@ impl ActionImpl for DeleteChar {
         if let Some(_) = buffer.delete_char(position) {
             // Cursor stays in place after deletion
         }
+        ctx.compositor.mark_dirty(&ctx.component_ids.buffer_view_id)?;
+        ctx.compositor.mark_dirty(&ctx.component_ids.status_line_id)?;
         Ok(())
     }
 
@@ -49,6 +53,8 @@ impl ActionImpl for Backspace {
             if let Some(_) = buffer.delete_char(position - 1) {
                 ctx.cursor.move_left(buffer, ctx.mode);
             }
+            ctx.compositor.mark_dirty(&ctx.component_ids.buffer_view_id)?;
+            ctx.compositor.mark_dirty(&ctx.component_ids.status_line_id)?;
         }
         Ok(())
     }
@@ -68,6 +74,8 @@ impl ActionImpl for InsertNewLine {
         let new_position = buffer.insert_char(position, '\n');
         ctx.cursor
             .set_position(buffer.point_at_position(new_position));
+        ctx.compositor.mark_dirty(&ctx.component_ids.buffer_view_id)?;
+        ctx.compositor.mark_dirty(&ctx.component_ids.status_line_id)?;
         Ok(())
     }
 

@@ -1,3 +1,4 @@
+use log::info;
 use tree_sitter::Point;
 
 use crate::core::buffer::gap_buffer::GapBuffer;
@@ -107,6 +108,7 @@ impl Buffer {
         }
 
         // Return the position after insertion
+        info!("Inserted '{}' at position {}, new line starts: {:?}", ch, position, self.line_starts);
         position + 1
     }
 
