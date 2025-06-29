@@ -1,7 +1,7 @@
-use crate::core::buffer;
 use crate::ui::render_buffer::RenderBuffer;
 use crate::ui::{Bounds, Drawable, RenderContext};
 use anyhow::{Ok, Result};
+use log::info;
 
 pub struct BufferView {
     id: String,
@@ -39,12 +39,14 @@ impl BufferView {
             let content = if buffer_row >= buffer.line_count() {
                 " ".repeat(visible_width)
             } else {
+                let line = buffer.get_content_line(buffer_row);
+                info!("Render line {line:?}");
                 format!(
                     "{:<visible_width$}",
-                    buffer
-                        .get_content_line(buffer_row)
-                        .get(left_col..)
-                        .unwrap_or("")
+                    line.chars()
+                        .skip(left_col)
+                        .take_while(|c| c != &'\n')
+                        .collect::<String>()
                 )
             };
 

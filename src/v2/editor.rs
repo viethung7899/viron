@@ -20,9 +20,9 @@ use crate::input::{
     actions::ActionContext,
     events::{EventHandler, InputEvent},
 };
+use crate::ui::components::{BufferView, Gutter, StatusLine};
 use crate::ui::compositor::Compositor;
-use crate::ui::{theme::Theme, RenderContext};
-use crate::ui::components::{Gutter, StatusLine};
+use crate::ui::{RenderContext, theme::Theme};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Mode {
@@ -58,6 +58,8 @@ impl Mode {
     }
 }
 
+const GUTTER_SIZE: usize = 4;
+
 pub struct Editor {
     // Core components
     buffer_manager: BufferManager,
@@ -68,9 +70,11 @@ pub struct Editor {
 
     // UI Components
     compositor: Compositor<'static>,
+    gutter_size: usize,
     theme: Theme,
-    status_line_id: String,
     gutter_id: String,
+    status_line_id: String,
+    buffer_view_id: String,
 
     // Input handling
     keymap: KeyMap,
@@ -100,14 +104,15 @@ impl Editor {
         // Create core components
         let buffer_manager = BufferManager::new();
         let cursor = Cursor::new();
-        let viewport = Viewport::new(height as usize - 2, width as usize);
+        let viewport = Viewport::new(height as usize - 2, width as usize - GUTTER_SIZE);
 
         // Create UI components
         let theme = Theme::default();
         let mut compositor =
             Compositor::new(width as usize, height as usize, &theme.editor_style());
         let status_line_id = compositor.add_component(Box::new(StatusLine::new()))?;
-        let gutter_id = compositor.add_component(Box::new(Gutter::new()))?;
+        let gutter_id = compositor.add_component(Box::new(Gutter::with_size(GUTTER_SIZE)))?;
+        let buffer_view_id = compositor.add_component(Box::new(BufferView::new()))?;
 
         // Create input handling
         let keymap = KeyMap::new();
@@ -122,9 +127,11 @@ impl Editor {
             stdout,
 
             theme,
+            gutter_size: GUTTER_SIZE,
             compositor,
             status_line_id,
             gutter_id,
+            buffer_view_id,
 
             keymap,
             pending_keys,
@@ -168,12 +175,18 @@ impl Editor {
                     }
                 }
                 InputEvent::Resize(width, height) => {
-                    self.compositor.resize(width as usize, height as usize);
+                    self.handle_resize(width as usize, height as usize)?;
                 }
                 _ => {}
             }
         }
 
+        Ok(())
+    }
+
+    fn handle_resize(&mut self, width: usize, height: usize) -> Result<()> {
+        self.compositor.resize(width, height);
+        self.viewport.resize(height - 2, width - self.gutter_size);
         Ok(())
     }
 
