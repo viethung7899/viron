@@ -1,4 +1,3 @@
-use crate::core::buffer::Buffer;
 use crate::core::cursor::Cursor;
 use crate::core::document::Document;
 use crate::core::viewport::Viewport;
@@ -22,7 +21,15 @@ pub struct RenderContext<'a> {
     pub theme: &'a Theme,
 }
 
+pub struct Bounds {
+    pub start_row: usize,
+    pub start_col: usize,
+    pub width: usize,
+    pub height: usize,
+}
+
 pub trait Drawable {
     fn id(&self) -> &str;
-    fn draw(&self, buffer: &mut RenderBuffer, context: &RenderContext);
+    fn draw(&self, buffer: &mut RenderBuffer, context: &RenderContext) -> anyhow::Result<()>;
+    fn bounds(&self, size: (usize, usize), context: &RenderContext) -> Bounds;
 }
