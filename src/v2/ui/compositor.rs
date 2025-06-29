@@ -6,30 +6,30 @@ use std::collections::HashSet;
 use std::hash::Hash;
 use std::io::Write;
 
-type Component<'a> = Box<dyn Drawable + 'a>;
+type Component = Box<dyn Drawable>;
 
-impl PartialEq for Component<'_> {
+impl PartialEq for Component {
     fn eq(&self, other: &Self) -> bool {
         self.id() == other.id()
     }
 }
 
-impl Eq for Component<'_> {}
-impl Hash for Component<'_> {
+impl Eq for Component {}
+impl Hash for Component {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.id().hash(state);
     }
 }
 
-pub struct Compositor<'a> {
-    components: HashSet<Component<'a>>,
+pub struct Compositor {
+    components: HashSet<Component>,
     dirty_set: HashSet<String>,
     editor_style: Style,
     current_buffer: RenderBuffer,
     previous_buffer: Option<RenderBuffer>,
 }
 
-impl<'a> Compositor<'a> {
+impl Compositor {
     pub fn new(width: usize, height: usize, default_style: &Style) -> Self {
         Self {
             components: HashSet::new(),
@@ -40,7 +40,7 @@ impl<'a> Compositor<'a> {
         }
     }
 
-    pub fn add_component(&mut self, component: Box<dyn Drawable + 'a>) -> Result<String> {
+    pub fn add_component(&mut self, component: Component) -> Result<String> {
         let id = component.id().to_string();
 
         if self.components.contains(&component) {
@@ -102,7 +102,6 @@ impl<'a> Compositor<'a> {
         }
 
         // Store current buffer as previous for next diff
-        writer.flush()?;
         self.previous_buffer = Some(self.current_buffer.clone());
         self.dirty_set.clear();
 

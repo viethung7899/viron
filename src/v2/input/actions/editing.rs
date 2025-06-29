@@ -1,6 +1,6 @@
-use std::fmt::Debug;
 use crate::impl_action;
 use crate::input::actions::{Action, ActionContext, ActionDefinition, ActionImpl, ActionResult};
+use std::fmt::Debug;
 
 #[derive(Debug, Clone)]
 pub struct InsertChar(char);
@@ -13,10 +13,6 @@ impl ActionImpl for InsertChar {
         ctx.cursor
             .set_position(buffer.point_at_position(new_position));
         Ok(())
-    }
-
-    fn describe_impl(&self) -> &str {
-        "Insert character"
     }
 
     fn to_serializable_impl(&self) -> ActionDefinition {
@@ -35,10 +31,6 @@ impl ActionImpl for DeleteChar {
             // Cursor stays in place after deletion
         }
         Ok(())
-    }
-
-    fn describe_impl(&self) -> &str {
-        "Delete character"
     }
 
     fn to_serializable_impl(&self) -> ActionDefinition {
@@ -61,10 +53,6 @@ impl ActionImpl for Backspace {
         Ok(())
     }
 
-    fn describe_impl(&self) -> &str {
-        "Delete previous character"
-    }
-
     fn to_serializable_impl(&self) -> ActionDefinition {
         ActionDefinition::Backspace
     }
@@ -83,19 +71,15 @@ impl ActionImpl for InsertNewLine {
         Ok(())
     }
 
-    fn describe_impl(&self) -> &str {
-        "Insert new line"
-    }
-
     fn to_serializable_impl(&self) -> ActionDefinition {
         ActionDefinition::InsertNewLine
     }
 }
 
-impl_action!(InsertNewLine);
-impl_action!(Backspace);
-impl_action!(DeleteChar);
-impl_action!(InsertChar);
+impl_action!(InsertNewLine, "Insert new line");
+impl_action!(Backspace, "Backspace");
+impl_action!(DeleteChar, "Delete character");
+impl_action!(InsertChar, "Insert new line");
 
 // Convenience functions for creating editing actions
 pub fn insert_char(ch: char) -> Box<dyn Action> {
