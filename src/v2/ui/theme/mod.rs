@@ -122,6 +122,14 @@ impl Theme {
         let vscode: VsCodeTheme = serde_json::from_reader(reader)?;
         Ok(Theme::from(&vscode))
     }
+    
+    pub fn editor_style(&self) -> Style {
+        Style {
+            foreground: self.colors.editor.foreground,
+            background: self.colors.editor.background,
+            ..Default::default()
+        }
+    }
 }
 
 impl From<&VsCodeTheme> for StatusColors {

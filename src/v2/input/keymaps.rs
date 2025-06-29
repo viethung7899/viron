@@ -63,10 +63,10 @@ impl KeySequence {
 
 #[derive(Debug, Default)]
 pub struct KeyMap {
-    normal: HashMap<KeySequence, Box<dyn Action>>,
-    insert: HashMap<KeySequence, Box<dyn Action>>,
-    command: HashMap<KeySequence, Box<dyn Action>>,
-    search: HashMap<KeySequence, Box<dyn Action>>,
+    pub normal: HashMap<KeySequence, Box<dyn Action>>,
+    pub insert: HashMap<KeySequence, Box<dyn Action>>,
+    pub command: HashMap<KeySequence, Box<dyn Action>>,
+    pub search: HashMap<KeySequence, Box<dyn Action>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Default)]

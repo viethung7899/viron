@@ -7,6 +7,7 @@ use crate::ui::render_buffer::RenderBuffer;
 use crate::ui::theme::Theme;
 
 pub mod command_line;
+pub mod compositor;
 pub mod gutter;
 pub mod renderer;
 pub mod status_line;
@@ -22,5 +23,6 @@ pub struct RenderContext<'a> {
 }
 
 pub trait Drawable {
+    fn id(&self) -> &str;
     fn draw(&self, buffer: &mut RenderBuffer, context: &RenderContext);
 }
