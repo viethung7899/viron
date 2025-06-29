@@ -102,18 +102,18 @@ fn default_colors() -> Colors {
 }
 
 impl Theme {
-    pub fn style_for_token(&self, token_type: &str) -> ContentStyle {
-        let mut style = ContentStyle::default();
-
+    pub fn style_for_token(&self, token_type: &str) -> Style {
+        let mut style = self.editor_style();
         if let Some(token_style) = self.token_styles.get(token_type) {
             if let Some(fg) = token_style.foreground {
-                style.background_color = fg.into();
+                style.foreground = fg.into();
             }
             if let Some(bg) = token_style.background {
-                style.background_color = bg.into();
+                style.background = bg.into();
             }
+            style.bold = token_style.bold;
+            style.italic = token_style.italic;
         }
-
         style
     }
 

@@ -82,6 +82,9 @@ impl BufferManager {
 
         // Set as current
         self.current_index = index;
+        
+        // Update syntax highlighting
+        self.update_syntax_highlighting()?;
 
         Ok(index)
     }
@@ -190,6 +193,11 @@ impl BufferManager {
                 is_modified: doc.modified,
             })
             .collect()
+    }
+
+    
+    pub fn get_syntax_highlighter(&mut self) -> &mut SyntaxHighlighter {
+        &mut self.syntax_highlighter
     }
 }
 
