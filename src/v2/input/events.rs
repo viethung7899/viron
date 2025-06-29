@@ -21,6 +21,7 @@ impl EventHandler {
 }
 
 // Possible input events
+#[derive(Debug)]
 pub enum InputEvent {
     Key(KeyEvent),
     Resize(u16, u16),

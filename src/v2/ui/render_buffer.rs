@@ -118,12 +118,11 @@ impl RenderBuffer {
     }
 
     pub(super) fn flush<W: Write>(&self, writer: &mut W) -> Result<()> {
-        for (pos, cell) in self.cells.iter().enumerate() {
-            let x = pos % self.width;
-            let y = pos / self.width;
+        writer.queue(cursor::MoveTo(0, 0))?;
+        for cell in self.cells.iter() {
             let style = cell.style.to_content_style(&self.style);
             let content = style::StyledContent::new(style, cell.c);
-            writer.queue(cursor::MoveTo(x as u16, y as u16))?.queue(style::Print(content))?;
+            writer.queue(style::Print(content))?;
         }
         Ok(())
     }
