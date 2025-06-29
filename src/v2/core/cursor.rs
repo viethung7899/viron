@@ -38,7 +38,7 @@ impl Cursor {
 
     /// Move cursor one character to the right
     pub fn move_right(&mut self, buffer: &Buffer, mode: &Mode) {
-        let line_length = buffer.get_line_length(self.position.row).saturating_sub(1);
+        let line_length = buffer.get_line_length(self.position.row);
 
         let at_end_of_line = if *mode == Mode::Insert {
             self.position.column >= line_length
