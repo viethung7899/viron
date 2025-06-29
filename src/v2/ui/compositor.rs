@@ -80,7 +80,7 @@ impl<'a> Compositor<'a> {
     }
 
     // Render using diff
-    pub fn render<W: Write>(&mut self, context: &RenderContext, writer: &mut W) -> Result<()> {
+    pub fn render<W: Write>(&mut self, context: &mut RenderContext, writer: &mut W) -> Result<()> {
         // Render all components to the current buffer
         let components = self
             .components
@@ -88,7 +88,7 @@ impl<'a> Compositor<'a> {
             .filter(|&component| self.dirty_set.contains(component.id()));
 
         for component in components {
-            component.draw(&mut self.current_buffer, context);
+            component.draw(&mut self.current_buffer, context)?;
         }
 
         // If we have a previous buffer, do differential rendering

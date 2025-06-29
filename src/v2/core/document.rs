@@ -1,40 +1,35 @@
-use std::path::{Path, PathBuf};
-use anyhow::{Result, Context};
 use crate::core::buffer::Buffer;
+use crate::core::syntax::LanguageType;
+use anyhow::{Context, Result};
+use std::path::{Path, PathBuf};
 
+#[derive(Debug, Default)]
 pub struct Document {
     pub buffer: Buffer,
     pub path: Option<PathBuf>,
     pub modified: bool,
-    pub syntax: Option<String>,
+    pub language: LanguageType,
 }
 
 impl Document {
     pub fn new() -> Self {
-        Self {
-            buffer: Buffer::default(),
-            path: None,
-            modified: false,
-            syntax: None,
-        }
+        Self::default()
     }
-    
+
     pub fn from_file(path: &Path) -> Result<Self> {
         let content = std::fs::read_to_string(path)
             .context(format!("Failed to read file: {}", path.display()))?;
-        
-        let syntax = path.extension()
-            .and_then(|ext| ext.to_str())
-            .map(|ext| ext.to_string());
-            
+
+        let language = LanguageType::from_path(path);
+
         Ok(Self {
             buffer: Buffer::from_string(&content),
             path: Some(path.to_path_buf()),
             modified: false,
-            syntax,
+            language,
         })
     }
-    
+
     pub fn save(&mut self) -> Result<()> {
         if let Some(path) = &self.path {
             let content = self.buffer.to_bytes();
@@ -46,18 +41,19 @@ impl Document {
             Err(anyhow::anyhow!("No file path set"))
         }
     }
-    
+
     pub fn save_as(&mut self, path: &Path) -> Result<()> {
         self.path = Some(path.to_path_buf());
         self.save()
     }
-    
+
     pub fn mark_modified(&mut self) {
         self.modified = true;
     }
-    
+
     pub fn file_name(&self) -> Option<String> {
-        self.path.as_ref()
+        self.path
+            .as_ref()
             .and_then(|p| p.file_name())
             .and_then(|n| n.to_str())
             .map(|s| s.to_string())

@@ -1,7 +1,6 @@
 use crate::ui::render_buffer::RenderBuffer;
 use crate::ui::theme::Style;
 use crate::ui::{Bounds, Drawable, RenderContext};
-use anyhow::Result;
 
 pub struct Gutter {
     id: String,
@@ -25,15 +24,20 @@ impl Gutter {
 }
 
 impl Drawable for Gutter {
-    fn draw(&self, buffer: &mut RenderBuffer, context: &RenderContext) -> anyhow::Result<()> {
+    fn draw(&self, buffer: &mut RenderBuffer, context: &mut RenderContext) -> anyhow::Result<()> {
         let top_line = context.viewport.top_line();
         let style = Style::from(context.theme.colors.gutter);
-        let Bounds { start_col, width, height, .. } 
-            = self.bounds(buffer.get_size(), context);
+        let Bounds {
+            start_col,
+            width,
+            height,
+            ..
+        } = self.bounds(buffer.get_size(), context);
+        let line_count = context.buffer_manager.current_buffer().line_count();
 
         for i in 0..(height) {
             let buffer_line = top_line + i;
-            if buffer_line >= context.document.buffer.line_count() {
+            if buffer_line >= line_count {
                 break;
             }
 

@@ -22,8 +22,11 @@ impl Drawable for StatusLine {
         &self.id
     }
 
-    fn draw(&self, buffer: &mut RenderBuffer, context: &RenderContext) -> anyhow::Result<()> {
-        let Bounds { start_row, width, .. } = self.bounds(buffer.get_size(), context);
+    fn draw(&self, buffer: &mut RenderBuffer, context: &mut RenderContext) -> anyhow::Result<()> {
+        let Bounds {
+            start_row, width, ..
+        } = self.bounds(buffer.get_size(), context);
+        let document = context.buffer_manager.current();
 
         let left = format!(" {} ", context.mode.to_name().to_uppercase());
 
@@ -32,16 +35,8 @@ impl Drawable for StatusLine {
 
         let file = format!(
             " {}{}",
-            context
-                .document
-                .file_name()
-                .as_deref()
-                .unwrap_or("new file"),
-            if context.document.modified {
-                " [+]"
-            } else {
-                ""
-            }
+            document.file_name().as_deref().unwrap_or("new file"),
+            if document.modified { " [+]" } else { "" }
         );
         let center_width = width - left.len() - right.len();
         let center = format!("{file:<center_width$}");
@@ -70,7 +65,7 @@ impl Drawable for StatusLine {
             start_row,
             start_col: 0,
             width,
-            height: 1
+            height: 1,
         }
     }
 }
