@@ -1,8 +1,7 @@
 use crate::ui::render_buffer::RenderBuffer;
 use crate::ui::theme::Style;
 use crate::ui::{Bounds, Drawable, RenderContext};
-use anyhow::{Ok, Result};
-use log::info;
+use anyhow::Result;
 use std::ops::Add;
 use std::str::from_utf8;
 use tree_sitter::Point;
@@ -81,8 +80,6 @@ impl BufferView {
             .buffer_manager
             .get_syntax_highlighter()
             .highlight(&code)?;
-
-        info!("{tokens:?}");
 
         let top_line = viewport.top_line();
         let left_column = viewport.left_column();
@@ -259,7 +256,13 @@ impl Drawable for BufferView {
         if context.buffer_manager.current().language.is_plain_text() {
             self.render_plain_text(buffer, context)
         } else {
-            self.render_with_syntax_highlighting(buffer, context)
+            match self.render_with_syntax_highlighting(buffer, context) {
+                Ok(_) => Ok(()),
+                Err(e) => {
+                    log::error!("Failed to render buffer with syntax highlighting: {}", e);
+                    self.render_plain_text(buffer, context)
+                }
+            }
         }
     }
 
