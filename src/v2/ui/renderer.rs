@@ -3,7 +3,6 @@ use crossterm::{cursor, queue, style, terminal, QueueableCommand};
 use std::io::Write;
 
 use crate::core::{cursor::Cursor, viewport::Viewport};
-use crate::core::buffer::Buffer;
 use crate::ui::render_buffer::RenderBuffer;
 use crate::ui::theme::{Style, Theme};
 

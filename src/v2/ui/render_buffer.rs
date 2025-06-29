@@ -1,6 +1,7 @@
-use crossterm::{cursor, style, QueueableCommand};
-use std::io::Write;
 use super::theme::{Style, Theme};
+use anyhow::Result;
+use crossterm::{QueueableCommand, cursor, style};
+use std::io::Write;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct Cell {
@@ -15,9 +16,21 @@ pub(super) struct Change<'a> {
     pub(super) cell: &'a Cell,
 }
 
+impl<'a> Change<'a> {
+    pub(super) fn flush<W: Write>(&self, writer: &mut W, style: &Style) -> Result<()> {
+        let style = self.cell.style.to_content_style(&style);
+        let content = style::StyledContent::new(style, self.cell.c);
+        writer
+            .queue(cursor::MoveTo(self.x as u16, self.y as u16))?
+            .queue(style::Print(content))?;
+        Ok(())
+    }
+}
+
 #[derive(Debug, Clone)]
 pub(super) struct RenderBuffer {
     pub(super) cells: Vec<Cell>,
+    pub style: Style,
     pub(super) width: usize,
     pub(super) height: usize,
 }
@@ -33,6 +46,7 @@ impl RenderBuffer {
         ];
         Self {
             cells,
+            style: fallback.clone(),
             width,
             height,
         }
@@ -68,7 +82,7 @@ impl RenderBuffer {
         }
     }
 
-    pub(super) fn diff(&self, other: &Self) -> Vec<Change> {
+    pub fn diff(&self, other: &Self) -> Vec<Change> {
         let mut changes = Vec::new();
         for (pos, cell) in self.cells.iter().enumerate() {
             if *cell != other.cells[pos] {
@@ -78,5 +92,21 @@ impl RenderBuffer {
             }
         }
         changes
+    }
+
+    pub(super) fn clear(&mut self) {
+        for cell in self.cells.iter_mut() {
+            cell.c = ' ';
+        }
+    }
+
+    pub(super) fn flush<W: Write>(&self, writer: &mut W) -> Result<()> {
+        writer.queue(cursor::MoveTo(0, 0))?;
+        for cell in self.cells.iter() {
+            let style = cell.style.to_content_style(&self.style);
+            let content = style::StyledContent::new(style, cell.c);
+            writer.queue(style::Print(content))?;
+        }
+        Ok(())
     }
 }

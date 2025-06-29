@@ -1,21 +1,24 @@
-use anyhow::Result;
 use crate::ui::render_buffer::RenderBuffer;
-use crate::ui::{Drawable, RenderContext};
 use crate::ui::theme::Style;
+use crate::ui::{Drawable, RenderContext};
+use anyhow::Result;
 
 pub struct Gutter {
+    id: String,
     pub width: usize,
 }
 
 impl Gutter {
     pub fn new() -> Self {
         Self {
+            id: "gutter".to_string(),
             width: 4,
         }
     }
 
     pub fn with_options(width: usize) -> Self {
         Self {
+            id: "gutter".to_string(),
             width,
         }
     }
@@ -37,5 +40,9 @@ impl Drawable for Gutter {
 
             buffer.set_text(i, 0, &line_text, &style);
         }
+    }
+
+    fn id(&self) -> &str {
+        &self.id
     }
 }
