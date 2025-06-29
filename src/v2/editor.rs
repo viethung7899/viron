@@ -208,13 +208,13 @@ impl Editor {
         let viewport = &self.viewport;
 
         let screen_row = cursor.row - viewport.top_line();
-        let screen_col = cursor.column - viewport.left_column() + self.gutter_size;
+        let screen_col = cursor.column - viewport.left_column();
 
         if screen_row < viewport.height() && screen_col < viewport.width() {
             queue!(
                 self.stdout,
                 self.mode.set_cursor_style(),
-                cursor::MoveTo(screen_col as u16, screen_row as u16),
+                cursor::MoveTo((screen_col + self.gutter_size) as u16, screen_row as u16),
                 cursor::Show,
             )?;
         } else {
