@@ -21,7 +21,8 @@ use crate::input::{
     events::{EventHandler, InputEvent},
 };
 use crate::ui::compositor::Compositor;
-use crate::ui::{RenderContext, gutter::Gutter, status_line::StatusLine, theme::Theme};
+use crate::ui::{theme::Theme, RenderContext};
+use crate::ui::components::{Gutter, StatusLine};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Mode {
@@ -144,16 +145,16 @@ impl Editor {
     pub fn run(&mut self) -> Result<()> {
         // Main event loop
         while self.running {
-            let context = RenderContext {
+            let mut context = RenderContext {
                 theme: &self.theme,
                 cursor: &self.cursor,
-                document: &self.buffer_manager.current(),
+                buffer_manager: &mut self.buffer_manager,
                 mode: &self.mode,
                 viewport: &self.viewport,
             };
 
             // Handle events
-            self.compositor.render(&context, &mut self.stdout)?;
+            self.compositor.render(&mut context, &mut self.stdout)?;
             match self.event_handler.next()? {
                 InputEvent::Key(key) => {
                     if let Some(action) = self.handle_key(key) {

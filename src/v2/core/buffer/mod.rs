@@ -4,6 +4,7 @@ use crate::core::buffer::gap_buffer::GapBuffer;
 
 pub mod gap_buffer;
 
+#[derive(Debug)]
 pub struct Buffer {
     buffer: GapBuffer<char>,
     line_starts: Vec<usize>,

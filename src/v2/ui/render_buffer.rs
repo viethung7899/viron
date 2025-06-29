@@ -1,7 +1,7 @@
-use std::fmt::{Debug, Write as DebugWrite};
-use super::theme::{Style};
+use super::theme::Style;
 use anyhow::Result;
 use crossterm::{QueueableCommand, cursor, style};
+use std::fmt::{Debug, Write as DebugWrite};
 use std::io::Write;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -126,7 +126,7 @@ impl RenderBuffer {
         }
         Ok(())
     }
-    
+
     pub fn get_size(&self) -> (usize, usize) {
         (self.width, self.height)
     }

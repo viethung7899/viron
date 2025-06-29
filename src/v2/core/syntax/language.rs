@@ -2,7 +2,7 @@ use std::path::Path;
 use tree_sitter::Language;
 use tree_sitter_rust::HIGHLIGHTS_QUERY;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum LanguageType {
     Rust,
     JavaScript,
@@ -17,10 +17,15 @@ pub enum LanguageType {
     Html,
     Css,
     Bash,
+    #[default]
     PlainText, // Fallback for unsupported languages
 }
 
 impl LanguageType {
+    pub fn is_plain_text(&self) -> bool {
+        return self == &LanguageType::PlainText;
+    }
+
     pub fn from_extension(extension: &str) -> Self {
         match extension.to_lowercase().as_str() {
             "rs" => Self::Rust,
@@ -71,7 +76,7 @@ impl LanguageType {
     pub fn get_tree_sitter_language(&self) -> Option<Language> {
         match self {
             Self::Rust => Some(tree_sitter_rust::LANGUAGE.into()),
-            _ => None
+            _ => None,
         }
     }
 
