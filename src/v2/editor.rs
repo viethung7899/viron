@@ -153,6 +153,7 @@ impl Editor {
     pub fn run(&mut self) -> Result<()> {
         // Main event loop
         while self.running {
+            self.scroll_viewport()?;
             let mut context = RenderContext {
                 theme: &self.theme,
                 cursor: &self.cursor,
@@ -190,6 +191,15 @@ impl Editor {
             }
         }
 
+        Ok(())
+    }
+
+    fn scroll_viewport(&mut self) -> Result<()> {
+        if self.viewport.scroll_to_cursor(&self.cursor) {
+            self.compositor.mark_dirty(&self.component_ids.buffer_view_id)?;
+            self.compositor.mark_dirty(&self.component_ids.gutter_id)?;
+            self.compositor.mark_dirty(&self.component_ids.status_line_id)?;
+        }
         Ok(())
     }
 

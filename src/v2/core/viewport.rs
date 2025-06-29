@@ -60,26 +60,33 @@ impl Viewport {
     }
 
     /// Scrolls the viewport to ensure the cursor is visible
-    pub fn scroll_to_cursor(&mut self, cursor: &Cursor, buffer: &Buffer) {
+    /// Returns true if the viewport was scrolled
+    pub fn scroll_to_cursor(&mut self, cursor: &Cursor) -> bool {
         let position = cursor.get_position();
 
         // Scroll vertically if needed
         if position.row < self.offset.row {
             // Cursor is above viewport
             self.offset.row = position.row;
+            return true;
         } else if position.row >= self.offset.row + self.height {
             // Cursor is below viewport
             self.offset.row = position.row - self.height + 1;
+            return true;
         }
 
         // Scroll horizontally if needed
         if position.column < self.offset.column {
             // Cursor is to the left of viewport
             self.offset.column = position.column;
+            return true;
         } else if position.column >= self.offset.column + self.width {
             // Cursor is to the right of viewport
             self.offset.column = position.column - self.width + 1;
+            return true;
         }
+
+        false
     }
 
     /// Scrolls up by the specified number of lines
