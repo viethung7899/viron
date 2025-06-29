@@ -1,4 +1,3 @@
-use log::info;
 use tree_sitter::Point;
 
 use crate::core::buffer::gap_buffer::GapBuffer;

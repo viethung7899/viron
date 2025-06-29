@@ -1,7 +1,7 @@
 use std::fmt::Debug;
 
 use crate::editor::Mode;
-use crate::input::actions::{Action, ActionContext, ActionDefinition, ActionImpl, ActionResult};
+use crate::input::actions::{Action, ActionContext, ActionDefinition, ActionResult};
 
 #[derive(Debug, Clone)]
 pub struct EnterMode {

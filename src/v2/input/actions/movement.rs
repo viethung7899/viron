@@ -100,6 +100,8 @@ impl ActionImpl for MoveDown {
             ctx.cursor
                 .move_down(ctx.buffer_manager.current_buffer(), ctx.mode);
         }
+        ctx.compositor
+            .mark_dirty(&ctx.component_ids.status_line_id)?;
         Ok(())
     }
 
