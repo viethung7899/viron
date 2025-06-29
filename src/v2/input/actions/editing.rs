@@ -1,12 +1,12 @@
 use std::fmt::Debug;
+use crate::impl_action;
+use crate::input::actions::{Action, ActionContext, ActionDefinition, ActionImpl, ActionResult};
 
-use crate::input::actions::{Action, ActionContext, ActionDefinition, ActionResult};
-
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct InsertChar(char);
 
-impl Action for InsertChar {
-    fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+impl ActionImpl for InsertChar {
+    fn execute_impl(&self, ctx: &mut ActionContext) -> ActionResult {
         let buffer = ctx.buffer_manager.current_buffer_mut();
         let position = buffer.cursor_position(&ctx.cursor.get_position());
         let new_position = buffer.insert_char(position, self.0);
@@ -15,20 +15,20 @@ impl Action for InsertChar {
         Ok(())
     }
 
-    fn describe(&self) -> &str {
+    fn describe_impl(&self) -> &str {
         "Insert character"
     }
 
-    fn to_serializable(&self) -> ActionDefinition {
+    fn to_serializable_impl(&self) -> ActionDefinition {
         ActionDefinition::InsertChar { ch: self.0 }
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct DeleteChar;
 
-impl Action for DeleteChar {
-    fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+impl ActionImpl for DeleteChar {
+    fn execute_impl(&self, ctx: &mut ActionContext) -> ActionResult {
         let buffer = ctx.buffer_manager.current_buffer_mut();
         let position = buffer.cursor_position(&ctx.cursor.get_position());
         if let Some(_) = buffer.delete_char(position) {
@@ -37,20 +37,20 @@ impl Action for DeleteChar {
         Ok(())
     }
 
-    fn describe(&self) -> &str {
+    fn describe_impl(&self) -> &str {
         "Delete character"
     }
 
-    fn to_serializable(&self) -> ActionDefinition {
+    fn to_serializable_impl(&self) -> ActionDefinition {
         ActionDefinition::DeleteChar
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Backspace;
 
-impl Action for Backspace {
-    fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+impl ActionImpl for Backspace {
+    fn execute_impl(&self, ctx: &mut ActionContext) -> ActionResult {
         let buffer = ctx.buffer_manager.current_buffer_mut();
         let position = buffer.cursor_position(&ctx.cursor.get_position());
         if position > 0 {
@@ -61,20 +61,20 @@ impl Action for Backspace {
         Ok(())
     }
 
-    fn describe(&self) -> &str {
+    fn describe_impl(&self) -> &str {
         "Delete previous character"
     }
 
-    fn to_serializable(&self) -> ActionDefinition {
+    fn to_serializable_impl(&self) -> ActionDefinition {
         ActionDefinition::Backspace
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct InsertNewLine;
 
-impl Action for InsertNewLine {
-    fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+impl ActionImpl for InsertNewLine {
+    fn execute_impl(&self, ctx: &mut ActionContext) -> ActionResult {
         let buffer = ctx.buffer_manager.current_buffer_mut();
         let position = buffer.cursor_position(&ctx.cursor.get_position());
         let new_position = buffer.insert_char(position, '\n');
@@ -83,14 +83,19 @@ impl Action for InsertNewLine {
         Ok(())
     }
 
-    fn describe(&self) -> &str {
+    fn describe_impl(&self) -> &str {
         "Insert new line"
     }
 
-    fn to_serializable(&self) -> ActionDefinition {
+    fn to_serializable_impl(&self) -> ActionDefinition {
         ActionDefinition::InsertNewLine
     }
 }
+
+impl_action!(InsertNewLine);
+impl_action!(Backspace);
+impl_action!(DeleteChar);
+impl_action!(InsertChar);
 
 // Convenience functions for creating editing actions
 pub fn insert_char(ch: char) -> Box<dyn Action> {
