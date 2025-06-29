@@ -58,7 +58,7 @@ impl Mode {
     }
 }
 
-const GUTTER_SIZE: usize = 4;
+const MIN_GUTTER_SIZE: usize = 4;
 
 pub struct Editor {
     // Core components
@@ -70,7 +70,6 @@ pub struct Editor {
 
     // UI Components
     compositor: Compositor,
-    gutter_size: usize,
     theme: Theme,
     component_ids: ComponentIds,
 
@@ -102,14 +101,14 @@ impl Editor {
         // Create core components
         let buffer_manager = BufferManager::new();
         let cursor = Cursor::new();
-        let viewport = Viewport::new(height as usize - 2, width as usize - GUTTER_SIZE);
+        let viewport = Viewport::new(height as usize - 2, width as usize - MIN_GUTTER_SIZE);
 
         // Create UI components
         let theme = Theme::default();
         let mut compositor =
             Compositor::new(width as usize, height as usize, &theme.editor_style());
         let status_line_id = compositor.add_component(Box::new(StatusLine::new()))?;
-        let gutter_id = compositor.add_component(Box::new(Gutter::with_size(GUTTER_SIZE)))?;
+        let gutter_id = compositor.add_component(Box::new(Gutter::new()))?;
         let buffer_view_id = compositor.add_component(Box::new(BufferView::new()))?;
         let component_ids = ComponentIds {
             status_line_id,
@@ -130,7 +129,6 @@ impl Editor {
             stdout,
 
             theme,
-            gutter_size: GUTTER_SIZE,
             compositor,
             component_ids,
 
@@ -153,13 +151,18 @@ impl Editor {
     pub fn run(&mut self) -> Result<()> {
         // Main event loop
         while self.running {
+            let gutter_width = self.gutter_width();
+            self.update_viewport_for_gutter_width(gutter_width)?;
+
             self.scroll_viewport()?;
+
             let mut context = RenderContext {
                 theme: &self.theme,
                 cursor: &self.cursor,
                 buffer_manager: &mut self.buffer_manager,
                 mode: &self.mode,
                 viewport: &self.viewport,
+                gutter_width
             };
 
             self.stdout.queue(cursor::Hide)?;
@@ -196,9 +199,11 @@ impl Editor {
 
     fn scroll_viewport(&mut self) -> Result<()> {
         if self.viewport.scroll_to_cursor(&self.cursor) {
-            self.compositor.mark_dirty(&self.component_ids.buffer_view_id)?;
+            self.compositor
+                .mark_dirty(&self.component_ids.buffer_view_id)?;
             self.compositor.mark_dirty(&self.component_ids.gutter_id)?;
-            self.compositor.mark_dirty(&self.component_ids.status_line_id)?;
+            self.compositor
+                .mark_dirty(&self.component_ids.status_line_id)?;
         }
         Ok(())
     }
@@ -206,6 +211,7 @@ impl Editor {
     fn show_cursor(&mut self) -> Result<()> {
         let cursor = self.cursor.get_position();
         let viewport = &self.viewport;
+        let gutter_size = self.gutter_width();
 
         let screen_row = cursor.row - viewport.top_line();
         let screen_col = cursor.column - viewport.left_column();
@@ -214,7 +220,7 @@ impl Editor {
             queue!(
                 self.stdout,
                 self.mode.set_cursor_style(),
-                cursor::MoveTo((screen_col + self.gutter_size) as u16, screen_row as u16),
+                cursor::MoveTo((screen_col + gutter_size) as u16, screen_row as u16),
                 cursor::Show,
             )?;
         } else {
@@ -225,7 +231,7 @@ impl Editor {
 
     fn handle_resize(&mut self, width: usize, height: usize) -> Result<()> {
         self.compositor.resize(width, height);
-        self.viewport.resize(height - 2, width - self.gutter_size);
+        self.viewport.resize(height - 2, width - self.gutter_width());
         Ok(())
     }
 
@@ -281,5 +287,26 @@ impl Editor {
 
     pub fn buffer_manager_mut(&mut self) -> &mut BufferManager {
         &mut self.buffer_manager
+    }
+
+    fn gutter_width(&self) -> usize {
+        let line_count = self.buffer_manager.current_buffer().line_count();
+
+        // Calculate digits needed for line numbers + 1 space
+        let digits = line_count.to_string().len();
+        (digits + 1).max(MIN_GUTTER_SIZE)
+    }
+
+    fn update_viewport_for_gutter_width(&mut self, gutter_size: usize) -> Result<()> {
+        let terminal_size = terminal::size()?;
+        let required_viewport_width = terminal_size.0 as usize - gutter_size;
+
+        // Only update if the width actually changed
+        if self.viewport.width() != required_viewport_width {
+            self.viewport
+                .resize(terminal_size.1 as usize - 2, required_viewport_width);
+            self.compositor.mark_all_dirty();
+        }
+        Ok(())
     }
 }
