@@ -1,10 +1,8 @@
-use anyhow::Result;
 use std::fmt::Debug;
+use crate::impl_action;
+use crate::input::actions::{Action, ActionContext, ActionDefinition, ActionImpl, ActionResult};
 
-use crate::core::{buffer::Buffer, cursor::Cursor};
-use crate::input::actions::{Action, ActionContext, ActionDefinition, ActionResult};
-
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct MoveLeft {
     count: usize,
 }
@@ -15,8 +13,8 @@ impl MoveLeft {
     }
 }
 
-impl Action for MoveLeft {
-    fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+impl ActionImpl for MoveLeft {
+    fn execute_impl(&self, ctx: &mut ActionContext) -> ActionResult {
         for _ in 0..self.count {
             ctx.cursor
                 .move_left(ctx.buffer_manager.current_buffer(), ctx.mode);
@@ -24,16 +22,16 @@ impl Action for MoveLeft {
         Ok(())
     }
 
-    fn describe(&self) -> &str {
+    fn describe_impl(&self) -> &str {
         "Move cursor left"
     }
 
-    fn to_serializable(&self) -> ActionDefinition {
+    fn to_serializable_impl(&self) -> ActionDefinition {
         ActionDefinition::MoveLeft { count: self.count }
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct MoveRight {
     count: usize,
 }
@@ -44,8 +42,8 @@ impl MoveRight {
     }
 }
 
-impl Action for MoveRight {
-    fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+impl ActionImpl for MoveRight {
+    fn execute_impl(&self, ctx: &mut ActionContext) -> ActionResult {
         for _ in 0..self.count {
             ctx.cursor
                 .move_right(ctx.buffer_manager.current_buffer(), ctx.mode);
@@ -53,16 +51,16 @@ impl Action for MoveRight {
         Ok(())
     }
 
-    fn describe(&self) -> &str {
+    fn describe_impl(&self) -> &str {
         "Move cursor right"
     }
 
-    fn to_serializable(&self) -> ActionDefinition {
+    fn to_serializable_impl(&self) -> ActionDefinition {
         ActionDefinition::MoveRight { count: self.count }
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct MoveUp {
     count: usize,
 }
@@ -73,8 +71,8 @@ impl MoveUp {
     }
 }
 
-impl Action for MoveUp {
-    fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+impl ActionImpl for MoveUp {
+    fn execute_impl(&self, ctx: &mut ActionContext) -> ActionResult {
         for _ in 0..self.count {
             ctx.cursor
                 .move_up(ctx.buffer_manager.current_buffer(), ctx.mode);
@@ -82,16 +80,16 @@ impl Action for MoveUp {
         Ok(())
     }
 
-    fn describe(&self) -> &str {
+    fn describe_impl(&self) -> &str {
         "Move cursor up"
     }
 
-    fn to_serializable(&self) -> ActionDefinition {
+    fn to_serializable_impl(&self) -> ActionDefinition {
         ActionDefinition::MoveUp { count: self.count }
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct MoveDown {
     count: usize,
 }
@@ -102,8 +100,8 @@ impl MoveDown {
     }
 }
 
-impl Action for MoveDown {
-    fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+impl ActionImpl for MoveDown {
+    fn execute_impl(&self, ctx: &mut ActionContext) -> ActionResult {
         for _ in 0..self.count {
             ctx.cursor
                 .move_down(ctx.buffer_manager.current_buffer(), ctx.mode);
@@ -111,51 +109,58 @@ impl Action for MoveDown {
         Ok(())
     }
 
-    fn describe(&self) -> &str {
+    fn describe_impl(&self) -> &str {
         "Move cursor down"
     }
 
-    fn to_serializable(&self) -> ActionDefinition {
+    fn to_serializable_impl(&self) -> ActionDefinition {
         ActionDefinition::MoveDown { count: self.count }
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct MoveToLineStart {}
 
-impl Action for MoveToLineStart {
-    fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+impl ActionImpl for MoveToLineStart {
+    fn execute_impl(&self, ctx: &mut ActionContext) -> ActionResult {
         ctx.cursor.move_to_line_start();
         Ok(())
     }
 
-    fn describe(&self) -> &str {
+    fn describe_impl(&self) -> &str {
         "Move to start of line"
     }
 
-    fn to_serializable(&self) -> ActionDefinition {
+    fn to_serializable_impl(&self) -> ActionDefinition {
         ActionDefinition::MoveToLineStart
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct MoveToLineEnd {}
 
-impl Action for MoveToLineEnd {
-    fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+impl ActionImpl for MoveToLineEnd {
+    fn execute_impl(&self, ctx: &mut ActionContext) -> ActionResult {
         ctx.cursor
             .move_to_line_end(ctx.buffer_manager.current_buffer(), ctx.mode);
         Ok(())
     }
 
-    fn describe(&self) -> &str {
+    fn describe_impl(&self) -> &str {
         "Move to end of line"
     }
 
-    fn to_serializable(&self) -> ActionDefinition {
+    fn to_serializable_impl(&self) -> ActionDefinition {
         ActionDefinition::MoveToLineEnd
     }
 }
+
+impl_action!(MoveLeft);
+impl_action!(MoveRight);
+impl_action!(MoveUp);
+impl_action!(MoveDown);
+impl_action!(MoveToLineStart);
+impl_action!(MoveToLineEnd);
 
 // Convenience functions for creating movement actions
 pub fn move_left(count: usize) -> Box<dyn Action> {

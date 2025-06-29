@@ -1,46 +1,45 @@
-use anyhow::Result;
 use std::fmt::Debug;
 use std::path::PathBuf;
+use crate::impl_action;
+use crate::input::actions::{Action, ActionContext, ActionDefinition, ActionImpl, ActionResult};
 
-use crate::input::actions::{Action, ActionContext, ActionDefinition, ActionResult};
-
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct NextBuffer;
 
-impl Action for NextBuffer {
-    fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+impl ActionImpl for NextBuffer {
+    fn execute_impl(&self, ctx: &mut ActionContext) -> ActionResult {
         ctx.buffer_manager.next_buffer();
         Ok(())
     }
 
-    fn describe(&self) -> &str {
+    fn describe_impl(&self) -> &str {
         "Switch to next buffer"
     }
 
-    fn to_serializable(&self) -> ActionDefinition {
+    fn to_serializable_impl(&self) -> ActionDefinition {
         ActionDefinition::NextBuffer
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct PreviousBuffer;
 
-impl Action for PreviousBuffer {
-    fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+impl ActionImpl for PreviousBuffer {
+    fn execute_impl(&self, ctx: &mut ActionContext) -> ActionResult {
         ctx.buffer_manager.previous_buffer();
         Ok(())
     }
 
-    fn describe(&self) -> &str {
+    fn describe_impl(&self) -> &str {
         "Switch to previous buffer"
     }
 
-    fn to_serializable(&self) -> ActionDefinition {
+    fn to_serializable_impl(&self) -> ActionDefinition {
         ActionDefinition::PreviousBuffer
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct OpenBuffer {
     path: PathBuf,
 }
@@ -51,41 +50,46 @@ impl OpenBuffer {
     }
 }
 
-impl Action for OpenBuffer {
-    fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+impl ActionImpl for OpenBuffer {
+    fn execute_impl(&self, ctx: &mut ActionContext) -> ActionResult {
         ctx.buffer_manager.open_file(&self.path)?;
         Ok(())
     }
 
-    fn describe(&self) -> &str {
+    fn describe_impl(&self) -> &str {
         "Open buffer from file"
     }
 
-    fn to_serializable(&self) -> ActionDefinition {
+    fn to_serializable_impl(&self) -> ActionDefinition {
         ActionDefinition::OpenBuffer {
             path: self.path.to_string_lossy().to_string(),
         }
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct QuitEditor;
 
-impl Action for QuitEditor {
-    fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+impl ActionImpl for QuitEditor {
+    fn execute_impl(&self, ctx: &mut ActionContext) -> ActionResult {
         // Access to the editor's running state
         *ctx.running = false;
         Ok(())
     }
 
-    fn describe(&self) -> &str {
+    fn describe_impl(&self) -> &str {
         "Quit the editor"
     }
 
-    fn to_serializable(&self) -> ActionDefinition {
+    fn to_serializable_impl(&self) -> ActionDefinition {
         ActionDefinition::Quit
     }
 }
+
+impl_action!(OpenBuffer);
+impl_action!(QuitEditor);
+impl_action!(PreviousBuffer);
+impl_action!(NextBuffer);
 
 pub fn open_buffer(path: PathBuf) -> Box<dyn Action> {
     Box::new(OpenBuffer::new(path))

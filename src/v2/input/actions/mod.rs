@@ -4,7 +4,7 @@ use std::fmt::Debug;
 use std::path::PathBuf;
 
 use crate::core::buffer_manager::BufferManager;
-use crate::core::{buffer::Buffer, cursor::Cursor, document::Document, viewport::Viewport};
+use crate::core::{cursor::Cursor, viewport::Viewport};
 use crate::editor::Mode;
 
 pub type ActionResult = Result<()>;
@@ -34,10 +34,17 @@ pub trait Action: Debug + Send + Sync {
     fn describe(&self) -> &str;
 
     fn to_serializable(&self) -> ActionDefinition;
+    fn clone_box(&self) -> Box<dyn Action>;
+}
+
+impl Clone for Box<dyn Action> {
+    fn clone(&self) -> Self {
+        self.clone_box()
+    }
 }
 
 // A composite action that runs multiple actions in sequence
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CompositeAction {
     actions: Vec<Box<dyn Action>>,
     description: String,
@@ -79,6 +86,39 @@ impl Action for CompositeAction {
                 .collect(),
         }
     }
+    fn clone_box(&self) -> Box<(dyn Action + 'static)> {
+        Box::new(self.clone())
+    }
+}
+
+pub(super) trait ActionImpl: Debug + Clone + Send + Sync {
+    fn execute_impl(&self, ctx: &mut ActionContext) -> ActionResult;
+    fn describe_impl(&self) -> &str;
+    fn to_serializable_impl(&self) -> ActionDefinition;
+}
+
+#[macro_export]
+macro_rules! impl_action {
+    ($action_type:ty) => {
+        impl Action for $action_type {
+            fn clone_box(&self) -> Box<dyn Action> {
+                Box::new(self.clone())
+            }
+
+            // Other methods must still be implemented manually
+            fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+                self.execute_impl(ctx)
+            }
+
+            fn describe(&self) -> &str {
+                self.describe_impl()
+            }
+
+            fn to_serializable(&self) -> ActionDefinition {
+                self.to_serializable_impl()
+            }
+        }
+    };
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
