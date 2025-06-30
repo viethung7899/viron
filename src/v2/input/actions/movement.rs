@@ -164,7 +164,8 @@ pub struct MoveToBottom;
 
 impl ActionImpl for MoveToBottom {
     fn execute_impl(&self, ctx: &mut ActionContext) -> ActionResult {
-        ctx.cursor.move_to_bottom(ctx.buffer_manager.current_buffer(), ctx.mode);
+        ctx.cursor
+            .move_to_bottom(ctx.buffer_manager.current_buffer(), ctx.mode);
         ctx.compositor
             .mark_dirty(&ctx.component_ids.status_line_id)?;
         Ok(())
@@ -172,6 +173,26 @@ impl ActionImpl for MoveToBottom {
 
     fn to_serializable_impl(&self) -> ActionDefinition {
         ActionDefinition::MoveToBottom
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct MoveToViewportCenter;
+
+impl ActionImpl for MoveToViewportCenter {
+    fn execute_impl(&self, ctx: &mut ActionContext) -> ActionResult {
+        ctx.viewport.center_on_line(
+            ctx.cursor.get_position().row,
+            ctx.buffer_manager.current_buffer(),
+        );
+        ctx.compositor
+            .mark_dirty(&ctx.component_ids.buffer_view_id)?;
+        ctx.compositor.mark_dirty(&ctx.component_ids.gutter_id)?;
+        Ok(())
+    }
+
+    fn to_serializable_impl(&self) -> ActionDefinition {
+        ActionDefinition::MoveToViewportCenter
     }
 }
 
@@ -183,3 +204,4 @@ impl_action!(MoveToLineStart, "Move to line start");
 impl_action!(MoveToLineEnd, "Move to line end");
 impl_action!(MoveToTop, "Move to top of buffer");
 impl_action!(MoveToBottom, "Move to bottom of buffer");
+impl_action!(MoveToViewportCenter, "Move viewport to center of buffer");
