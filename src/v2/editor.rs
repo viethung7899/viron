@@ -1,11 +1,11 @@
 use anyhow::Result;
-use crossterm::{QueueableCommand, queue, style};
 use crossterm::{
     cursor,
     event::{KeyCode, KeyEvent, KeyModifiers},
     execute,
     terminal::{self, ClearType},
 };
+use crossterm::{queue, style, QueueableCommand};
 use serde::{Deserialize, Serialize};
 use std::io::{self, Stdout, Write};
 
@@ -22,7 +22,7 @@ use crate::input::{
 };
 use crate::ui::components::{BufferView, ComponentIds, Gutter, StatusLine};
 use crate::ui::compositor::Compositor;
-use crate::ui::{RenderContext, theme::Theme};
+use crate::ui::{theme::Theme, RenderContext};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Mode {
@@ -162,7 +162,7 @@ impl Editor {
                 buffer_manager: &mut self.buffer_manager,
                 mode: &self.mode,
                 viewport: &self.viewport,
-                gutter_width
+                gutter_width,
             };
 
             self.stdout.queue(cursor::Hide)?;
@@ -231,7 +231,8 @@ impl Editor {
 
     fn handle_resize(&mut self, width: usize, height: usize) -> Result<()> {
         self.compositor.resize(width, height);
-        self.viewport.resize(height - 2, width - self.gutter_width());
+        self.viewport
+            .resize(height - 2, width - self.gutter_width());
         Ok(())
     }
 
@@ -267,7 +268,7 @@ impl Editor {
         let code = key_event.code;
         let modifiers = key_event.modifiers;
         match (code, modifiers) {
-            (KeyCode::Char(ch), KeyModifiers::NONE) => Some(actions::insert_char(ch)),
+            (KeyCode::Char(ch), KeyModifiers::NONE) => Some(Box::new(actions::InsertChar::new(ch))),
             _ => None,
         }
     }

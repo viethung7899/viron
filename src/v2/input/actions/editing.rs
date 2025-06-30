@@ -18,6 +18,7 @@ impl ActionImpl for InsertChar {
         let new_position = buffer.insert_char(position, self.0);
         ctx.cursor
             .set_position(buffer.point_at_position(new_position));
+        ctx.buffer_manager.current_mut().mark_modified();
         ctx.compositor.mark_dirty(&ctx.component_ids.buffer_view_id)?;
         ctx.compositor.mark_dirty(&ctx.component_ids.status_line_id)?;
         Ok(())
@@ -37,9 +38,10 @@ impl ActionImpl for DeleteChar {
         let position = buffer.cursor_position(&ctx.cursor.get_position());
         if let Some(_) = buffer.delete_char(position) {
             // Cursor stays in place after deletion
+            ctx.buffer_manager.current_mut().mark_modified();
+            ctx.compositor.mark_dirty(&ctx.component_ids.buffer_view_id)?;
+            ctx.compositor.mark_dirty(&ctx.component_ids.status_line_id)?;
         }
-        ctx.compositor.mark_dirty(&ctx.component_ids.buffer_view_id)?;
-        ctx.compositor.mark_dirty(&ctx.component_ids.status_line_id)?;
         Ok(())
     }
 
@@ -58,9 +60,10 @@ impl ActionImpl for Backspace {
         if position > 0 {
             if let Some(_) = buffer.delete_char(position - 1) {
                 ctx.cursor.move_left(buffer, ctx.mode);
+                ctx.buffer_manager.current_mut().mark_modified();
+                ctx.compositor.mark_dirty(&ctx.component_ids.buffer_view_id)?;
+                ctx.compositor.mark_dirty(&ctx.component_ids.status_line_id)?;
             }
-            ctx.compositor.mark_dirty(&ctx.component_ids.buffer_view_id)?;
-            ctx.compositor.mark_dirty(&ctx.component_ids.status_line_id)?;
         }
         Ok(())
     }
@@ -80,6 +83,7 @@ impl ActionImpl for InsertNewLine {
         let new_position = buffer.insert_char(position, '\n');
         ctx.cursor
             .set_position(buffer.point_at_position(new_position));
+        ctx.buffer_manager.current_mut().mark_modified();
         ctx.compositor.mark_dirty(&ctx.component_ids.buffer_view_id)?;
         ctx.compositor.mark_dirty(&ctx.component_ids.status_line_id)?;
         Ok(())
@@ -94,20 +98,3 @@ impl_action!(InsertNewLine, "Insert new line");
 impl_action!(Backspace, "Backspace");
 impl_action!(DeleteChar, "Delete character");
 impl_action!(InsertChar, "Insert new line");
-
-// Convenience functions for creating editing actions
-pub fn insert_char(ch: char) -> Box<dyn Action> {
-    Box::new(InsertChar(ch))
-}
-
-pub fn delete_char() -> Box<dyn Action> {
-    Box::new(DeleteChar)
-}
-
-pub fn backspace() -> Box<dyn Action> {
-    Box::new(Backspace)
-}
-
-pub fn insert_new_line() -> Box<dyn Action> {
-    Box::new(InsertNewLine)
-}
