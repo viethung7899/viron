@@ -3,7 +3,6 @@ mod language;
 use std::{collections::HashMap, ops::Range};
 
 use anyhow::{Ok, Result};
-use log::info;
 use tree_sitter::{Parser, Point, Query, QueryCursor, StreamingIterator};
 
 pub use language::LanguageType;
