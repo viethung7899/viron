@@ -142,6 +142,8 @@ pub enum ActionDefinition {
     },
     MoveToLineStart,
     MoveToLineEnd,
+    MoveToTop,
+    MoveToBottom,
 
     // Editing actions
     InsertChar {
@@ -174,33 +176,41 @@ pub enum ActionDefinition {
 pub fn create_action_from_definition(definition: &ActionDefinition) -> Box<dyn Action> {
     match definition {
         // Movement actions
-        ActionDefinition::MoveLeft { count } => move_left(*count),
-        ActionDefinition::MoveRight { count } => move_right(*count),
-        ActionDefinition::MoveUp { count } => move_up(*count),
-        ActionDefinition::MoveDown { count } => move_down(*count),
-        ActionDefinition::MoveToLineStart => move_to_line_start(),
-        ActionDefinition::MoveToLineEnd => move_to_line_end(),
+        ActionDefinition::MoveLeft { count } => Box::new(MoveLeft::new(*count)),
+        ActionDefinition::MoveRight { count } => Box::new(MoveRight::new(*count)),
+        ActionDefinition::MoveUp { count } => Box::new(MoveUp::new(*count)),
+        ActionDefinition::MoveDown { count } => Box::new(MoveDown::new(*count)),
+        ActionDefinition::MoveToLineStart => Box::new(MoveToLineStart),
+        ActionDefinition::MoveToLineEnd => Box::new(MoveToLineEnd),
+        ActionDefinition::MoveToTop => Box::new(MoveToTop),
+        ActionDefinition::MoveToBottom => Box::new(MoveToBottom),
 
         // Editing actions
-        ActionDefinition::InsertChar { ch } => insert_char(*ch),
-        ActionDefinition::DeleteChar => delete_char(),
-        ActionDefinition::Backspace => backspace(),
-        ActionDefinition::InsertNewLine => insert_new_line(),
+        ActionDefinition::InsertChar { ch } => Box::new(InsertChar::new(*ch)),
+        ActionDefinition::DeleteChar => Box::new(DeleteChar),
+        ActionDefinition::Backspace => Box::new(Backspace),
+        ActionDefinition::InsertNewLine => Box::new(InsertNewLine),
 
         // Mode actions
-        ActionDefinition::EnterMode { mode } => match mode.as_str() {
-            "normal" => enter_normal_mode(),
-            "insert" => enter_insert_mode(),
-            "command" => enter_command_mode(),
-            "search" => enter_search_mode(),
-            _ => enter_normal_mode(), // Default fallback
+        ActionDefinition::EnterMode { mode } => {
+            let mode = match mode.as_str() {
+                "insert" => Mode::Insert,
+                "command" => Mode::Command,
+                "search" => Mode::Search,
+                _ => Mode::Normal, // Default fallback
+            };
+            Box::new(EnterMode::new(mode))
         },
 
+
         // Buffer actions
-        ActionDefinition::NextBuffer => next_buffer(),
-        ActionDefinition::PreviousBuffer => previous_buffer(),
-        ActionDefinition::OpenBuffer { path } => open_buffer(PathBuf::from(path)),
-        ActionDefinition::Quit => quit_editor(),
+        ActionDefinition::NextBuffer => Box::new(NextBuffer),
+        ActionDefinition::PreviousBuffer => Box::new(PreviousBuffer),
+        ActionDefinition::OpenBuffer { path } => {
+            let path_buf = PathBuf::from(path);
+            Box::new(OpenBuffer::new(path_buf))
+        },
+        ActionDefinition::Quit => Box::new(QuitEditor),
 
         ActionDefinition::Composite {
             description,

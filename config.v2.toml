@@ -3,16 +3,22 @@ theme = "themes/catppuchin/mocha.json"
 # Keybindings for normal mode
 [keymap.normal]
 "q" = { type = "Quit" }
+
 "h" = { type = "MoveLeft", params = { count = 1 } }
 "j" = { type = "MoveDown", params = { count = 1 } }
 "k" = { type = "MoveUp", params = { count = 1 } }
 "l" = { type = "MoveRight", params = { count = 1 } }
-"$" = { type = "MoveToLineEnd" }
-"0" = { type = "MoveToLineStart" }
 "<Left>" = { type = "MoveLeft", params = { count = 1 } }
 "<Right>" = { type = "MoveRight", params = { count = 1 } }
 "<Up>" = { type = "MoveUp", params = { count = 1 } }
 "<Down>" = { type = "MoveDown", params = { count = 1 } }
+
+"$" = { type = "MoveToLineEnd" }
+"0" = { type = "MoveToLineStart" }
+"<Home>" = { type = "MoveToLineStart" }
+"<End>" = { type = "MoveToLineEnd" }
+"gg" = { type = "MoveToTop" }
+"G" = { type = "MoveToBottom" }
 
 "i" = { type = "EnterMode", params = { mode = "insert" } }
 ":" = { type = "EnterMode", params = { mode = "command" } }
@@ -27,6 +33,8 @@ theme = "themes/catppuchin/mocha.json"
 "<Right>" = { type = "MoveRight", params = { count = 1 } }
 "<Up>" = { type = "MoveUp", params = { count = 1 } }
 "<Down>" = { type = "MoveDown", params = { count = 1 } }
+"<Home>" = { type = "MoveToLineStart" }
+"<End>" = { type = "MoveToLineEnd" }
 
 [keymap.command]
 "<Esc>" = { type = "EnterMode", params = { mode = "normal" } }
