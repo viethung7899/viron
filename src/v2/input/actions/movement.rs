@@ -196,6 +196,38 @@ impl ActionImpl for MoveToViewportCenter {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct MoveToNextWord;
+
+impl ActionImpl for MoveToNextWord {
+    fn execute_impl(&self, ctx: &mut ActionContext) -> ActionResult {
+        ctx.cursor.find_next_word(ctx.buffer_manager.current_buffer());
+        ctx.compositor
+            .mark_dirty(&ctx.component_ids.status_line_id)?;
+        Ok(())
+    }
+
+    fn to_serializable_impl(&self) -> ActionDefinition {
+        ActionDefinition::MoveToNextWord
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct MoveToPreviousWord;
+
+impl ActionImpl for MoveToPreviousWord {
+    fn execute_impl(&self, ctx: &mut ActionContext) -> ActionResult {
+        ctx.cursor.find_previous_word(ctx.buffer_manager.current_buffer());
+        ctx.compositor
+            .mark_dirty(&ctx.component_ids.status_line_id)?;
+        Ok(())
+    }
+
+    fn to_serializable_impl(&self) -> ActionDefinition {
+        ActionDefinition::MoveToPreviousWord
+    }
+}
+
 impl_action!(MoveLeft, "Move cursor left");
 impl_action!(MoveRight, "Move cursor right");
 impl_action!(MoveUp, "Move cursor up");
@@ -205,3 +237,5 @@ impl_action!(MoveToLineEnd, "Move to line end");
 impl_action!(MoveToTop, "Move to top of buffer");
 impl_action!(MoveToBottom, "Move to bottom of buffer");
 impl_action!(MoveToViewportCenter, "Move viewport to center of buffer");
+impl_action!(MoveToNextWord, "Move cursor to next word");
+impl_action!(MoveToPreviousWord, "Move cursor to previous word");
