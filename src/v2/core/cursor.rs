@@ -114,7 +114,7 @@ impl Cursor {
 
     /// Jump to the next word
     pub fn find_next_word(&mut self, buffer: &Buffer) {
-        // Get the position in the buffer
+        // Get the position within the buffer
         let position = buffer.cursor_position(&self.position);
 
         // Get buffer content
@@ -153,7 +153,7 @@ impl Cursor {
 
     /// Jump to the previous word
     pub fn find_previous_word(&mut self, buffer: &Buffer) {
-        // Get the position in the buffer
+        // Get the position within the buffer
         let position = buffer.cursor_position(&self.position);
 
         if position == 0 {
