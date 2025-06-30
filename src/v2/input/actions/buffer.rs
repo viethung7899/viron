@@ -74,19 +74,3 @@ impl_action!(OpenBuffer, "Open buffer from file");
 impl_action!(QuitEditor, "Quit the editor");
 impl_action!(PreviousBuffer, "Previous buffer");
 impl_action!(NextBuffer, "Next buffer");
-
-pub fn open_buffer(path: PathBuf) -> Box<dyn Action> {
-    Box::new(OpenBuffer::new(path))
-}
-
-pub fn next_buffer() -> Box<dyn Action> {
-    Box::new(NextBuffer)
-}
-
-pub fn previous_buffer() -> Box<dyn Action> {
-    Box::new(PreviousBuffer)
-}
-
-pub fn quit_editor() -> Box<dyn Action> {
-    Box::new(QuitEditor)
-}

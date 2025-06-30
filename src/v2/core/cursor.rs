@@ -92,6 +92,25 @@ impl Cursor {
         }
         self.preferred_column = self.position.column;
     }
+    
+    /// Move to the start of the document
+    pub fn move_to_top(&mut self) {
+        self.position = Point { row: 0, column: 0 };
+        self.preferred_column = 0;
+    }
+    
+    /// Move to the end of the document
+    pub fn move_to_bottom(&mut self, buffer: &Buffer, mode: &Mode) {
+        let last_row = buffer.line_count().saturating_sub(1);
+        let last_column = buffer.get_line_length(last_row).saturating_sub(1);
+        self.position.row = last_row;
+        self.position.column = if *mode == Mode::Insert {
+            last_column
+        } else {
+            last_column.saturating_sub(1)
+        };
+        self.preferred_column = self.position.column;
+    }
 
     /// Jump to the next word
     pub fn find_next_word(&mut self, buffer: &Buffer) {

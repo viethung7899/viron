@@ -248,6 +248,8 @@ impl KeySequence {
                         "Right" => KeyCode::Right,
                         "Up" => KeyCode::Up,
                         "Down" => KeyCode::Down,
+                        "Home" => KeyCode::Home,
+                        "End" => KeyCode::End,
                         // Add more special keys as needed
                         _ => continue, // Skip unknown keys
                     };

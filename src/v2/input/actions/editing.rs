@@ -5,6 +5,12 @@ use std::fmt::Debug;
 #[derive(Debug, Clone)]
 pub struct InsertChar(char);
 
+impl InsertChar {
+    pub fn new(ch: char) -> Self {
+        Self(ch)
+    }
+}
+
 impl ActionImpl for InsertChar {
     fn execute_impl(&self, ctx: &mut ActionContext) -> ActionResult {
         let buffer = ctx.buffer_manager.current_buffer_mut();
