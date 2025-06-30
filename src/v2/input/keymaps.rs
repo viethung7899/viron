@@ -263,7 +263,11 @@ impl KeySequence {
                 // Regular character
                 keys.push(KeyEvent {
                     code: KeyCode::Char(c),
-                    modifiers: KeyModifiers::NONE,
+                    modifiers: if c.is_ascii_uppercase() {
+                        KeyModifiers::SHIFT
+                    } else {
+                        KeyModifiers::NONE
+                    },
                 });
             }
         }
