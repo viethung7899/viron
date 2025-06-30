@@ -144,6 +144,7 @@ pub enum ActionDefinition {
     MoveToLineEnd,
     MoveToTop,
     MoveToBottom,
+    MoveToViewportCenter,
 
     // Editing actions
     InsertChar {
@@ -184,6 +185,7 @@ pub fn create_action_from_definition(definition: &ActionDefinition) -> Box<dyn A
         ActionDefinition::MoveToLineEnd => Box::new(MoveToLineEnd),
         ActionDefinition::MoveToTop => Box::new(MoveToTop),
         ActionDefinition::MoveToBottom => Box::new(MoveToBottom),
+        ActionDefinition::MoveToViewportCenter => Box::new(MoveToViewportCenter),
 
         // Editing actions
         ActionDefinition::InsertChar { ch } => Box::new(InsertChar::new(*ch)),

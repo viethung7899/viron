@@ -19,6 +19,7 @@ theme = "themes/catppuchin/mocha.json"
 "<End>" = { type = "MoveToLineEnd" }
 "gg" = { type = "MoveToTop" }
 "G" = { type = "MoveToBottom" }
+"zz" = { type = "MoveToViewportCenter" }
 
 "i" = { type = "EnterMode", params = { mode = "insert" } }
 ":" = { type = "EnterMode", params = { mode = "command" } }
