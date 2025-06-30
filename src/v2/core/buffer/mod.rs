@@ -1,4 +1,3 @@
-use log::info;
 use tree_sitter::Point;
 
 use crate::core::buffer::gap_buffer::GapBuffer;
@@ -108,7 +107,6 @@ impl Buffer {
         }
 
         // Return the position after insertion
-        info!("Inserted '{}' at position {}, new line starts: {:?}", ch, position, self.line_starts);
         position + 1
     }
 
@@ -145,63 +143,6 @@ impl Buffer {
         Some((deleted_char, position))
     }
 
-    // pub fn move_left(&self, cursor: &mut Point, mode: &Mode) {
-    //     if cursor.column > 0 {
-    //         cursor.column -= 1;
-    //         return;
-    //     }
-    //     if cursor.row > 0 {
-    //         cursor.row -= 1;
-    //         cursor.column = usize::MAX;
-    //         self.clamp_column(cursor, mode);
-    //     }
-    // }
-
-    // pub fn move_right(&self, cursor: &mut Point, mode: &Mode) {
-    //     let previous = cursor.column;
-    //     cursor.column += 1;
-    //     self.clamp_column(cursor, mode);
-    //     if previous == cursor.column && cursor.row + 1 < self.line_count() {
-    //         cursor.row += 1;
-    //         cursor.column = 0;
-    //     }
-    // }
-
-    // pub fn move_up(&self, cursor: &mut Point, mode: &Mode) {
-    //     if cursor.row == 0 {
-    //         return;
-    //     }
-    //     cursor.row -= 1;
-    //     self.clamp_column(cursor, mode);
-    // }
-
-    // pub fn move_down(&self, cursor: &mut Point, mode: &Mode) {
-    //     if cursor.row == self.line_starts.len() - 1 {
-    //         return;
-    //     }
-    //     cursor.row += 1;
-    //     self.clamp_column(cursor, mode);
-    // }
-
-    // pub fn move_to_line_start(&self, cursor: &mut Point) {
-    //     cursor.column = 0;
-    // }
-
-    // pub fn move_to_line_end(&self, cursor: &mut Point, mode: &Mode) {
-    //     cursor.column = usize::MAX;
-    //     self.clamp_column(cursor, mode);
-    // }
-
-    // pub fn get_current_char(&self, cursor: &Point) -> Option<char> {
-    //     let position = self.cursor_position(cursor);
-    //     if position < self.buffer.gap_start {
-    //         Some(self.buffer.buffer[position])
-    //     } else {
-    //         let index = position + self.buffer.gap_len();
-    //         self.buffer.buffer.get(index).copied()
-    //     }
-    // }
-
     // pub fn delete_current_line(&mut self, cursor: &mut Point) -> Option<String> {
     //     cursor.column = 0;
     //     let position = self.cursor_position(cursor);
@@ -228,43 +169,6 @@ impl Buffer {
     //     }
     //     self.dirty = true;
     //     Some(chars.into_iter().collect())
-    // }
-
-    // pub fn find_next_word(&mut self, cursor: &Point) -> Option<Point> {
-    //     self.buffer.move_gap(self.cursor_position(cursor));
-    //     let mut index = self.buffer.gap_end;
-    //     let mut point = cursor.clone();
-    //     let buffer = &self.buffer.buffer;
-    //     let length = buffer.len();
-    //     let mode = Mode::Insert;
-
-    //     // Skip the current word
-    //     if index < length && !buffer[index].is_whitespace() {
-    //         let keyword_type = is_keyword(buffer[index]);
-
-    //         while index < length {
-    //             let c = buffer[index];
-    //             if c.is_whitespace() || is_keyword(c) != keyword_type {
-    //                 break;
-    //             }
-    //             index += 1;
-    //             self.move_right(&mut point, &mode);
-    //         }
-    //     }
-
-    //     // Skip the whitespace
-    //     let mut already_new_line = false;
-    //     while index < length && buffer[index].is_whitespace() {
-    //         let c = buffer[index];
-    //         if c == '\n' && already_new_line {
-    //             return Some(point);
-    //         }
-    //         already_new_line = c == '\n';
-    //         index += 1;
-    //         self.move_right(&mut point, &mode);
-    //     }
-
-    //     Some(point)
     // }
 
     // pub fn delete_word_inline(&mut self, cursor: &mut Point) -> String {
