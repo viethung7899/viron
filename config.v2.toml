@@ -25,6 +25,21 @@ theme = "themes/catppuchin/mocha.json"
 ":" = { type = "EnterMode", params = { mode = "command" } }
 "/" = { type = "EnterMode", params = { mode = "search" } }
 
+[keymap.normal.a]
+type = "Composite"
+params = { description = "Insert mode with move right", actions = [
+    { type = "EnterMode", params = { mode = "insert" } },
+    { type = "MoveRight", params = { count = 1 } }
+] }
+
+[keymap.normal.A]
+type = "Composite"
+params = { description = "Insert mode at line end", actions = [
+    { type = "EnterMode", params = { mode = "insert" } },
+    { type = "MoveToLineEnd" }
+] }
+
+
 # Keybindings for insert mode
 [keymap.insert]
 "<Esc>" = { type = "EnterMode", params = { mode = "normal" } }
