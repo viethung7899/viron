@@ -110,10 +110,11 @@ impl Buffer {
         position + 1
     }
 
-    pub fn insert_string(&mut self, position: usize, string: &str) {
+    pub fn insert_string(&mut self, position: usize, string: &str) -> usize {
         for (index, ch) in string.chars().enumerate() {
             self.insert_char(position + index, ch);
         }
+        position + string.chars().count()
     }
 
     pub fn delete_char(&mut self, position: usize) -> Option<(char, usize)> {

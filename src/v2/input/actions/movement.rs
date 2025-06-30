@@ -116,6 +116,7 @@ pub struct MoveToLineStart;
 impl ActionImpl for MoveToLineStart {
     fn execute_impl(&self, ctx: &mut ActionContext) -> ActionResult {
         ctx.cursor.move_to_line_start();
+        ctx.cursor.find_next_word(ctx.buffer_manager.current_buffer());
         ctx.compositor
             .mark_dirty(&ctx.component_ids.status_line_id)?;
         Ok(())
@@ -201,7 +202,8 @@ pub struct MoveToNextWord;
 
 impl ActionImpl for MoveToNextWord {
     fn execute_impl(&self, ctx: &mut ActionContext) -> ActionResult {
-        ctx.cursor.find_next_word(ctx.buffer_manager.current_buffer());
+        ctx.cursor
+            .find_next_word(ctx.buffer_manager.current_buffer());
         ctx.compositor
             .mark_dirty(&ctx.component_ids.status_line_id)?;
         Ok(())
@@ -217,7 +219,8 @@ pub struct MoveToPreviousWord;
 
 impl ActionImpl for MoveToPreviousWord {
     fn execute_impl(&self, ctx: &mut ActionContext) -> ActionResult {
-        ctx.cursor.find_previous_word(ctx.buffer_manager.current_buffer());
+        ctx.cursor
+            .find_previous_word(ctx.buffer_manager.current_buffer());
         ctx.compositor
             .mark_dirty(&ctx.component_ids.status_line_id)?;
         Ok(())

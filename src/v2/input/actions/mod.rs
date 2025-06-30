@@ -6,8 +6,8 @@ use std::path::PathBuf;
 use crate::core::buffer_manager::BufferManager;
 use crate::core::{cursor::Cursor, viewport::Viewport};
 use crate::editor::Mode;
-use crate::ui::compositor::Compositor;
 use crate::ui::components::ComponentIds;
+use crate::ui::compositor::Compositor;
 
 pub type ActionResult = Result<()>;
 
@@ -30,7 +30,7 @@ pub struct ActionContext<'a> {
     pub running: &'a mut bool,
 
     pub compositor: &'a mut Compositor,
-    pub component_ids: &'a ComponentIds
+    pub component_ids: &'a ComponentIds,
 }
 
 // The Action trait defines what all actions must implement
@@ -155,6 +155,8 @@ pub enum ActionDefinition {
     DeleteChar,
     Backspace,
     InsertNewLine,
+    InsertNewLineBelow,
+    InsertNewLineAbove,
 
     // Mode actions
     EnterMode {
@@ -196,6 +198,8 @@ pub fn create_action_from_definition(definition: &ActionDefinition) -> Box<dyn A
         ActionDefinition::DeleteChar => Box::new(DeleteChar),
         ActionDefinition::Backspace => Box::new(Backspace),
         ActionDefinition::InsertNewLine => Box::new(InsertNewLine),
+        ActionDefinition::InsertNewLineBelow => Box::new(InsertNewLineBelow),
+        ActionDefinition::InsertNewLineAbove => Box::new(InsertNewLineAbove),
 
         // Mode actions
         ActionDefinition::EnterMode { mode } => {
@@ -206,8 +210,7 @@ pub fn create_action_from_definition(definition: &ActionDefinition) -> Box<dyn A
                 _ => Mode::Normal, // Default fallback
             };
             Box::new(EnterMode::new(mode))
-        },
-
+        }
 
         // Buffer actions
         ActionDefinition::NextBuffer => Box::new(NextBuffer),
@@ -215,7 +218,7 @@ pub fn create_action_from_definition(definition: &ActionDefinition) -> Box<dyn A
         ActionDefinition::OpenBuffer { path } => {
             let path_buf = PathBuf::from(path);
             Box::new(OpenBuffer::new(path_buf))
-        },
+        }
         ActionDefinition::Quit => Box::new(QuitEditor),
 
         ActionDefinition::Composite {
