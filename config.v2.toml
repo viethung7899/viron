@@ -24,6 +24,8 @@ theme = "themes/catppuchin/mocha.json"
 "w" = { type = "MoveToNextWord" }
 "b" = { type = "MoveToPreviousWord" }
 
+"x" = { type = "DeleteChar" }
+
 "i" = { type = "EnterMode", params = { mode = "insert" } }
 ":" = { type = "EnterMode", params = { mode = "command" } }
 "/" = { type = "EnterMode", params = { mode = "search" } }
@@ -46,6 +48,7 @@ params = { description = "Insert mode at line end", actions = [
 # Keybindings for insert mode
 [keymap.insert]
 "<Esc>" = { type = "EnterMode", params = { mode = "normal" } }
+"<Delete>" = { type = "DeleteChar" }
 "<Backspace>" = { type = "Backspace" }
 "<Enter>" = { type = "InsertNewLine" }
 "<Left>" = { type = "MoveLeft", params = { count = 1 } }
