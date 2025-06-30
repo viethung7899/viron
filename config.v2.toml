@@ -44,6 +44,19 @@ params = { description = "Insert mode at line end", actions = [
     { type = "MoveToLineEnd" }
 ] }
 
+[keymap.normal.o]
+type = "Composite"
+params = { description = "Insert new line at cursor", actions = [
+    { type = "EnterMode", params = { mode = "insert" } },
+    { type = "InsertNewLineBelow" }
+] }
+
+[keymap.normal.O]
+type = "Composite"
+params = { description = "Insert new line at current line", actions = [
+    { type = "EnterMode", params = { mode = "insert" } },
+    { type = "InsertNewLineAbove" }
+] }
 
 # Keybindings for insert mode
 [keymap.insert]
