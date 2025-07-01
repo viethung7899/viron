@@ -20,11 +20,14 @@ use crate::input::{
     events::{EventHandler, InputEvent},
 };
 use crate::ui::components::{
-    BufferView, CommandLine, ComponentIds, Gutter, MessageArea, PendingKeys, StatusLine,
+    BufferView, CommandLine, ComponentIds, Gutter, MessageArea, PendingKeys, SearchBox, StatusLine,
 };
 use crate::ui::compositor::Compositor;
 use crate::ui::{theme::Theme, Component, RenderContext};
-use crate::{config::Config, core::command_buffer::CommandBuffer};
+use crate::{
+    config::Config,
+    core::command::{CommandBuffer, SearchBuffer},
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Mode {
@@ -72,6 +75,8 @@ pub struct Editor {
     buffer_manager: BufferManager,
     command_buffer: CommandBuffer,
     message_manager: MessageManager,
+    search_buffer: SearchBuffer,
+
     cursor: Cursor,
     viewport: Viewport,
     mode: Mode,
@@ -109,6 +114,7 @@ impl Editor {
         let buffer_manager = BufferManager::new();
         let command_buffer = CommandBuffer::new();
         let message_manager = MessageManager::new();
+        let search_buffer = SearchBuffer::new();
         let cursor = Cursor::new();
         let viewport = Viewport::new(height as usize - 2, width as usize - MIN_GUTTER_SIZE);
 
@@ -131,6 +137,8 @@ impl Editor {
             "command_line",
             Box::new(CommandLine),
         ))?;
+        let search_box_id = compositor
+            .add_component(Component::new_invisible("search_box", Box::new(SearchBox)))?;
         let message_area_id = compositor.add_component(Component::new_invisible(
             "message_area",
             Box::new(MessageArea),
@@ -143,6 +151,7 @@ impl Editor {
             pending_keys_id,
             command_line_id,
             message_area_id,
+            search_box_id,
         };
 
         // Create input handling
@@ -156,7 +165,9 @@ impl Editor {
 
             buffer_manager,
             command_buffer,
+            search_buffer,
             message_manager,
+
             cursor,
             viewport,
             mode: Mode::Normal,
@@ -195,6 +206,7 @@ impl Editor {
                 mode: &self.mode,
                 viewport: &self.viewport,
                 command_buffer: &self.command_buffer,
+                search_buffer: &self.search_buffer,
                 message_manager: &self.message_manager,
                 pending_keys: &self.pending_keys,
                 gutter_width,
@@ -219,6 +231,7 @@ impl Editor {
                                 viewport: &mut self.viewport,
                                 buffer_manager: &mut self.buffer_manager,
                                 command_buffer: &mut self.command_buffer,
+                                search_buffer: &mut self.search_buffer,
                                 message: &mut self.message_manager,
                                 cursor: &mut self.cursor,
                                 running: &mut self.running,
@@ -266,8 +279,8 @@ impl Editor {
             Mode::Command => {
                 self.show_cursor_in_command_line()?;
             }
-            _ => {
-                self.stdout.queue(cursor::Hide)?;
+            Mode::Search => {
+                self.show_cursor_in_search_box()?;
             }
         }
         Ok(())
@@ -295,6 +308,16 @@ impl Editor {
 
     fn show_cursor_in_command_line(&mut self) -> Result<()> {
         let position = self.command_buffer.cursor_position();
+        queue!(
+            self.stdout,
+            cursor::MoveTo(position as u16 + 1, self.height as u16 - 1),
+            cursor::Show,
+        )?;
+        Ok(())
+    }
+
+    fn show_cursor_in_search_box(&mut self) -> Result<()> {
+        let position = self.search_buffer.buffer.cursor_position();
         queue!(
             self.stdout,
             cursor::MoveTo(position as u16 + 1, self.height as u16 - 1),
@@ -343,6 +366,7 @@ impl Editor {
         match &self.mode {
             Mode::Insert => self.handle_default_insert_event(&key_event),
             Mode::Command => self.handle_default_command_event(&key_event),
+            Mode::Search => self.handle_default_search_event(&key_event),
             _ => None,
         }
     }
@@ -354,8 +378,7 @@ impl Editor {
         let code = key_event.code;
         let modifiers = key_event.modifiers;
         match (code, modifiers) {
-            (KeyCode::Char(ch), KeyModifiers::NONE) => Some(Box::new(actions::InsertChar::new(ch))),
-            (KeyCode::Char(ch), KeyModifiers::SHIFT) => {
+            (KeyCode::Char(ch), KeyModifiers::NONE | KeyModifiers::SHIFT) => {
                 Some(Box::new(actions::InsertChar::new(ch)))
             }
             _ => None,
@@ -369,11 +392,22 @@ impl Editor {
         let code = key_event.code;
         let modifiers = key_event.modifiers;
         match (code, modifiers) {
-            (KeyCode::Char(ch), KeyModifiers::NONE) => {
+            (KeyCode::Char(ch), KeyModifiers::NONE | KeyModifiers::SHIFT) => {
                 Some(Box::new(actions::CommandInsertChar::new(ch)))
             }
-            (KeyCode::Char(ch), KeyModifiers::SHIFT) => {
-                Some(Box::new(actions::CommandInsertChar::new(ch)))
+            _ => None,
+        }
+    }
+
+    fn handle_default_search_event(
+        &mut self,
+        key_event: &VironKeyEvent,
+    ) -> Option<Box<dyn Action>> {
+        let code = key_event.code;
+        let modifiers = key_event.modifiers;
+        match (code, modifiers) {
+            (KeyCode::Char(ch), KeyModifiers::NONE | KeyModifiers::SHIFT) => {
+                Some(Box::new(actions::SearchInsertChar::new(ch)))
             }
             _ => None,
         }

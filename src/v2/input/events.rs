@@ -1,6 +1,5 @@
 use anyhow::Result;
 use crossterm::event::{self, Event, KeyEvent};
-use std::time::{Duration, Instant};
 
 // Handle input events from the terminal
 pub struct EventHandler {}

@@ -149,7 +149,7 @@ impl KeyMap {
 
         Ok(keymap)
     }
-
+    
     pub fn save_to_file(&self, path: impl AsRef<Path>) -> Result<()> {
         let config = self.to_config();
         let toml_str = toml::to_string_pretty(&config)?;

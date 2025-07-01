@@ -4,7 +4,8 @@ use std::fmt::Debug;
 use std::path::PathBuf;
 
 use crate::core::buffer_manager::BufferManager;
-use crate::core::command_buffer::CommandBuffer;
+use crate::core::command::{CommandBuffer, SearchBuffer};
+use crate::core::message::MessageManager;
 use crate::core::{cursor::Cursor, viewport::Viewport};
 use crate::editor::Mode;
 use crate::ui::components::ComponentIds;
@@ -17,6 +18,7 @@ mod command;
 mod editing;
 mod mode;
 mod movement;
+mod search;
 mod system;
 
 pub use buffer::*;
@@ -24,12 +26,14 @@ pub use command::*;
 pub use editing::*;
 pub use mode::*;
 pub use movement::*;
+pub use search::*;
 pub use system::*;
 
 // Context passed to actions when they execute
 pub struct ActionContext<'a> {
     pub buffer_manager: &'a mut BufferManager,
     pub command_buffer: &'a mut CommandBuffer,
+    pub search_buffer: &'a mut SearchBuffer,
     pub message: &'a mut MessageManager,
     pub cursor: &'a mut Cursor,
     pub viewport: &'a mut Viewport,
@@ -125,7 +129,7 @@ macro_rules! impl_action {
         }
     };
 }
-use crate::core::message::MessageManager;
+
 pub(super) use impl_action;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -176,6 +180,15 @@ pub enum ActionDefinition {
     CommandDeleteChar,
     CommandBackspace,
     CommandExecute,
+
+    // Search actions
+    SearchMoveLeft,
+    SearchMoveRight,
+    SearchInsertChar {
+        ch: char,
+    },
+    SearchDeleteChar,
+    SearchBackspace,
 
     // Buffer actions
     NextBuffer,
@@ -240,6 +253,13 @@ pub fn create_action_from_definition(definition: &ActionDefinition) -> Box<dyn A
         ActionDefinition::CommandDeleteChar => Box::new(CommandDeleteChar),
         ActionDefinition::CommandBackspace => Box::new(CommandBackspace),
         ActionDefinition::CommandExecute => Box::new(CommandExecute),
+
+        // Search actions
+        ActionDefinition::SearchMoveLeft => Box::new(SearchMoveLeft),
+        ActionDefinition::SearchMoveRight => Box::new(SearchMoveRight),
+        ActionDefinition::SearchInsertChar { ch } => Box::new(SearchInsertChar::new(*ch)),
+        ActionDefinition::SearchDeleteChar => Box::new(SearchDeleteChar),
+        ActionDefinition::SearchBackspace => Box::new(SearchBackspace),
 
         // Buffer actions
         ActionDefinition::NextBuffer => Box::new(NextBuffer),
