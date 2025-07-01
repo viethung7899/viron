@@ -3,6 +3,7 @@ theme = "themes/catppuchin/mocha.json"
 # Keybindings for normal mode
 [keymap.normal]
 "q" = { type = "Quit", params = { force = true } }
+"<Esc>" = { type = "EnterMode", params = { mode = "normal" } }
 
 "h" = { type = "MoveLeft", params = { count = 1 } }
 "j" = { type = "MoveDown", params = { count = 1 } }
@@ -29,6 +30,9 @@ theme = "themes/catppuchin/mocha.json"
 "i" = { type = "EnterMode", params = { mode = "insert" } }
 ":" = { type = "EnterMode", params = { mode = "command" } }
 "/" = { type = "EnterMode", params = { mode = "search" } }
+
+"n" = { type = "FindNext" }
+"N" = { type = "FindPrevious" }
 
 [keymap.normal.a]
 type = "Composite"

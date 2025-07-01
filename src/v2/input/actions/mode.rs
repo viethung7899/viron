@@ -36,6 +36,16 @@ impl Executable for EnterMode {
                 ctx.search_buffer.buffer.clear();
                 ctx.compositor
                     .mark_visible(&ctx.component_ids.search_box_id, true)?;
+                ctx.compositor
+                    .mark_dirty(&ctx.component_ids.search_box_id)?;
+            }
+            (_, Mode::Normal) => {
+                ctx.command_buffer.clear();
+                ctx.search_buffer.buffer.clear();
+                ctx.compositor
+                    .mark_visible(&ctx.component_ids.command_line_id, false)?;
+                ctx.compositor
+                    .mark_visible(&ctx.component_ids.search_box_id, false)?;
             }
             _ => {}
         }

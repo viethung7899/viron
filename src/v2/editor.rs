@@ -12,7 +12,7 @@ use std::io::{self, Stdout, Write};
 use crate::core::cursor::Cursor;
 use crate::core::viewport::Viewport;
 use crate::core::{buffer_manager::BufferManager, message::MessageManager};
-use crate::input::actions::Action;
+use crate::input::actions::{Action, Executable};
 use crate::input::keymaps::{KeyEvent as VironKeyEvent, KeyMap, KeySequence};
 use crate::input::{
     actions,
@@ -224,7 +224,7 @@ impl Editor {
             match self.event_handler.next()? {
                 InputEvent::Key(key) => {
                     if let Some(action) = self.handle_key(key) {
-                        Action::execute(
+                        Executable::execute(
                             action.as_ref(),
                             &mut ActionContext {
                                 mode: &mut self.mode,
@@ -335,7 +335,7 @@ impl Editor {
         Ok(())
     }
 
-    fn handle_key(&mut self, key: KeyEvent) -> Option<Box<dyn Action>> {
+    fn handle_key(&mut self, key: KeyEvent) -> Option<Box<dyn Executable>> {
         // Convert to our key event type
         let key_event = VironKeyEvent::from(key);
         self.pending_keys.add(key_event.clone());
@@ -344,12 +344,12 @@ impl Editor {
             .get_action(&self.mode, &self.pending_keys)
             .cloned();
 
-        if action.is_some() {
+        if let Some(action) = &action {
             self.pending_keys.clear();
             self.compositor
                 .mark_visible(&self.component_ids.pending_keys_id, false)
                 .ok();
-            return action;
+            return Some(action.clone());
         }
 
         if self.keymap.is_partial_match(&self.mode, &self.pending_keys) {
@@ -374,7 +374,7 @@ impl Editor {
     fn handle_default_insert_event(
         &mut self,
         key_event: &VironKeyEvent,
-    ) -> Option<Box<dyn Action>> {
+    ) -> Option<Box<dyn Executable>> {
         let code = key_event.code;
         let modifiers = key_event.modifiers;
         match (code, modifiers) {
@@ -388,13 +388,18 @@ impl Editor {
     fn handle_default_command_event(
         &mut self,
         key_event: &VironKeyEvent,
-    ) -> Option<Box<dyn Action>> {
+    ) -> Option<Box<dyn Executable>> {
         let code = key_event.code;
         let modifiers = key_event.modifiers;
         match (code, modifiers) {
             (KeyCode::Char(ch), KeyModifiers::NONE | KeyModifiers::SHIFT) => {
                 Some(Box::new(actions::CommandInsertChar::new(ch)))
             }
+            (KeyCode::Enter, _) => Some(Box::new(actions::CommandExecute)),
+            (KeyCode::Left, _) => Some(Box::new(actions::CommandMoveLeft)),
+            (KeyCode::Right, _) => Some(Box::new(actions::CommandMoveLeft)),
+            (KeyCode::Backspace, _) => Some(Box::new(actions::CommandBackspace)),
+            (KeyCode::Delete, _) => Some(Box::new(actions::CommandDeleteChar)),
             _ => None,
         }
     }
@@ -402,13 +407,20 @@ impl Editor {
     fn handle_default_search_event(
         &mut self,
         key_event: &VironKeyEvent,
-    ) -> Option<Box<dyn Action>> {
+    ) -> Option<Box<dyn Executable>> {
         let code = key_event.code;
         let modifiers = key_event.modifiers;
         match (code, modifiers) {
             (KeyCode::Char(ch), KeyModifiers::NONE | KeyModifiers::SHIFT) => {
                 Some(Box::new(actions::SearchInsertChar::new(ch)))
             }
+            (KeyCode::Enter, _) => Some(Box::new(actions::SearchSubmit::new(
+                self.search_buffer.buffer.content(),
+            ))),
+            (KeyCode::Left, _) => Some(Box::new(actions::SearchMoveLeft)),
+            (KeyCode::Right, _) => Some(Box::new(actions::SearchMoveLeft)),
+            (KeyCode::Backspace, _) => Some(Box::new(actions::SearchBackspace)),
+            (KeyCode::Delete, _) => Some(Box::new(actions::SearchDeleteChar)),
             _ => None,
         }
     }

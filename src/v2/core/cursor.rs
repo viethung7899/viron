@@ -92,13 +92,13 @@ impl Cursor {
         }
         self.preferred_column = self.position.column;
     }
-    
+
     /// Move to the start of the document
     pub fn move_to_top(&mut self) {
         self.position = Point { row: 0, column: 0 };
         self.preferred_column = 0;
     }
-    
+
     /// Move to the end of the document
     pub fn move_to_bottom(&mut self, buffer: &Buffer, mode: &Mode) {
         let last_row = buffer.line_count().saturating_sub(1);
@@ -207,7 +207,7 @@ impl Cursor {
         // Try to maintain the preferred column if possible
         self.position.column = self.preferred_column.min(max_column);
     }
-    
+
     pub fn go_to_line(&mut self, line_number: usize, buffer: &Buffer, mode: &Mode) {
         let max_lines = buffer.line_count().saturating_sub(1);
         if line_number > max_lines {
@@ -216,6 +216,16 @@ impl Cursor {
             self.position.row = line_number;
         }
         self.clamp_column(buffer, mode);
+    }
+
+    pub fn go_to_column(&mut self, column: usize, buffer: &Buffer, mode: &Mode) {
+        let line_length = buffer.get_line_length(self.position.row);
+        if *mode == Mode::Insert {
+            self.position.column = column.min(line_length);
+        } else {
+            self.position.column = column.min(line_length.saturating_sub(1));
+        }
+        self.preferred_column = self.position.column;
     }
 }
 
