@@ -1,17 +1,17 @@
 use anyhow::Result;
+use crossterm::{QueueableCommand, queue, style};
 use crossterm::{
     cursor,
     event::{KeyCode, KeyEvent, KeyModifiers},
     execute,
     terminal::{self, ClearType},
 };
-use crossterm::{queue, style, QueueableCommand};
 use serde::{Deserialize, Serialize};
 use std::io::{self, Stdout, Write};
 
-use crate::core::buffer_manager::BufferManager;
 use crate::core::cursor::Cursor;
 use crate::core::viewport::Viewport;
+use crate::core::{buffer_manager::BufferManager, message::MessageManager};
 use crate::input::actions::Action;
 use crate::input::keymaps::{KeyEvent as VironKeyEvent, KeyMap, KeySequence};
 use crate::input::{
@@ -21,7 +21,7 @@ use crate::input::{
 };
 use crate::ui::components::{BufferView, CommandLine, ComponentIds, Gutter, StatusLine};
 use crate::ui::compositor::Compositor;
-use crate::ui::{theme::Theme, Component, RenderContext};
+use crate::ui::{Component, RenderContext, theme::Theme};
 use crate::{config::Config, core::command_buffer::CommandBuffer};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -69,6 +69,7 @@ pub struct Editor {
     // Core components
     buffer_manager: BufferManager,
     command_buffer: CommandBuffer,
+    message_manager: MessageManager,
     cursor: Cursor,
     viewport: Viewport,
     mode: Mode,
@@ -105,6 +106,7 @@ impl Editor {
         // Create core components
         let buffer_manager = BufferManager::new();
         let command_buffer = CommandBuffer::new();
+        let message_manager = MessageManager::new();
         let cursor = Cursor::new();
         let viewport = Viewport::new(height as usize - 2, width as usize - MIN_GUTTER_SIZE);
 
@@ -141,6 +143,7 @@ impl Editor {
 
             buffer_manager,
             command_buffer,
+            message_manager,
             cursor,
             viewport,
             mode: Mode::Normal,
@@ -179,15 +182,17 @@ impl Editor {
                 mode: &self.mode,
                 viewport: &self.viewport,
                 command_buffer: &self.command_buffer,
+                message_manager: &self.message_manager,
                 gutter_width,
             };
 
             self.stdout.queue(cursor::Hide)?;
             self.compositor.render(&mut context, &mut self.stdout)?;
-
             self.show_cursor()?;
-
             self.stdout.flush()?;
+
+            // Clean up messages after rendering
+            self.message_manager.post_render_cleanup();
 
             // Handle events
             match self.event_handler.next()? {

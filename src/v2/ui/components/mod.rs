@@ -1,6 +1,7 @@
 mod buffer_view;
 mod command_line;
 mod gutter;
+mod message_area;
 mod status_line;
 
 pub use buffer_view::BufferView;

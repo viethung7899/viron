@@ -81,6 +81,7 @@ impl Compositor {
                     .drawable
                     .clear(&mut self.current_buffer, context)?;
             }
+            component.dirty = false; // Clear dirty flag after rendering
         }
 
         // If we have a previous buffer, do differential rendering

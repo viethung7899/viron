@@ -1,6 +1,7 @@
 use crate::core::buffer_manager::BufferManager;
 use crate::core::command_buffer::CommandBuffer;
 use crate::core::cursor::Cursor;
+use crate::core::message::MessageManager;
 use crate::core::viewport::Viewport;
 use crate::editor::Mode;
 use crate::ui::render_buffer::RenderBuffer;
@@ -20,6 +21,7 @@ pub struct RenderContext<'a> {
     pub mode: &'a Mode,
     pub theme: &'a Theme,
     pub command_buffer: &'a CommandBuffer,
+    pub message_manager: &'a MessageManager,
     pub gutter_width: usize,
 }
 
