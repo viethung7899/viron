@@ -7,8 +7,8 @@ mod status_line;
 pub use buffer_view::BufferView;
 pub use command_line::CommandLine;
 pub use gutter::Gutter;
-pub use status_line::StatusLine;
 pub use message_area::MessageArea;
+pub use status_line::StatusLine;
 
 use crate::ui::Drawable;
 
@@ -33,6 +33,15 @@ impl Component {
             id: id.to_string(),
             dirty: true,
             visible: true,
+            drawable,
+        }
+    }
+
+    pub fn new_invisible(id: &str, drawable: Box<dyn Drawable>) -> Self {
+        Self {
+            id: id.to_string(),
+            dirty: true,
+            visible: false,
             drawable,
         }
     }
