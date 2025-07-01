@@ -1,8 +1,8 @@
+use crate::ui::RenderContext;
 use crate::ui::components::Component;
 use crate::ui::render_buffer::RenderBuffer;
 use crate::ui::theme::Style;
-use crate::ui::RenderContext;
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use std::io::Write;
 
 pub struct Compositor {

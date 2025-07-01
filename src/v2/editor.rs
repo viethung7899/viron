@@ -122,13 +122,14 @@ impl Editor {
         let gutter_id = compositor.add_component(Component::new("gutter", Box::new(Gutter)))?;
         let buffer_view_id =
             compositor.add_component(Component::new("buffer_view", Box::new(BufferView)))?;
-        let mut command_line = Component::new("command_line", Box::new(CommandLine));
-        command_line.visible = false;
-        let command_line_id = compositor.add_component(command_line)?;
-        let mut message_area = Component::new("message_area", Box::new(MessageArea));
-        message_area.visible = false;
-        let message_area_id =
-            compositor.add_component(message_area)?;
+        let command_line_id = compositor.add_component(Component::new_invisible(
+            "command_line",
+            Box::new(CommandLine),
+        ))?;
+        let message_area_id = compositor.add_component(Component::new_invisible(
+            "message_area",
+            Box::new(MessageArea),
+        ))?;
 
         let component_ids = ComponentIds {
             status_line_id,
