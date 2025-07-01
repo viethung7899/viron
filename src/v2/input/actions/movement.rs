@@ -232,3 +232,33 @@ impl Executable for MoveToPreviousWord {
 impl_action!(MoveToPreviousWord, "Move to previous word", self {
     ActionDefinition::MoveToPreviousWord
 });
+
+#[derive(Debug, Clone)]
+pub struct GoToLine {
+    line_number: usize,
+}
+
+impl GoToLine {
+    pub fn new(line_number: usize) -> Self {
+        Self { line_number }
+    }
+}
+
+impl Executable for GoToLine {
+    fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+        let buffer = ctx.buffer_manager.current_buffer();
+        ctx.cursor.go_to_line(self.line_number, buffer, ctx.mode);
+        let new_line = ctx.cursor.get_position().row;
+        let viewport = &ctx.viewport;
+        if new_line < viewport.top_line() || new_line >= viewport.top_line() + viewport.height() {
+            Action::execute(&MoveToViewportCenter, ctx)?;
+        }
+        ctx.compositor
+            .mark_dirty(&ctx.component_ids.status_line_id)?;
+        Ok(())
+    }
+}
+
+impl_action!(GoToLine, "Go to line", self {
+    ActionDefinition::GoToLine { line_number: self.line_number }
+});

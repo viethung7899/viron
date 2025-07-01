@@ -155,6 +155,9 @@ pub enum ActionDefinition {
     MoveToViewportCenter,
     MoveToPreviousWord,
     MoveToNextWord,
+    GoToLine {
+        line_number: usize,
+    },
 
     // Editing actions
     InsertChar {
@@ -226,6 +229,7 @@ pub fn create_action_from_definition(definition: &ActionDefinition) -> Box<dyn A
         ActionDefinition::MoveToViewportCenter => Box::new(MoveToViewportCenter),
         ActionDefinition::MoveToPreviousWord => Box::new(MoveToPreviousWord),
         ActionDefinition::MoveToNextWord => Box::new(MoveToNextWord),
+        ActionDefinition::GoToLine { line_number } => Box::new(GoToLine::new(*line_number)),
 
         // Editing actions
         ActionDefinition::InsertChar { ch } => Box::new(InsertChar::new(*ch)),

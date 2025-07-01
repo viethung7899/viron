@@ -207,6 +207,16 @@ impl Cursor {
         // Try to maintain the preferred column if possible
         self.position.column = self.preferred_column.min(max_column);
     }
+    
+    pub fn go_to_line(&mut self, line_number: usize, buffer: &Buffer, mode: &Mode) {
+        let max_lines = buffer.line_count().saturating_sub(1);
+        if line_number > max_lines {
+            self.position.row = max_lines;
+        } else {
+            self.position.row = line_number;
+        }
+        self.clamp_column(buffer, mode);
+    }
 }
 
 fn is_keyword(c: char) -> bool {
