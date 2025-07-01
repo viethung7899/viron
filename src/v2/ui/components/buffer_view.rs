@@ -19,7 +19,7 @@ impl BufferView {
             width: visible_width,
             height: visible_height,
             ..
-        } = self.bounds(render_buffer.get_size(), context);
+        } = self.bounds(render_buffer, context);
         let viewport = context.viewport;
         let buffer = context.buffer_manager.current_buffer_mut();
         let theme = context.theme;
@@ -60,7 +60,7 @@ impl BufferView {
             width: visible_width,
             height: visible_height,
             ..
-        } = self.bounds(render_buffer.get_size(), context);
+        } = self.bounds(render_buffer, context);
 
         let viewport = context.viewport;
         let buffer = context.buffer_manager.current_buffer();
@@ -201,7 +201,7 @@ impl BufferView {
             width: visible_width,
             height,
             ..
-        } = self.bounds(render_buffer.get_size(), context);
+        } = self.bounds(render_buffer, context);
         let left_column = context.viewport.left_column();
 
         let mut lines = bytes.split(|&c| c == b'\n').peekable();
@@ -240,7 +240,6 @@ impl BufferView {
 }
 
 impl Drawable for BufferView {
-
     fn draw(&self, buffer: &mut RenderBuffer, context: &mut RenderContext) -> Result<()> {
         if context.buffer_manager.current().language.is_plain_text() {
             self.render_plain_text(buffer, context)
@@ -255,10 +254,10 @@ impl Drawable for BufferView {
         }
     }
 
-    fn bounds(&self, size: (usize, usize), context: &RenderContext<'_>) -> Bounds {
+    fn bounds(&self, render_buffer: &RenderBuffer, context: &RenderContext<'_>) -> Bounds {
         let width = context.viewport.width();
         let height = context.viewport.height();
-        let window_width = size.0;
+        let window_width = render_buffer.width;
         Bounds {
             start_row: 0,
             start_col: window_width - width,

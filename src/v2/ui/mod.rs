@@ -32,7 +32,7 @@ pub struct Bounds {
 
 pub trait Drawable {
     fn draw(&self, buffer: &mut RenderBuffer, context: &mut RenderContext) -> anyhow::Result<()>;
-    fn bounds(&self, size: (usize, usize), context: &RenderContext) -> Bounds;
+    fn bounds(&self, buffer: &RenderBuffer, context: &RenderContext) -> Bounds;
 
     fn clear(&self, buffer: &mut RenderBuffer, context: &RenderContext) -> anyhow::Result<()> {
         let Bounds {
@@ -40,7 +40,7 @@ pub trait Drawable {
             start_col,
             width,
             height,
-        } = self.bounds(buffer.get_size(), context);
+        } = self.bounds(buffer, context);
 
         for row in start_row..start_row + height {
             buffer.set_text(

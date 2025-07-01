@@ -13,7 +13,7 @@ impl Drawable for Gutter {
             width,
             height,
             ..
-        } = self.bounds(buffer.get_size(), context);
+        } = self.bounds(buffer, context);
         let line_count = context.buffer_manager.current_buffer().line_count();
 
         for i in 0..(height) {
@@ -31,7 +31,7 @@ impl Drawable for Gutter {
         Ok(())
     }
 
-    fn bounds(&self, _size: (usize, usize), context: &RenderContext) -> Bounds {
+    fn bounds(&self, _render_buffer: &RenderBuffer, context: &RenderContext) -> Bounds {
         Bounds {
             start_row: 0,
             start_col: 0,
