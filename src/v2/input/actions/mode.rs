@@ -22,10 +22,20 @@ impl Executable for EnterMode {
                 ctx.compositor
                     .mark_visible(&ctx.component_ids.command_line_id, false)?;
             }
+            (Mode::Search, _) => {
+                ctx.search_buffer.buffer.clear();
+                ctx.compositor
+                    .mark_visible(&ctx.component_ids.search_box_id, false)?;
+            }
             (_, Mode::Command) => {
                 ctx.command_buffer.clear();
                 ctx.compositor
                     .mark_visible(&ctx.component_ids.command_line_id, true)?;
+            }
+            (_, Mode::Search) => {
+                ctx.search_buffer.buffer.clear();
+                ctx.compositor
+                    .mark_visible(&ctx.component_ids.search_box_id, true)?;
             }
             _ => {}
         }
@@ -37,7 +47,6 @@ impl Executable for EnterMode {
 }
 
 impl Action for EnterMode {
-
     fn describe(&self) -> &str {
         match self.mode {
             Mode::Normal => "Enter normal mode",
