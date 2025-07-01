@@ -5,22 +5,9 @@ use crate::ui::render_buffer::RenderBuffer;
 use crate::ui::theme::Style;
 use crate::ui::{Bounds, Drawable, RenderContext};
 
-pub struct StatusLine {
-    id: String,
-}
-
-impl StatusLine {
-    pub fn new() -> Self {
-        Self {
-            id: "status_line".to_string(),
-        }
-    }
-}
+pub struct StatusLine;
 
 impl Drawable for StatusLine {
-    fn id(&self) -> &str {
-        &self.id
-    }
 
     fn draw(&self, buffer: &mut RenderBuffer, context: &mut RenderContext) -> anyhow::Result<()> {
         let Bounds {
@@ -44,7 +31,8 @@ impl Drawable for StatusLine {
         let colors = match context.mode {
             Mode::Normal => context.theme.colors.status.normal,
             Mode::Insert => context.theme.colors.status.insert,
-            _ => context.theme.colors.status.command,
+            Mode::Command => context.theme.colors.status.command,
+            Mode::Search => context.theme.colors.status.search,
         };
 
         let mut outer = Style::from(colors);

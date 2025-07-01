@@ -6,17 +6,9 @@ use std::ops::Add;
 use std::str::from_utf8;
 use tree_sitter::Point;
 
-pub struct BufferView {
-    id: String,
-}
+pub struct BufferView;
 
 impl BufferView {
-    pub fn new() -> Self {
-        Self {
-            id: "buffer_view".to_string(),
-        }
-    }
-
     fn render_plain_text(
         &self,
         render_buffer: &mut RenderBuffer,
@@ -248,9 +240,6 @@ impl BufferView {
 }
 
 impl Drawable for BufferView {
-    fn id(&self) -> &str {
-        &self.id
-    }
 
     fn draw(&self, buffer: &mut RenderBuffer, context: &mut RenderContext) -> Result<()> {
         if context.buffer_manager.current().language.is_plain_text() {
