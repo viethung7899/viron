@@ -1,7 +1,7 @@
 use crate::core::message::Message;
 use crate::editor::Mode;
-use crate::input::actions::{impl_action, mode, system, Action, Executable};
-use crate::input::actions::{ActionContext, ActionDefinition, ActionResult};
+use crate::input::actions::{mode, system, Executable};
+use crate::input::actions::{ActionContext, ActionResult};
 use crate::input::command_parser::parse_command;
 
 #[derive(Debug, Clone)]
@@ -14,10 +14,6 @@ impl Executable for CommandMoveLeft {
     }
 }
 
-impl_action!(CommandMoveLeft, "Move cursor left in command line", self {
-    ActionDefinition::CommandMoveLeft
-});
-
 #[derive(Debug, Clone)]
 pub struct CommandMoveRight;
 
@@ -27,10 +23,6 @@ impl Executable for CommandMoveRight {
         Ok(())
     }
 }
-
-impl_action!(CommandMoveRight, "Move cursor right in command line", self {
-    ActionDefinition::CommandMoveRight
-});
 
 #[derive(Debug, Clone)]
 pub struct CommandInsertChar {
@@ -52,10 +44,6 @@ impl Executable for CommandInsertChar {
     }
 }
 
-impl_action!(CommandInsertChar, "Insert character in command line", self {
-    ActionDefinition::CommandInsertChar { ch: self.ch }
-});
-
 #[derive(Debug, Clone)]
 pub struct CommandDeleteChar;
 
@@ -70,10 +58,6 @@ impl Executable for CommandDeleteChar {
     }
 }
 
-impl_action!(CommandDeleteChar, "Delete character in command line", self {
-    ActionDefinition::CommandDeleteChar
-});
-
 #[derive(Debug, Clone)]
 pub struct CommandBackspace;
 impl Executable for CommandBackspace {
@@ -86,10 +70,6 @@ impl Executable for CommandBackspace {
         Ok(())
     }
 }
-
-impl_action!(CommandBackspace, "Backspace in command line", self {
-    ActionDefinition::CommandBackspace
-});
 
 #[derive(Debug, Clone)]
 pub struct CommandExecute;
@@ -108,7 +88,3 @@ impl Executable for CommandExecute {
         Ok(())
     }
 }
-
-impl_action!(CommandExecute, "Execute command in command line", self {
-    ActionDefinition::CommandExecute
-});
