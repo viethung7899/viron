@@ -99,7 +99,8 @@ impl Executable for CommandExecute {
         let input = ctx.command_buffer.content();
         Executable::execute(&mode::EnterMode::new(Mode::Normal), ctx)?;
 
-        let result = parse_command(&input).and_then(|action| Action::execute(action.as_ref(), ctx));
+        let result =
+            parse_command(&input).and_then(|action| Executable::execute(action.as_ref(), ctx));
         if let Err(err) = result {
             system::ShowMessage(Message::error(format!("E: {err}"))).execute(ctx)?;
         }
