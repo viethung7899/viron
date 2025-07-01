@@ -1,35 +1,35 @@
 use crate::editor::Mode;
-use crate::input::actions::{Action, impl_action, mode};
-use crate::input::actions::{ActionContext, ActionDefinition, ActionImpl, ActionResult};
+use crate::input::actions::{impl_action, mode, Action, Executable};
+use crate::input::actions::{ActionContext, ActionDefinition, ActionResult};
 use crate::input::command_parser::parse_command;
 
 #[derive(Debug, Clone)]
 pub struct CommandMoveLeft;
 
-impl ActionImpl for CommandMoveLeft {
-    fn execute_impl(&self, ctx: &mut ActionContext) -> ActionResult {
+impl Executable for CommandMoveLeft {
+    fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         ctx.command_buffer.move_cursor_left();
         Ok(())
     }
-
-    fn to_serializable_impl(&self) -> ActionDefinition {
-        ActionDefinition::CommandMoveLeft
-    }
 }
+
+impl_action!(CommandMoveLeft, "Move cursor left in command line", self {
+    ActionDefinition::CommandMoveLeft
+});
 
 #[derive(Debug, Clone)]
 pub struct CommandMoveRight;
 
-impl ActionImpl for CommandMoveRight {
-    fn execute_impl(&self, ctx: &mut ActionContext) -> ActionResult {
+impl Executable for CommandMoveRight {
+    fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         ctx.command_buffer.move_cursor_right();
         Ok(())
     }
-
-    fn to_serializable_impl(&self) -> ActionDefinition {
-        ActionDefinition::CommandMoveRight
-    }
 }
+
+impl_action!(CommandMoveRight, "Move cursor right in command line", self {
+    ActionDefinition::CommandMoveRight
+});
 
 #[derive(Debug, Clone)]
 pub struct CommandInsertChar {
@@ -42,74 +42,67 @@ impl CommandInsertChar {
     }
 }
 
-impl ActionImpl for CommandInsertChar {
-    fn execute_impl(&self, ctx: &mut ActionContext) -> ActionResult {
+impl Executable for CommandInsertChar {
+    fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         ctx.command_buffer.insert_char(self.ch);
         ctx.compositor
             .mark_dirty(&ctx.component_ids.command_line_id)?;
         Ok(())
     }
-
-    fn to_serializable_impl(&self) -> ActionDefinition {
-        ActionDefinition::CommandInsertChar { ch: self.ch }
-    }
 }
+
+impl_action!(CommandInsertChar, "Insert character in command line", self {
+    ActionDefinition::CommandInsertChar { ch: self.ch }
+});
 
 #[derive(Debug, Clone)]
 pub struct CommandDeleteChar;
 
-impl ActionImpl for CommandDeleteChar {
-    fn execute_impl(&self, ctx: &mut ActionContext) -> ActionResult {
+impl Executable for CommandDeleteChar {
+    fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         if !ctx.command_buffer.delete_char() {
-            mode::EnterMode::new(Mode::Normal).execute(ctx)?;
+            Executable::execute(&mode::EnterMode::new(Mode::Normal), ctx)?;
         }
         ctx.compositor
             .mark_dirty(&ctx.component_ids.command_line_id)?;
         Ok(())
     }
-
-    fn to_serializable_impl(&self) -> ActionDefinition {
-        ActionDefinition::CommandDeleteChar
-    }
 }
+
+impl_action!(CommandDeleteChar, "Delete character in command line", self {
+    ActionDefinition::CommandDeleteChar
+});
 
 #[derive(Debug, Clone)]
 pub struct CommandBackspace;
-impl ActionImpl for CommandBackspace {
-    fn execute_impl(&self, ctx: &mut ActionContext) -> ActionResult {
+impl Executable for CommandBackspace {
+    fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         if !ctx.command_buffer.backspace() {
-            mode::EnterMode::new(Mode::Normal).execute(ctx)?;
+            Executable::execute(&mode::EnterMode::new(Mode::Normal), ctx)?;
         }
         ctx.compositor
             .mark_dirty(&ctx.component_ids.command_line_id)?;
         Ok(())
     }
-
-    fn to_serializable_impl(&self) -> ActionDefinition {
-        ActionDefinition::CommandBackspace
-    }
 }
+
+impl_action!(CommandBackspace, "Backspace in command line", self {
+    ActionDefinition::CommandBackspace
+});
 
 #[derive(Debug, Clone)]
 pub struct CommandExecute;
 
-impl ActionImpl for CommandExecute {
-    fn execute_impl(&self, ctx: &mut ActionContext) -> ActionResult {
+impl Executable for CommandExecute {
+    fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         let input = ctx.command_buffer.content();
         let action = parse_command(input.trim())?;
         action.execute(ctx)?;
-        mode::EnterMode::new(Mode::Normal).execute(ctx)?;
+        Executable::execute(&mode::EnterMode::new(Mode::Normal), ctx)?;
         Ok(())
-    }
-
-    fn to_serializable_impl(&self) -> ActionDefinition {
-        ActionDefinition::CommandExecute
     }
 }
 
-impl_action!(CommandMoveLeft, "Move cursor left in command line");
-impl_action!(CommandMoveRight, "Move cursor right in command line");
-impl_action!(CommandInsertChar, "Insert character in command line");
-impl_action!(CommandDeleteChar, "Delete character in command line");
-impl_action!(CommandBackspace, "Backspace in command line");
-impl_action!(CommandExecute, "Execute command");
+impl_action!(CommandExecute, "Execute command in command line", self {
+    ActionDefinition::CommandExecute
+});

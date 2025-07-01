@@ -1,7 +1,7 @@
 use std::fmt::Debug;
 
 use crate::editor::Mode;
-use crate::input::actions::{Action, ActionContext, ActionDefinition, ActionResult};
+use crate::input::actions::{Action, ActionContext, ActionDefinition, ActionResult, Executable};
 
 #[derive(Debug, Clone)]
 pub struct EnterMode {
@@ -14,7 +14,7 @@ impl EnterMode {
     }
 }
 
-impl Action for EnterMode {
+impl Executable for EnterMode {
     fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         match (&ctx.mode, &self.mode) {
             (Mode::Command, _) => {
@@ -34,6 +34,9 @@ impl Action for EnterMode {
             .mark_dirty(&ctx.component_ids.status_line_id)?;
         Ok(())
     }
+}
+
+impl Action for EnterMode {
 
     fn describe(&self) -> &str {
         match self.mode {

@@ -1,5 +1,5 @@
 use crate::input::actions::{
-    Action, ActionContext, ActionDefinition, ActionImpl, ActionResult, impl_action,
+    impl_action, Action, ActionContext, ActionDefinition, ActionResult, Executable,
 };
 
 #[derive(Debug, Clone)]
@@ -13,16 +13,14 @@ impl QuitEditor {
     }
 }
 
-impl ActionImpl for QuitEditor {
-    fn execute_impl(&self, ctx: &mut ActionContext) -> ActionResult {
+impl Executable for QuitEditor {
+    fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         // Access to the editor's running state
         *ctx.running = false;
         Ok(())
     }
-
-    fn to_serializable_impl(&self) -> ActionDefinition {
-        ActionDefinition::Quit { force: self.force }
-    }
 }
 
-impl_action!(QuitEditor, "Quit the editor");
+impl_action!(QuitEditor, "Quit the editor", self {
+    ActionDefinition::Quit { force: self.force }
+});

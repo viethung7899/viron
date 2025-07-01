@@ -198,7 +198,7 @@ impl Editor {
             match self.event_handler.next()? {
                 InputEvent::Key(key) => {
                     if let Some(action) = self.handle_key(key) {
-                        action.execute(&mut ActionContext {
+                        Action::execute(action.as_ref(), &mut ActionContext {
                             mode: &mut self.mode,
                             viewport: &mut self.viewport,
                             buffer_manager: &mut self.buffer_manager,
