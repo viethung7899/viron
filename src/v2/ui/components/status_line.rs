@@ -8,11 +8,10 @@ use crate::ui::{Bounds, Drawable, RenderContext};
 pub struct StatusLine;
 
 impl Drawable for StatusLine {
-
     fn draw(&self, buffer: &mut RenderBuffer, context: &mut RenderContext) -> anyhow::Result<()> {
         let Bounds {
             start_row, width, ..
-        } = self.bounds(buffer.get_size(), context);
+        } = self.bounds(buffer, context);
         let document = context.buffer_manager.current();
 
         let left = format!(" {} ", context.mode.to_name().to_uppercase());
@@ -46,8 +45,9 @@ impl Drawable for StatusLine {
         Ok(())
     }
 
-    fn bounds(&self, size: (usize, usize), _context: &RenderContext) -> Bounds {
-        let (width, height) = size;
+    fn bounds(&self, render_buffer: &RenderBuffer, _context: &RenderContext) -> Bounds {
+        let width = render_buffer.width;
+        let height = render_buffer.height;
         let start_row = height - 2;
         Bounds {
             start_row,
