@@ -25,6 +25,13 @@ impl From<Colors> for Style {
     }
 }
 
+fn default_colors() -> Colors {
+    Colors {
+        foreground: None,
+        background: None,
+    }
+}
+
 impl Style {
     pub fn to_content_style(&self, fallback: &Style) -> ContentStyle {
         let foreground_color = self.foreground.or(fallback.foreground);
@@ -59,6 +66,7 @@ pub struct ThemeColors {
     pub editor: Colors,
     pub gutter: Colors,
     pub status: StatusColors,
+    pub diagnostic: DiagnosticColors,
 }
 
 impl Default for ThemeColors {
@@ -67,6 +75,24 @@ impl Default for ThemeColors {
             editor: default_colors(),
             gutter: default_colors(),
             status: Default::default(),
+            diagnostic: Default::default(),
+        }
+    }
+}
+
+impl From<&VsCodeTheme> for ThemeColors {
+    fn from(vscode: &VsCodeTheme) -> Self {
+        ThemeColors {
+            editor: Colors {
+                foreground: vscode.get_color("editor.foreground"),
+                background: vscode.get_color("editor.background"),
+            },
+            gutter: Colors {
+                foreground: vscode.get_color("editorLineNumber.foreground"),
+                background: vscode.get_color("editorLineNumber.background"),
+            },
+            status: StatusColors::from(vscode),
+            diagnostic: DiagnosticColors::from(vscode),
         }
     }
 }
@@ -88,44 +114,6 @@ impl Default for StatusColors {
             command: default_colors(),
             search: default_colors(),
             inner: default_colors(),
-        }
-    }
-}
-
-fn default_colors() -> Colors {
-    Colors {
-        foreground: None,
-        background: None,
-    }
-}
-
-impl Theme {
-    pub fn style_for_token(&self, token_type: &str) -> Style {
-        let mut style = self.editor_style();
-        if let Some(token_style) = self.token_styles.get(token_type) {
-            if let Some(fg) = token_style.foreground {
-                style.foreground = fg.into();
-            }
-            if let Some(bg) = token_style.background {
-                style.background = bg.into();
-            }
-            style.bold = token_style.bold;
-            style.italic = token_style.italic;
-        }
-        style
-    }
-
-    pub fn load_from_file(path: impl AsRef<std::path::Path>) -> Result<Theme> {
-        let reader = BufReader::new(fs::File::open(path)?);
-        let vscode: VsCodeTheme = serde_json::from_reader(reader)?;
-        Ok(Theme::from(&vscode))
-    }
-
-    pub fn editor_style(&self) -> Style {
-        Style {
-            foreground: self.colors.editor.foreground,
-            background: self.colors.editor.background,
-            ..Default::default()
         }
     }
 }
@@ -169,18 +157,79 @@ impl From<&VsCodeTheme> for StatusColors {
     }
 }
 
-impl From<&VsCodeTheme> for ThemeColors {
+#[derive(Debug, Clone)]
+pub struct DiagnosticColors {
+    pub error: Colors,
+    pub hint: Colors,
+    pub info: Colors,
+    pub warning: Colors,
+}
+
+impl Default for DiagnosticColors {
+    fn default() -> Self {
+        Self {
+            error: default_colors(),
+            hint: default_colors(),
+            info: default_colors(),
+            warning: default_colors(),
+        }
+    }
+}
+
+impl From<&VsCodeTheme> for DiagnosticColors {
     fn from(vscode: &VsCodeTheme) -> Self {
-        ThemeColors {
-            editor: Colors {
-                foreground: vscode.get_color("editor.foreground"),
-                background: vscode.get_color("editor.background"),
-            },
-            gutter: Colors {
-                foreground: vscode.get_color("editorLineNumber.foreground"),
-                background: vscode.get_color("editorLineNumber.background"),
-            },
-            status: StatusColors::from(vscode),
+        let error = Colors {
+            foreground: vscode.get_color("errorLens.errorForeground"),
+            background: vscode.get_color("errorLens.errorBackground"),
+        };
+        let hint = Colors {
+            foreground: vscode.get_color("errorLens.hintForeground"),
+            background: vscode.get_color("errorLens.hintBackground"),
+        };
+        let info = Colors {
+            foreground: vscode.get_color("errorLens.infoForeground"),
+            background: vscode.get_color("errorLens.infoBackground"),
+        };
+        let warning = Colors {
+            foreground: vscode.get_color("errorLens.warningForeground"),
+            background: vscode.get_color("errorLens.warningBackground"),
+        };
+        DiagnosticColors {
+            error,
+            hint,
+            info,
+            warning,
+        }
+    }
+}
+
+impl Theme {
+    pub fn style_for_token(&self, token_type: &str) -> Style {
+        let mut style = self.editor_style();
+        if let Some(token_style) = self.token_styles.get(token_type) {
+            if let Some(fg) = token_style.foreground {
+                style.foreground = fg.into();
+            }
+            if let Some(bg) = token_style.background {
+                style.background = bg.into();
+            }
+            style.bold = token_style.bold;
+            style.italic = token_style.italic;
+        }
+        style
+    }
+
+    pub fn load_from_file(path: impl AsRef<std::path::Path>) -> Result<Theme> {
+        let reader = BufReader::new(fs::File::open(path)?);
+        let vscode: VsCodeTheme = serde_json::from_reader(reader)?;
+        Ok(Theme::from(&vscode))
+    }
+
+    pub fn editor_style(&self) -> Style {
+        Style {
+            foreground: self.colors.editor.foreground,
+            background: self.colors.editor.background,
+            ..Default::default()
         }
     }
 }
