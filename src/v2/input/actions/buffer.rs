@@ -57,21 +57,38 @@ impl ActionImpl for OpenBuffer {
 }
 
 #[derive(Debug, Clone)]
-pub struct QuitEditor;
+pub struct WriteBuffer {
+    path: Option<PathBuf>,
+}
 
-impl ActionImpl for QuitEditor {
+impl WriteBuffer {
+    pub fn new(path: Option<PathBuf>) -> Self {
+        Self { path }
+    }
+}
+
+impl ActionImpl for WriteBuffer {
     fn execute_impl(&self, ctx: &mut ActionContext) -> ActionResult {
-        // Access to the editor's running state
-        *ctx.running = false;
+        let current_document = ctx.buffer_manager.current();
+        let path = self.path.clone().or(current_document.path.clone());
+        let Some(path) = path else {
+            return Err(anyhow::anyhow!("No path specified for writing buffer"));
+        };
+
+        let content = current_document.buffer.to_bytes();
+        std::fs::write(path, content)?;
+
         Ok(())
     }
 
     fn to_serializable_impl(&self) -> ActionDefinition {
-        ActionDefinition::Quit
+        ActionDefinition::WriteBuffer {
+            path: self.path.as_ref().map(|p| p.to_string_lossy().to_string()),
+        }
     }
 }
 
 impl_action!(OpenBuffer, "Open buffer from file");
-impl_action!(QuitEditor, "Quit the editor");
 impl_action!(PreviousBuffer, "Previous buffer");
 impl_action!(NextBuffer, "Next buffer");
+impl_action!(WriteBuffer, "Write buffer to file");

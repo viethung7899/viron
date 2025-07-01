@@ -17,12 +17,14 @@ mod command;
 mod editing;
 mod mode;
 mod movement;
+mod system;
 
 pub use buffer::*;
 pub use command::*;
 pub use editing::*;
 pub use mode::*;
 pub use movement::*;
+pub use system::*;
 
 // Context passed to actions when they execute
 pub struct ActionContext<'a> {
@@ -176,20 +178,28 @@ pub enum ActionDefinition {
     },
     CommandDeleteChar,
     CommandBackspace,
+    CommandExecute,
+
+    // Buffer actions
+    NextBuffer,
+    PreviousBuffer,
+    OpenBuffer {
+        path: String,
+    },
+    WriteBuffer {
+        path: Option<String>,
+    },
+
+    // System actions
+    Quit {
+        force: bool,
+    },
 
     // Composite actions
     Composite {
         description: String,
         actions: Vec<ActionDefinition>,
     },
-
-    NextBuffer,
-    PreviousBuffer,
-    OpenBuffer {
-        path: String,
-    },
-
-    Quit,
 }
 
 pub fn create_action_from_definition(definition: &ActionDefinition) -> Box<dyn Action> {
@@ -232,6 +242,7 @@ pub fn create_action_from_definition(definition: &ActionDefinition) -> Box<dyn A
         ActionDefinition::CommandInsertChar { ch } => Box::new(CommandInsertChar::new(*ch)),
         ActionDefinition::CommandDeleteChar => Box::new(CommandDeleteChar),
         ActionDefinition::CommandBackspace => Box::new(CommandBackspace),
+        ActionDefinition::CommandExecute => Box::new(CommandExecute),
 
         // Buffer actions
         ActionDefinition::NextBuffer => Box::new(NextBuffer),
@@ -240,7 +251,13 @@ pub fn create_action_from_definition(definition: &ActionDefinition) -> Box<dyn A
             let path_buf = PathBuf::from(path);
             Box::new(OpenBuffer::new(path_buf))
         }
-        ActionDefinition::Quit => Box::new(QuitEditor),
+        ActionDefinition::WriteBuffer { path } => {
+            let path_buf = path.as_ref().map(PathBuf::from);
+            Box::new(WriteBuffer::new(path_buf))
+        }
+        
+        // System actions
+        ActionDefinition::Quit { force } => Box::new(QuitEditor::new(*force)),
 
         ActionDefinition::Composite {
             description,
