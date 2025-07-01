@@ -1,6 +1,6 @@
 use crate::editor::Mode;
 use crate::input::actions::{
-    impl_action, Action, ActionContext, ActionDefinition, ActionImpl, ActionResult,
+    impl_action, Action, ActionContext, ActionDefinition, ActionResult, Executable,
 };
 use std::fmt::Debug;
 
@@ -13,8 +13,8 @@ impl InsertChar {
     }
 }
 
-impl ActionImpl for InsertChar {
-    fn execute_impl(&self, ctx: &mut ActionContext) -> ActionResult {
+impl Executable for InsertChar {
+    fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         let buffer = ctx.buffer_manager.current_buffer_mut();
         let position = buffer.cursor_position(&ctx.cursor.get_position());
         let new_position = buffer.insert_char(position, self.0);
@@ -27,17 +27,16 @@ impl ActionImpl for InsertChar {
             .mark_dirty(&ctx.component_ids.status_line_id)?;
         Ok(())
     }
-
-    fn to_serializable_impl(&self) -> ActionDefinition {
-        ActionDefinition::InsertChar { ch: self.0 }
-    }
 }
+impl_action!(InsertChar, "Insert char", self {
+    ActionDefinition::InsertChar { ch: self.0 }
+});
 
 #[derive(Debug, Clone)]
 pub struct DeleteChar;
 
-impl ActionImpl for DeleteChar {
-    fn execute_impl(&self, ctx: &mut ActionContext) -> ActionResult {
+impl Executable for DeleteChar {
+    fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         let buffer = ctx.buffer_manager.current_buffer_mut();
         let position = buffer.cursor_position(&ctx.cursor.get_position());
         if let Some(_) = buffer.delete_char(position) {
@@ -50,17 +49,17 @@ impl ActionImpl for DeleteChar {
         }
         Ok(())
     }
-
-    fn to_serializable_impl(&self) -> ActionDefinition {
-        ActionDefinition::DeleteChar
-    }
 }
+
+impl_action!(DeleteChar, "Delete character", self {
+    ActionDefinition::DeleteChar
+});
 
 #[derive(Debug, Clone)]
 pub struct Backspace;
 
-impl ActionImpl for Backspace {
-    fn execute_impl(&self, ctx: &mut ActionContext) -> ActionResult {
+impl Executable for Backspace {
+    fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         let buffer = ctx.buffer_manager.current_buffer_mut();
         let position = buffer.cursor_position(&ctx.cursor.get_position());
         if position > 0 {
@@ -75,17 +74,17 @@ impl ActionImpl for Backspace {
         }
         Ok(())
     }
-
-    fn to_serializable_impl(&self) -> ActionDefinition {
-        ActionDefinition::Backspace
-    }
 }
+
+impl_action!(Backspace, "Backspace", self {
+    ActionDefinition::Backspace
+});
 
 #[derive(Debug, Clone)]
 pub struct InsertNewLine;
 
-impl ActionImpl for InsertNewLine {
-    fn execute_impl(&self, ctx: &mut ActionContext) -> ActionResult {
+impl Executable for InsertNewLine {
+    fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         let buffer = ctx.buffer_manager.current_buffer_mut();
         let position = buffer.cursor_position(&ctx.cursor.get_position());
         let new_position = buffer.insert_char(position, '\n');
@@ -98,17 +97,17 @@ impl ActionImpl for InsertNewLine {
             .mark_dirty(&ctx.component_ids.status_line_id)?;
         Ok(())
     }
-
-    fn to_serializable_impl(&self) -> ActionDefinition {
-        ActionDefinition::InsertNewLine
-    }
 }
+
+impl_action!(InsertNewLine, "Insert new line", self {
+    ActionDefinition::InsertNewLine
+});
 
 #[derive(Debug, Clone)]
 pub struct InsertNewLineBelow;
 
-impl ActionImpl for InsertNewLineBelow {
-    fn execute_impl(&self, ctx: &mut ActionContext) -> ActionResult {
+impl Executable for InsertNewLineBelow {
+    fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         let buffer = ctx.buffer_manager.current_buffer_mut();
         let cursor = ctx.cursor.get_position();
 
@@ -136,17 +135,17 @@ impl ActionImpl for InsertNewLineBelow {
             .mark_dirty(&ctx.component_ids.status_line_id)?;
         Ok(())
     }
-
-    fn to_serializable_impl(&self) -> ActionDefinition {
-        ActionDefinition::InsertNewLineBelow
-    }
 }
+
+impl_action!(InsertNewLineBelow, "Insert new line below", self {
+    ActionDefinition::InsertNewLineBelow
+});
 
 #[derive(Debug, Clone)]
 pub struct InsertNewLineAbove;
 
-impl ActionImpl for InsertNewLineAbove {
-    fn execute_impl(&self, ctx: &mut ActionContext) -> ActionResult {
+impl Executable for InsertNewLineAbove {
+    fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         let buffer = ctx.buffer_manager.current_buffer_mut();
         let cursor_pos = ctx.cursor.get_position();
 
@@ -176,15 +175,8 @@ impl ActionImpl for InsertNewLineAbove {
             .mark_dirty(&ctx.component_ids.status_line_id)?;
         Ok(())
     }
-
-    fn to_serializable_impl(&self) -> ActionDefinition {
-        ActionDefinition::InsertNewLineAbove
-    }
 }
 
-impl_action!(InsertNewLine, "Insert new line");
-impl_action!(Backspace, "Backspace");
-impl_action!(DeleteChar, "Delete character");
-impl_action!(InsertChar, "Insert new line");
-impl_action!(InsertNewLineBelow, "Insert new line below");
-impl_action!(InsertNewLineAbove, "Insert new line above");
+impl_action!(InsertNewLineAbove, "Insert new line above", self {
+    ActionDefinition::InsertNewLineAbove
+});

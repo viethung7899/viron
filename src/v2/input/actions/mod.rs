@@ -39,9 +39,15 @@ pub struct ActionContext<'a> {
     pub component_ids: &'a ComponentIds,
 }
 
-// The Action trait defines what all actions must implement
-pub trait Action: Debug + Send + Sync {
+pub trait Executable {
     fn execute(&self, ctx: &mut ActionContext) -> ActionResult;
+}
+
+// The Action trait defines what all actions must implement
+pub trait Action: Debug + Send + Sync + Executable {
+    fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+        Executable::execute(self, ctx)
+    }
     fn describe(&self) -> &str;
     fn to_serializable(&self) -> ActionDefinition;
     fn clone_box(&self) -> Box<dyn Action>;
@@ -74,14 +80,16 @@ impl CompositeAction {
     }
 }
 
-impl Action for CompositeAction {
+impl Executable for CompositeAction {
     fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         for action in &self.actions {
-            action.execute(ctx)?;
+            Executable::execute(action.as_ref(), ctx)?;
         }
         Ok(())
     }
+}
 
+impl Action for CompositeAction {
     fn describe(&self) -> &str {
         &self.description
     }
@@ -101,34 +109,21 @@ impl Action for CompositeAction {
     }
 }
 
-pub(super) trait ActionImpl: Debug + Clone + Send + Sync {
-    fn execute_impl(&self, ctx: &mut ActionContext) -> ActionResult;
-    fn to_serializable_impl(&self) -> ActionDefinition;
-}
-
 macro_rules! impl_action {
-    ($action_type:ty, $description:expr) => {
+    ($action_type:ty, $description:expr, $self:ident $definition_block:block) => {
         impl Action for $action_type {
             fn clone_box(&self) -> Box<dyn Action> {
                 Box::new(self.clone())
-            }
-
-            // Other methods must still be implemented manually
-            fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
-                self.execute_impl(ctx)
             }
 
             fn describe(&self) -> &str {
                 $description
             }
 
-            fn to_serializable(&self) -> ActionDefinition {
-                self.to_serializable_impl()
-            }
+            fn to_serializable(&$self) -> ActionDefinition $definition_block
         }
     };
 }
-
 pub(super) use impl_action;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -255,7 +250,7 @@ pub fn create_action_from_definition(definition: &ActionDefinition) -> Box<dyn A
             let path_buf = path.as_ref().map(PathBuf::from);
             Box::new(WriteBuffer::new(path_buf))
         }
-        
+
         // System actions
         ActionDefinition::Quit { force } => Box::new(QuitEditor::new(*force)),
 
