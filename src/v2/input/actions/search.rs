@@ -1,6 +1,6 @@
 use crate::editor::Mode;
-use crate::input::actions::{impl_action, mode, Action, Executable};
-use crate::input::actions::{ActionContext, ActionDefinition, ActionResult};
+use crate::input::actions::{mode, Executable};
+use crate::input::actions::{ActionContext, ActionResult};
 
 #[derive(Debug, Clone)]
 pub struct SearchMoveLeft;
@@ -12,10 +12,6 @@ impl Executable for SearchMoveLeft {
     }
 }
 
-impl_action!(SearchMoveLeft, "Move cursor left in search box", self {
-    ActionDefinition::SearchMoveLeft
-});
-
 #[derive(Debug, Clone)]
 pub struct SearchMoveRight;
 
@@ -25,10 +21,6 @@ impl Executable for SearchMoveRight {
         Ok(())
     }
 }
-
-impl_action!(SearchMoveRight, "Move cursor right in search box", self {
-    ActionDefinition::SearchMoveRight
-});
 
 #[derive(Debug, Clone)]
 pub struct SearchInsertChar {
@@ -50,10 +42,6 @@ impl Executable for SearchInsertChar {
     }
 }
 
-impl_action!(SearchInsertChar, "Insert character in search box", self {
-    ActionDefinition::SearchInsertChar { ch: self.ch }
-});
-
 #[derive(Debug, Clone)]
 pub struct SearchDeleteChar;
 
@@ -67,10 +55,6 @@ impl Executable for SearchDeleteChar {
         Ok(())
     }
 }
-
-impl_action!(SearchDeleteChar, "Delete character in search box", self {
-    ActionDefinition::SearchDeleteChar
-});
 
 #[derive(Debug, Clone)]
 pub struct SearchBackspace;

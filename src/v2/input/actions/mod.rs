@@ -174,25 +174,6 @@ pub enum ActionDefinition {
         mode: String,
     },
 
-    // Command actions
-    CommandMoveLeft,
-    CommandMoveRight,
-    CommandInsertChar {
-        ch: char,
-    },
-    CommandDeleteChar,
-    CommandBackspace,
-    CommandExecute,
-
-    // Search actions
-    SearchMoveLeft,
-    SearchMoveRight,
-    SearchInsertChar {
-        ch: char,
-    },
-    SearchDeleteChar,
-    SearchBackspace,
-
     // Buffer actions
     NextBuffer,
     PreviousBuffer,
@@ -249,21 +230,6 @@ pub fn create_action_from_definition(definition: &ActionDefinition) -> Box<dyn A
             };
             Box::new(EnterMode::new(mode))
         }
-
-        // Command actions
-        ActionDefinition::CommandMoveLeft => Box::new(CommandMoveLeft),
-        ActionDefinition::CommandMoveRight => Box::new(CommandMoveRight),
-        ActionDefinition::CommandInsertChar { ch } => Box::new(CommandInsertChar::new(*ch)),
-        ActionDefinition::CommandDeleteChar => Box::new(CommandDeleteChar),
-        ActionDefinition::CommandBackspace => Box::new(CommandBackspace),
-        ActionDefinition::CommandExecute => Box::new(CommandExecute),
-
-        // Search actions
-        ActionDefinition::SearchMoveLeft => Box::new(SearchMoveLeft),
-        ActionDefinition::SearchMoveRight => Box::new(SearchMoveRight),
-        ActionDefinition::SearchInsertChar { ch } => Box::new(SearchInsertChar::new(*ch)),
-        ActionDefinition::SearchDeleteChar => Box::new(SearchDeleteChar),
-        ActionDefinition::SearchBackspace => Box::new(SearchBackspace),
 
         // Buffer actions
         ActionDefinition::NextBuffer => Box::new(NextBuffer),
