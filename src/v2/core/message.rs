@@ -29,7 +29,6 @@ impl Message {
 #[derive(Debug, Default)]
 pub struct MessageManager {
     current_message: Option<Message>,
-    clear_after_render: bool,
 }
 
 impl MessageManager {
@@ -37,42 +36,15 @@ impl MessageManager {
         Self::default()
     }
 
-    pub fn show_message(&mut self, message: Message) {
-        self.current_message = Some(message);
-        self.clear_after_render = true;
-    }
-
-    pub fn show_info(&mut self, content: String) {
-        self.show_message(Message::info(content));
-    }
-
-    pub fn show_error(&mut self, content: String) {
-        self.show_message(Message::error(content));
-    }
-
     pub fn current_message(&self) -> Option<&Message> {
         self.current_message.as_ref()
     }
 
-    pub fn has_message(&self) -> bool {
-        self.current_message.is_some()
+    pub fn show_message(&mut self, message: Message) {
+        self.current_message = Some(message);
     }
 
     pub fn clear_message(&mut self) {
         self.current_message = None;
-        self.clear_after_render = false;
-    }
-
-    /// Call this after rendering to clear the message
-    pub fn post_render_cleanup(&mut self) {
-        if self.clear_after_render {
-            self.current_message = None;
-            self.clear_after_render = false;
-        }
-    }
-
-    /// Call this to keep the message for another render cycle
-    pub fn keep_message(&mut self) {
-        self.clear_after_render = false;
     }
 }

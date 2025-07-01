@@ -1,11 +1,11 @@
 use anyhow::Result;
-use crossterm::{QueueableCommand, queue, style};
 use crossterm::{
     cursor,
     event::{KeyCode, KeyEvent, KeyModifiers},
     execute,
     terminal::{self, ClearType},
 };
+use crossterm::{queue, style, QueueableCommand};
 use serde::{Deserialize, Serialize};
 use std::io::{self, Stdout, Write};
 
@@ -19,9 +19,11 @@ use crate::input::{
     actions::ActionContext,
     events::{EventHandler, InputEvent},
 };
-use crate::ui::components::{BufferView, CommandLine, ComponentIds, Gutter, StatusLine};
+use crate::ui::components::{
+    BufferView, CommandLine, ComponentIds, Gutter, MessageArea, StatusLine,
+};
 use crate::ui::compositor::Compositor;
-use crate::ui::{Component, RenderContext, theme::Theme};
+use crate::ui::{theme::Theme, Component, RenderContext};
 use crate::{config::Config, core::command_buffer::CommandBuffer};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -120,16 +122,20 @@ impl Editor {
         let gutter_id = compositor.add_component(Component::new("gutter", Box::new(Gutter)))?;
         let buffer_view_id =
             compositor.add_component(Component::new("buffer_view", Box::new(BufferView)))?;
-
         let mut command_line = Component::new("command_line", Box::new(CommandLine));
         command_line.visible = false;
         let command_line_id = compositor.add_component(command_line)?;
+        let mut message_area = Component::new("message_area", Box::new(MessageArea));
+        message_area.visible = false;
+        let message_area_id =
+            compositor.add_component(message_area)?;
 
         let component_ids = ComponentIds {
             status_line_id,
             gutter_id,
             buffer_view_id,
             command_line_id,
+            message_area_id,
         };
 
         // Create input handling
@@ -192,22 +198,26 @@ impl Editor {
             self.stdout.flush()?;
 
             // Clean up messages after rendering
-            self.message_manager.post_render_cleanup();
+            self.post_render_cleanup()?;
 
             // Handle events
             match self.event_handler.next()? {
                 InputEvent::Key(key) => {
                     if let Some(action) = self.handle_key(key) {
-                        Action::execute(action.as_ref(), &mut ActionContext {
-                            mode: &mut self.mode,
-                            viewport: &mut self.viewport,
-                            buffer_manager: &mut self.buffer_manager,
-                            command_buffer: &mut self.command_buffer,
-                            cursor: &mut self.cursor,
-                            running: &mut self.running,
-                            compositor: &mut self.compositor,
-                            component_ids: &mut self.component_ids,
-                        })?
+                        Action::execute(
+                            action.as_ref(),
+                            &mut ActionContext {
+                                mode: &mut self.mode,
+                                viewport: &mut self.viewport,
+                                buffer_manager: &mut self.buffer_manager,
+                                command_buffer: &mut self.command_buffer,
+                                message: &mut self.message_manager,
+                                cursor: &mut self.cursor,
+                                running: &mut self.running,
+                                compositor: &mut self.compositor,
+                                component_ids: &mut self.component_ids,
+                            },
+                        )?
                     }
                 }
                 InputEvent::Resize(width, height) => {
@@ -217,6 +227,14 @@ impl Editor {
             }
         }
 
+        Ok(())
+    }
+
+    fn post_render_cleanup(&mut self) -> Result<()> {
+        // Clear the message area after rendering
+        self.message_manager.clear_message();
+        self.compositor
+            .mark_visible(&self.component_ids.message_area_id, false)?;
         Ok(())
     }
 
