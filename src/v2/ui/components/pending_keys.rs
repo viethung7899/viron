@@ -17,7 +17,7 @@ impl Drawable for PendingKeys {
         if pending_keys.is_empty() {
             return self.clear(buffer, context);
         }
-        let text = format!("{:width$}", pending_keys);
+        let text = format!("  {:w$}", pending_keys, w = width - 2);
 
         buffer.set_text(start_row, start_col, &text, &context.theme.editor_style());
 

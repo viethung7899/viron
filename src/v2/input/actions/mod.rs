@@ -169,6 +169,10 @@ pub enum ActionDefinition {
     InsertNewLineBelow,
     InsertNewLineAbove,
 
+    // Search actions
+    FindNext,
+    FindPrevious,
+
     // Mode actions
     EnterMode {
         mode: String,
@@ -219,6 +223,10 @@ pub fn create_action_from_definition(definition: &ActionDefinition) -> Box<dyn A
         ActionDefinition::InsertNewLine => Box::new(InsertNewLine),
         ActionDefinition::InsertNewLineBelow => Box::new(InsertNewLineBelow),
         ActionDefinition::InsertNewLineAbove => Box::new(InsertNewLineAbove),
+
+        // Search actions
+        ActionDefinition::FindNext => Box::new(FindNext),
+        ActionDefinition::FindPrevious => Box::new(FindPrevious),
 
         // Mode actions
         ActionDefinition::EnterMode { mode } => {

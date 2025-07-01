@@ -262,3 +262,25 @@ impl Executable for GoToLine {
 impl_action!(GoToLine, "Go to line", self {
     ActionDefinition::GoToLine { line_number: self.line_number }
 });
+
+#[derive(Debug, Clone)]
+pub struct GoToPosition {
+    row: usize,
+    column: usize,
+}
+
+impl GoToPosition {
+    pub fn new(row: usize, column: usize) -> Self {
+        Self { row, column }
+    }
+}
+impl Executable for GoToPosition {
+    fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+        Executable::execute(&GoToLine::new(self.row), ctx)?;
+        let buffer = ctx.buffer_manager.current_buffer();
+        ctx.cursor.go_to_column(self.column, buffer, ctx.mode);
+        ctx.compositor
+            .mark_dirty(&ctx.component_ids.status_line_id)?;
+        Ok(())
+    }
+}
