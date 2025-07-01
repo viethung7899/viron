@@ -20,7 +20,7 @@ use crate::input::{
     events::{EventHandler, InputEvent},
 };
 use crate::ui::components::{
-    BufferView, CommandLine, ComponentIds, Gutter, MessageArea, StatusLine,
+    BufferView, CommandLine, ComponentIds, Gutter, MessageArea, PendingKeys, StatusLine,
 };
 use crate::ui::compositor::Compositor;
 use crate::ui::{theme::Theme, Component, RenderContext};
@@ -122,6 +122,11 @@ impl Editor {
         let gutter_id = compositor.add_component(Component::new("gutter", Box::new(Gutter)))?;
         let buffer_view_id =
             compositor.add_component(Component::new("buffer_view", Box::new(BufferView)))?;
+
+        let pending_keys_id = compositor.add_component(Component::new_invisible(
+            "pending_keys",
+            Box::new(PendingKeys),
+        ))?;
         let command_line_id = compositor.add_component(Component::new_invisible(
             "command_line",
             Box::new(CommandLine),
@@ -135,6 +140,7 @@ impl Editor {
             status_line_id,
             gutter_id,
             buffer_view_id,
+            pending_keys_id,
             command_line_id,
             message_area_id,
         };
@@ -190,6 +196,7 @@ impl Editor {
                 viewport: &self.viewport,
                 command_buffer: &self.command_buffer,
                 message_manager: &self.message_manager,
+                pending_keys: &self.pending_keys,
                 gutter_width,
             };
 
@@ -316,14 +323,23 @@ impl Editor {
 
         if action.is_some() {
             self.pending_keys.clear();
+            self.compositor
+                .mark_visible(&self.component_ids.pending_keys_id, false)
+                .ok();
             return action;
         }
 
         if self.keymap.is_partial_match(&self.mode, &self.pending_keys) {
+            self.compositor
+                .mark_visible(&self.component_ids.pending_keys_id, true)
+                .ok();
             return None;
         }
 
         self.pending_keys.clear();
+        self.compositor
+            .mark_visible(&self.component_ids.pending_keys_id, false)
+            .ok();
         match &self.mode {
             Mode::Insert => self.handle_default_insert_event(&key_event),
             Mode::Command => self.handle_default_command_event(&key_event),
