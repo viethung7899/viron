@@ -1,9 +1,9 @@
+use crate::ui::theme::vscode::VsCodeTheme;
 use anyhow::Result;
 use crossterm::style::{Attribute, Attributes, Color, Colors, ContentStyle};
 use std::collections::HashMap;
 use std::fs;
 use std::io::BufReader;
-use crate::ui::theme::vscode::{VsCodeTheme};
 
 pub mod vscode;
 
@@ -27,12 +27,8 @@ impl From<Colors> for Style {
 
 impl Style {
     pub fn to_content_style(&self, fallback: &Style) -> ContentStyle {
-        let foreground_color = self
-            .foreground
-            .or(fallback.foreground);
-        let background_color = self
-            .background
-            .or(fallback.background);
+        let foreground_color = self.foreground.or(fallback.foreground);
+        let background_color = self.background.or(fallback.background);
         let mut attributes = Attributes::default();
 
         if self.italic {
@@ -80,6 +76,7 @@ pub struct StatusColors {
     pub normal: Colors,
     pub insert: Colors,
     pub command: Colors,
+    pub search: Colors,
     pub inner: Colors,
 }
 
@@ -89,6 +86,7 @@ impl Default for StatusColors {
             normal: default_colors(),
             insert: default_colors(),
             command: default_colors(),
+            search: default_colors(),
             inner: default_colors(),
         }
     }
@@ -122,7 +120,7 @@ impl Theme {
         let vscode: VsCodeTheme = serde_json::from_reader(reader)?;
         Ok(Theme::from(&vscode))
     }
-    
+
     pub fn editor_style(&self) -> Style {
         Style {
             foreground: self.colors.editor.foreground,
@@ -146,7 +144,7 @@ impl From<&VsCodeTheme> for StatusColors {
             background: vscode.get_color("terminal.ansiBlue"),
         };
 
-        let edit = Colors {
+        let insert = Colors {
             foreground: outer_foreground,
             background: vscode.get_color("terminal.ansiGreen"),
         };
@@ -156,9 +154,15 @@ impl From<&VsCodeTheme> for StatusColors {
             background: vscode.get_color("terminal.ansiYellow"),
         };
 
+        let search = Colors {
+            foreground: outer_foreground,
+            background: vscode.get_color("terminal.ansiMagenta"),
+        };
+
         StatusColors {
             normal,
-            insert: edit,
+            insert,
+            search,
             command,
             inner,
         }

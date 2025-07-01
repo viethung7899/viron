@@ -2,23 +2,9 @@ use crate::ui::render_buffer::RenderBuffer;
 use crate::ui::theme::Style;
 use crate::ui::{Bounds, Drawable, RenderContext};
 
-pub struct Gutter {
-    id: String,
-}
-
-impl Gutter {
-    pub fn new() -> Self {
-        Self {
-            id: "gutter".to_string(),
-        }
-    }
-}
+pub struct Gutter;
 
 impl Drawable for Gutter {
-    fn id(&self) -> &str {
-        &self.id
-    }
-
     fn draw(&self, buffer: &mut RenderBuffer, context: &mut RenderContext) -> anyhow::Result<()> {
         let top_line = context.viewport.top_line();
         let style = Style::from(context.theme.colors.gutter);

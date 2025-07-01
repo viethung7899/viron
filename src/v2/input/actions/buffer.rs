@@ -1,7 +1,8 @@
+use crate::input::actions::{
+    impl_action, Action, ActionContext, ActionDefinition, ActionImpl, ActionResult,
+};
 use std::fmt::Debug;
 use std::path::PathBuf;
-use crate::impl_action;
-use crate::input::actions::{Action, ActionContext, ActionDefinition, ActionImpl, ActionResult};
 
 #[derive(Debug, Clone)]
 pub struct NextBuffer;

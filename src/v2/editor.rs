@@ -9,7 +9,6 @@ use crossterm::{queue, style, QueueableCommand};
 use serde::{Deserialize, Serialize};
 use std::io::{self, Stdout, Write};
 
-use crate::config::Config;
 use crate::core::buffer_manager::BufferManager;
 use crate::core::cursor::Cursor;
 use crate::core::viewport::Viewport;
@@ -20,11 +19,12 @@ use crate::input::{
     actions::ActionContext,
     events::{EventHandler, InputEvent},
 };
-use crate::ui::components::{BufferView, ComponentIds, Gutter, StatusLine};
+use crate::ui::components::{BufferView, CommandLine, ComponentIds, Gutter, StatusLine};
 use crate::ui::compositor::Compositor;
-use crate::ui::{theme::Theme, RenderContext};
+use crate::ui::{theme::Theme, Component, RenderContext};
+use crate::{config::Config, core::command_buffer::CommandBuffer};
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Mode {
     Normal,
     Insert,
@@ -46,7 +46,8 @@ impl Mode {
         match self {
             Mode::Normal => "Normal",
             Mode::Insert => "Insert",
-            Mode::Command | Mode::Search => "Command",
+            Mode::Command => "Command",
+            Mode::Search => "Search",
         }
     }
 
@@ -61,8 +62,13 @@ impl Mode {
 const MIN_GUTTER_SIZE: usize = 4;
 
 pub struct Editor {
+    // Size
+    width: usize,
+    height: usize,
+
     // Core components
     buffer_manager: BufferManager,
+    command_buffer: CommandBuffer,
     cursor: Cursor,
     viewport: Viewport,
     mode: Mode,
@@ -80,8 +86,6 @@ pub struct Editor {
 
     // State
     running: bool,
-    command_buffer: String,
-    search_buffer: String,
 }
 
 impl Editor {
@@ -100,6 +104,7 @@ impl Editor {
 
         // Create core components
         let buffer_manager = BufferManager::new();
+        let command_buffer = CommandBuffer::new();
         let cursor = Cursor::new();
         let viewport = Viewport::new(height as usize - 2, width as usize - MIN_GUTTER_SIZE);
 
@@ -107,13 +112,22 @@ impl Editor {
         let theme = Theme::default();
         let mut compositor =
             Compositor::new(width as usize, height as usize, &theme.editor_style());
-        let status_line_id = compositor.add_component(Box::new(StatusLine::new()))?;
-        let gutter_id = compositor.add_component(Box::new(Gutter::new()))?;
-        let buffer_view_id = compositor.add_component(Box::new(BufferView::new()))?;
+
+        let status_line_id =
+            compositor.add_component(Component::new("status_line", Box::new(StatusLine)))?;
+        let gutter_id = compositor.add_component(Component::new("gutter", Box::new(Gutter)))?;
+        let buffer_view_id =
+            compositor.add_component(Component::new("buffer_view", Box::new(BufferView)))?;
+
+        let mut command_line = Component::new("command_line", Box::new(CommandLine));
+        command_line.visible = false;
+        let command_line_id = compositor.add_component(command_line)?;
+
         let component_ids = ComponentIds {
             status_line_id,
             gutter_id,
             buffer_view_id,
+            command_line_id,
         };
 
         // Create input handling
@@ -122,7 +136,11 @@ impl Editor {
         let event_handler = EventHandler::new();
 
         Ok(Self {
+            width: width as usize,
+            height: height as usize,
+
             buffer_manager,
+            command_buffer,
             cursor,
             viewport,
             mode: Mode::Normal,
@@ -137,8 +155,6 @@ impl Editor {
             event_handler,
 
             running: true,
-            command_buffer: String::new(),
-            search_buffer: String::new(),
         })
     }
 
@@ -162,6 +178,7 @@ impl Editor {
                 buffer_manager: &mut self.buffer_manager,
                 mode: &self.mode,
                 viewport: &self.viewport,
+                command_buffer: &self.command_buffer,
                 gutter_width,
             };
 
@@ -180,6 +197,7 @@ impl Editor {
                             mode: &mut self.mode,
                             viewport: &mut self.viewport,
                             buffer_manager: &mut self.buffer_manager,
+                            command_buffer: &mut self.command_buffer,
                             cursor: &mut self.cursor,
                             running: &mut self.running,
                             compositor: &mut self.compositor,
@@ -209,6 +227,22 @@ impl Editor {
     }
 
     fn show_cursor(&mut self) -> Result<()> {
+        self.stdout.queue(self.mode.set_cursor_style())?;
+        match self.mode {
+            Mode::Normal | Mode::Insert => {
+                self.show_cursor_in_buffer()?;
+            }
+            Mode::Command => {
+                self.show_cursor_in_command_line()?;
+            }
+            _ => {
+                self.stdout.queue(cursor::Hide)?;
+            }
+        }
+        Ok(())
+    }
+
+    fn show_cursor_in_buffer(&mut self) -> Result<()> {
         let cursor = self.cursor.get_position();
         let viewport = &self.viewport;
         let gutter_size = self.gutter_width();
@@ -219,7 +253,6 @@ impl Editor {
         if screen_row < viewport.height() && screen_col < viewport.width() {
             queue!(
                 self.stdout,
-                self.mode.set_cursor_style(),
                 cursor::MoveTo((screen_col + gutter_size) as u16, screen_row as u16),
                 cursor::Show,
             )?;
@@ -229,7 +262,19 @@ impl Editor {
         Ok(())
     }
 
+    fn show_cursor_in_command_line(&mut self) -> Result<()> {
+        let position = self.command_buffer.cursor_position();
+        queue!(
+            self.stdout,
+            cursor::MoveTo(position as u16 + 1, self.height as u16 - 1),
+            cursor::Show,
+        )?;
+        Ok(())
+    }
+
     fn handle_resize(&mut self, width: usize, height: usize) -> Result<()> {
+        self.width = width;
+        self.height = height;
         self.compositor.resize(width, height);
         self.viewport
             .resize(height - 2, width - self.gutter_width());
@@ -257,6 +302,7 @@ impl Editor {
         self.pending_keys.clear();
         match &self.mode {
             Mode::Insert => self.handle_default_insert_event(&key_event),
+            Mode::Command => self.handle_default_command_event(&key_event),
             _ => None,
         }
     }
@@ -269,6 +315,26 @@ impl Editor {
         let modifiers = key_event.modifiers;
         match (code, modifiers) {
             (KeyCode::Char(ch), KeyModifiers::NONE) => Some(Box::new(actions::InsertChar::new(ch))),
+            (KeyCode::Char(ch), KeyModifiers::SHIFT) => {
+                Some(Box::new(actions::InsertChar::new(ch)))
+            }
+            _ => None,
+        }
+    }
+
+    fn handle_default_command_event(
+        &mut self,
+        key_event: &VironKeyEvent,
+    ) -> Option<Box<dyn Action>> {
+        let code = key_event.code;
+        let modifiers = key_event.modifiers;
+        match (code, modifiers) {
+            (KeyCode::Char(ch), KeyModifiers::NONE) => {
+                Some(Box::new(actions::CommandInsertChar::new(ch)))
+            }
+            (KeyCode::Char(ch), KeyModifiers::SHIFT) => {
+                Some(Box::new(actions::CommandInsertChar::new(ch)))
+            }
             _ => None,
         }
     }

@@ -1,6 +1,7 @@
 use crate::editor::Mode;
-use crate::impl_action;
-use crate::input::actions::{Action, ActionContext, ActionDefinition, ActionImpl, ActionResult};
+use crate::input::actions::{
+    impl_action, Action, ActionContext, ActionDefinition, ActionImpl, ActionResult,
+};
 use std::fmt::Debug;
 
 #[derive(Debug, Clone)]

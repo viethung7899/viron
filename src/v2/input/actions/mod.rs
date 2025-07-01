@@ -4,6 +4,7 @@ use std::fmt::Debug;
 use std::path::PathBuf;
 
 use crate::core::buffer_manager::BufferManager;
+use crate::core::command_buffer::CommandBuffer;
 use crate::core::{cursor::Cursor, viewport::Viewport};
 use crate::editor::Mode;
 use crate::ui::components::ComponentIds;
@@ -12,11 +13,13 @@ use crate::ui::compositor::Compositor;
 pub type ActionResult = Result<()>;
 
 mod buffer;
+mod command;
 mod editing;
 mod mode;
 mod movement;
 
 pub use buffer::*;
+pub use command::*;
 pub use editing::*;
 pub use mode::*;
 pub use movement::*;
@@ -24,6 +27,7 @@ pub use movement::*;
 // Context passed to actions when they execute
 pub struct ActionContext<'a> {
     pub buffer_manager: &'a mut BufferManager,
+    pub command_buffer: &'a mut CommandBuffer,
     pub cursor: &'a mut Cursor,
     pub viewport: &'a mut Viewport,
     pub mode: &'a mut Mode,
@@ -100,7 +104,6 @@ pub(super) trait ActionImpl: Debug + Clone + Send + Sync {
     fn to_serializable_impl(&self) -> ActionDefinition;
 }
 
-#[macro_export]
 macro_rules! impl_action {
     ($action_type:ty, $description:expr) => {
         impl Action for $action_type {
@@ -123,6 +126,8 @@ macro_rules! impl_action {
         }
     };
 }
+
+pub(super) use impl_action;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", content = "params")]
@@ -162,6 +167,15 @@ pub enum ActionDefinition {
     EnterMode {
         mode: String,
     },
+
+    // Command actions
+    CommandMoveLeft,
+    CommandMoveRight,
+    CommandInsertChar {
+        ch: char,
+    },
+    CommandDeleteChar,
+    CommandBackspace,
 
     // Composite actions
     Composite {
@@ -211,6 +225,13 @@ pub fn create_action_from_definition(definition: &ActionDefinition) -> Box<dyn A
             };
             Box::new(EnterMode::new(mode))
         }
+
+        // Command actions
+        ActionDefinition::CommandMoveLeft => Box::new(CommandMoveLeft),
+        ActionDefinition::CommandMoveRight => Box::new(CommandMoveRight),
+        ActionDefinition::CommandInsertChar { ch } => Box::new(CommandInsertChar::new(*ch)),
+        ActionDefinition::CommandDeleteChar => Box::new(CommandDeleteChar),
+        ActionDefinition::CommandBackspace => Box::new(CommandBackspace),
 
         // Buffer actions
         ActionDefinition::NextBuffer => Box::new(NextBuffer),

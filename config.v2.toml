@@ -73,6 +73,10 @@ params = { description = "Insert new line at current line", actions = [
 
 [keymap.command]
 "<Esc>" = { type = "EnterMode", params = { mode = "normal" } }
+"<Left>" = { type = "CommandMoveLeft" }
+"<Right>" = { type = "CommandMoveRight" }
+"<Backspace>" = { type = "CommandBackspace" }
+"<Delete>" = { type = "CommandDeleteChar" }
 
 [keymap.search]
 "<Esc>" = { type = "EnterMode", params = { mode = "normal" } }

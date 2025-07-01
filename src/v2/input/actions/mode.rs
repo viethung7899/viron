@@ -16,6 +16,19 @@ impl EnterMode {
 
 impl Action for EnterMode {
     fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+        match (&ctx.mode, &self.mode) {
+            (Mode::Command, _) => {
+                ctx.command_buffer.clear();
+                ctx.compositor
+                    .mark_visible(&ctx.component_ids.command_line_id, false)?;
+            }
+            (_, Mode::Command) => {
+                ctx.command_buffer.clear();
+                ctx.compositor
+                    .mark_visible(&ctx.component_ids.command_line_id, true)?;
+            }
+            _ => {}
+        }
         *ctx.mode = self.mode.clone();
         ctx.compositor
             .mark_dirty(&ctx.component_ids.status_line_id)?;
