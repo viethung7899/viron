@@ -1,6 +1,6 @@
+use crate::core::message::Message;
 use crate::input::actions::{
-    impl_action, Action, ActionContext, ActionDefinition, ActionResult,
-    Executable,
+    impl_action, system, Action, ActionContext, ActionDefinition, ActionResult, Executable,
 };
 use std::fmt::Debug;
 use std::path::PathBuf;
@@ -73,13 +73,27 @@ impl Executable for WriteBuffer {
         let current_document = ctx.buffer_manager.current();
         let path = self.path.clone().or(current_document.path.clone());
         let Some(path) = path else {
-            return Err(anyhow::anyhow!("No path specified for writing buffer"));
+            return system::ShowMessage(Message::error(
+                "No path specified for writing the buffer. Please provide a valid path."
+                    .to_string(),
+            ))
+            .execute(ctx);
         };
 
         let content = current_document.buffer.to_bytes();
-        std::fs::write(path, content)?;
-
-        Ok(())
+        let line_count = current_document.buffer.line_count();
+        match std::fs::write(&path, &content) {
+            Ok(_) => {
+                let message = format!(
+                    "{:?} {}L, {}B written",
+                    path.to_string_lossy().to_string(),
+                    line_count,
+                    content.len()
+                );
+                system::ShowMessage(Message::info(message)).execute(ctx)
+            }
+            Err(e) => system::ShowMessage(Message::error(format!("E: {e}"))).execute(ctx),
+        }
     }
 }
 

@@ -1,5 +1,6 @@
+use crate::core::message::Message;
 use crate::editor::Mode;
-use crate::input::actions::{impl_action, mode, Action, Executable};
+use crate::input::actions::{impl_action, mode, system, Action, Executable};
 use crate::input::actions::{ActionContext, ActionDefinition, ActionResult};
 use crate::input::command_parser::parse_command;
 
@@ -96,9 +97,13 @@ pub struct CommandExecute;
 impl Executable for CommandExecute {
     fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         let input = ctx.command_buffer.content();
-        let action = parse_command(input.trim())?;
-        action.execute(ctx)?;
         Executable::execute(&mode::EnterMode::new(Mode::Normal), ctx)?;
+
+        let result = parse_command(&input).and_then(|action| Action::execute(action.as_ref(), ctx));
+        if let Err(err) = result {
+            system::ShowMessage(Message::error(format!("E: {err}"))).execute(ctx)?;
+        }
+
         Ok(())
     }
 }

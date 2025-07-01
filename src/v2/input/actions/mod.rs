@@ -30,6 +30,7 @@ pub use system::*;
 pub struct ActionContext<'a> {
     pub buffer_manager: &'a mut BufferManager,
     pub command_buffer: &'a mut CommandBuffer,
+    pub message: &'a mut MessageManager,
     pub cursor: &'a mut Cursor,
     pub viewport: &'a mut Viewport,
     pub mode: &'a mut Mode,
@@ -124,6 +125,7 @@ macro_rules! impl_action {
         }
     };
 }
+use crate::core::message::MessageManager;
 pub(super) use impl_action;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
