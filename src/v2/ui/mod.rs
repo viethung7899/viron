@@ -12,6 +12,7 @@ pub mod compositor;
 pub mod render_buffer;
 pub mod theme;
 
+use crate::input::keymaps::KeySequence;
 pub use components::Component;
 
 pub struct RenderContext<'a> {
@@ -22,6 +23,7 @@ pub struct RenderContext<'a> {
     pub theme: &'a Theme,
     pub command_buffer: &'a CommandBuffer,
     pub message_manager: &'a MessageManager,
+    pub pending_keys: &'a KeySequence,
     pub gutter_width: usize,
 }
 
