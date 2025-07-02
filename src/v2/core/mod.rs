@@ -4,5 +4,5 @@ pub mod command;
 pub mod cursor;
 pub mod document;
 pub mod message;
-mod syntax;
+pub mod syntax;
 pub mod viewport;

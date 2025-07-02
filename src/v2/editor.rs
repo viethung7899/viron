@@ -8,11 +8,13 @@ use crossterm::{
 use crossterm::{queue, style, QueueableCommand};
 use serde::{Deserialize, Serialize};
 use std::io::{self, Stdout, Write};
+use std::path::Path;
 
 use crate::core::cursor::Cursor;
+use crate::core::syntax::SyntaxHighlighter;
 use crate::core::viewport::Viewport;
 use crate::core::{buffer_manager::BufferManager, message::MessageManager};
-use crate::input::actions::{Action, Executable};
+use crate::input::actions::Executable;
 use crate::input::keymaps::{KeyEvent as VironKeyEvent, KeyMap, KeySequence};
 use crate::input::{
     actions,
@@ -76,6 +78,7 @@ pub struct Editor {
     command_buffer: CommandBuffer,
     message_manager: MessageManager,
     search_buffer: SearchBuffer,
+    syntax_highlighter: SyntaxHighlighter,
 
     cursor: Cursor,
     viewport: Viewport,
@@ -115,6 +118,7 @@ impl Editor {
         let command_buffer = CommandBuffer::new();
         let message_manager = MessageManager::new();
         let search_buffer = SearchBuffer::new();
+        let syntax_highlighter = SyntaxHighlighter::new();
         let cursor = Cursor::new();
         let viewport = Viewport::new(height as usize - 2, width as usize - MIN_GUTTER_SIZE);
 
@@ -167,6 +171,7 @@ impl Editor {
             command_buffer,
             search_buffer,
             message_manager,
+            syntax_highlighter,
 
             cursor,
             viewport,
@@ -185,6 +190,16 @@ impl Editor {
         })
     }
 
+    pub fn new_with_file(path: impl AsRef<Path>) -> Result<Self> {
+        let mut editor = Self::new()?;
+        editor.buffer_manager.open_file(path.as_ref())?;
+        editor
+            .syntax_highlighter
+            .set_langauge(editor.buffer_manager.current().language)?;
+        editor.update_viewport_for_gutter_width(editor.gutter_width())?;
+        Ok(editor)
+    }
+
     pub fn load_config(&mut self, config: &Config) -> Result<()> {
         self.keymap = KeyMap::load_from_config(&config.keymap)?;
         self.theme = Theme::load_from_file(&config.theme)?;
@@ -199,10 +214,15 @@ impl Editor {
 
             self.scroll_viewport()?;
 
+            // Get document and syntax highlighter separately to avoid simultaneous borrowing
+
+            self.stdout.queue(cursor::Hide)?;
+
             let mut context = RenderContext {
                 theme: &self.theme,
                 cursor: &self.cursor,
-                buffer_manager: &mut self.buffer_manager,
+                document: self.buffer_manager.current(),
+                syntax_highlighter: &mut self.syntax_highlighter,
                 mode: &self.mode,
                 viewport: &self.viewport,
                 command_buffer: &self.command_buffer,
@@ -212,8 +232,8 @@ impl Editor {
                 gutter_width,
             };
 
-            self.stdout.queue(cursor::Hide)?;
             self.compositor.render(&mut context, &mut self.stdout)?;
+
             self.show_cursor()?;
             self.stdout.flush()?;
 
@@ -233,6 +253,7 @@ impl Editor {
                                 command_buffer: &mut self.command_buffer,
                                 search_buffer: &mut self.search_buffer,
                                 message: &mut self.message_manager,
+                                syntax_highlighter: &mut self.syntax_highlighter,
                                 cursor: &mut self.cursor,
                                 running: &mut self.running,
                                 compositor: &mut self.compositor,
@@ -436,10 +457,6 @@ impl Editor {
         terminal::disable_raw_mode()?;
 
         Ok(())
-    }
-
-    pub fn buffer_manager_mut(&mut self) -> &mut BufferManager {
-        &mut self.buffer_manager
     }
 
     fn gutter_width(&self) -> usize {

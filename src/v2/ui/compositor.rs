@@ -71,7 +71,11 @@ impl Compositor {
     }
 
     // Render using diff
-    pub fn render<W: Write>(&mut self, context: &mut RenderContext, writer: &mut W) -> Result<()> {
+    pub fn render<'a, W: Write>(
+        &mut self,
+        context: &mut RenderContext<'a>,
+        writer: &mut W,
+    ) -> Result<()> {
         // Render all dirty components to the current buffer
         for component in self.components.iter_mut().filter(|c| c.dirty) {
             if component.visible {
