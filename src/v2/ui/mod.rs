@@ -26,8 +26,7 @@ pub struct RenderContext<'a> {
     pub command_buffer: &'a CommandBuffer,
     pub search_buffer: &'a SearchBuffer,
     pub message_manager: &'a MessageManager,
-    pub pending_keys: &'a KeySequence,
-    pub gutter_width: usize,
+    pub pending_keys: &'a KeySequence
 }
 
 pub struct Bounds {

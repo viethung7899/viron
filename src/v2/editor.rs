@@ -229,7 +229,6 @@ impl Editor {
                 search_buffer: &self.search_buffer,
                 message_manager: &self.message_manager,
                 pending_keys: &self.pending_keys,
-                gutter_width,
             };
 
             self.compositor.render(&mut context, &mut self.stdout)?;
@@ -462,7 +461,6 @@ impl Editor {
     fn gutter_width(&self) -> usize {
         let line_count = self.buffer_manager.current_buffer().line_count();
 
-        // Calculate digits needed for line numbers + 1 space
         let digits = line_count.to_string().len();
         (digits + 1).max(MIN_GUTTER_SIZE)
     }

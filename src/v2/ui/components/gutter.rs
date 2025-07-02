@@ -31,11 +31,11 @@ impl Drawable for Gutter {
         Ok(())
     }
 
-    fn bounds(&self, _render_buffer: &RenderBuffer, context: &RenderContext) -> Bounds {
+    fn bounds(&self, render_buffer: &RenderBuffer, context: &RenderContext) -> Bounds {
         Bounds {
             start_row: 0,
             start_col: 0,
-            width: context.gutter_width,
+            width: render_buffer.width - context.viewport.width(),
             height: context.viewport.height(),
         }
     }
