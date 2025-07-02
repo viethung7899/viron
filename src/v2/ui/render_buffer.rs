@@ -5,16 +5,16 @@ use std::fmt::{Debug, Write as DebugWrite};
 use std::io::Write;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) struct Cell {
-    pub(super) c: char,
-    pub(super) style: Style,
+pub struct Cell {
+    pub c: char,
+    pub style: Style,
 }
 
 #[derive(Debug, Clone)]
-pub(super) struct Change<'a> {
-    pub(super) x: usize,
-    pub(super) y: usize,
-    pub(super) cell: &'a Cell,
+pub struct Change<'a> {
+    pub x: usize,
+    pub y: usize,
+    pub cell: &'a Cell,
 }
 
 impl<'a> Change<'a> {
@@ -109,12 +109,6 @@ impl RenderBuffer {
             }
         }
         changes
-    }
-
-    pub(super) fn clear(&mut self) {
-        for cell in self.cells.iter_mut() {
-            cell.c = ' ';
-        }
     }
 
     pub(super) fn flush<W: Write>(&self, writer: &mut W) -> Result<()> {

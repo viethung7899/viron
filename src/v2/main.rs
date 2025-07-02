@@ -6,13 +6,12 @@ mod service;
 mod ui;
 mod utils;
 
+use crate::config::Config;
 use anyhow::Result;
 use crossterm::terminal::ClearType;
 use crossterm::{cursor, terminal};
 use editor::Editor;
-use std::path::Path;
 use std::{env, io::stdout, panic};
-use crate::config::Config;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -26,13 +25,19 @@ async fn main() -> Result<()> {
     let args: Vec<String> = env::args().collect();
 
     // Create and initialize editor
-    let mut editor = Editor::new()?;
+    let mut editor = if let Some(file_name) = args.get(1) {
+        // If a file path is provided, create a new editor with that file
+        Editor::new_with_file(file_name)
+    } else {
+        // Otherwise, create a new editor without a file
+        Editor::new()
+    }?;
 
     // Load the config
     editor.load_config(&Config::load_from_file("config.v2.toml")?)?;
 
     // Set up error handling for the editor's run method
-    let result = run_editor(&mut editor, &args);
+    let result = editor.run();
 
     // Always clean up terminal state, even if run_editor fails
     if let Err(e) = editor.cleanup() {
@@ -57,30 +62,14 @@ async fn main() -> Result<()> {
 
 fn setup_log() -> Result<()> {
     use env_logger::{Builder, Target};
-    use std::fs::File;
     use log::LevelFilter;
+    use std::fs::File;
 
     let file = File::create("/tmp/viron.log")?;
     Builder::new()
         .target(Target::Pipe(Box::new(file)))
         .filter(None, LevelFilter::Info)
         .init();
-
-    Ok(())
-}
-
-fn run_editor(editor: &mut Editor, args: &[String]) -> Result<()> {
-    // Open file if provided in arguments
-    if args.len() > 1 {
-        let path = &args[1];
-        if let Err(e) = editor.buffer_manager_mut().open_file(Path::new(path)) {
-            eprintln!("Error opening file {}: {}", path, e);
-            // Continue and open an empty buffer
-        }
-    }
-
-    // Run the editor's main loop
-    editor.run()?;
 
     Ok(())
 }
