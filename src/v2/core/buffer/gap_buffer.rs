@@ -1,3 +1,5 @@
+use std::ops::Range;
+
 #[derive(Debug)]
 pub struct GapBuffer<T> {
     pub(super) buffer: Vec<T>,
@@ -39,6 +41,16 @@ where
 
     pub fn suffix_len(&self) -> usize {
         self.buffer.len() - self.gap_end
+    }
+
+    pub fn get_range(&self, range: Range<usize>) -> impl Iterator<Item = &T> {
+        range.map(move |pos| {
+            if pos < self.gap_start {
+                &self.buffer[pos]
+            } else {
+                &self.buffer[pos + self.gap_end - self.gap_start]
+            }
+        })
     }
 
     pub fn len_without_gap(&self) -> usize {

@@ -62,9 +62,9 @@ impl Executable for Backspace {
     fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         let buffer = ctx.buffer_manager.current_buffer_mut();
         let position = buffer.cursor_position(&ctx.cursor.get_position());
+        ctx.cursor.move_left(buffer, ctx.mode);
         if position > 0 {
             if let Some(_) = buffer.delete_char(position - 1) {
-                ctx.cursor.move_left(buffer, ctx.mode);
                 ctx.buffer_manager.current_mut().mark_modified();
                 ctx.compositor
                     .mark_dirty(&ctx.component_ids.buffer_view_id)?;

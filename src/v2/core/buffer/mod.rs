@@ -52,24 +52,20 @@ impl Buffer {
         }
     }
 
-    pub fn get_content_line(&mut self, line: usize) -> String {
-        if line > self.line_count() {
+    pub fn get_content_line(&self, line: usize) -> String {
+        if line >= self.line_count() {
             return "".to_string();
         }
         let line_start = self.cursor_position(&Point {
             row: line,
             column: 0,
         });
-        self.buffer.move_gap(line_start);
         let line_end = if line + 1 < self.line_starts.len() {
             self.line_starts[line + 1]
         } else {
             self.buffer.len_without_gap()
         };
-        let index_start = self.buffer.gap_end;
-        let index_end = line_end + self.buffer.gap_end - line_start;
-        let chars = &self.buffer.buffer[index_start..index_end];
-        chars.iter().collect()
+        self.buffer.get_range(line_start..line_end).collect()
     }
 
     pub fn get_line_length(&self, line: usize) -> usize {
