@@ -21,7 +21,7 @@ impl BufferView {
             ..
         } = self.bounds(render_buffer, context);
         let viewport = context.viewport;
-        let buffer = context.buffer_manager.current_buffer_mut();
+        let buffer = &context.document.buffer;
         let theme = context.theme;
 
         let top_line = viewport.top_line();
@@ -63,15 +63,12 @@ impl BufferView {
         } = self.bounds(render_buffer, context);
 
         let viewport = context.viewport;
-        let buffer = context.buffer_manager.current_buffer();
+        let buffer = &context.document.buffer;
         let theme = context.theme;
         let editor_style = theme.editor_style();
 
         let code = buffer.to_bytes();
-        let tokens = context
-            .buffer_manager
-            .get_syntax_highlighter()
-            .highlight(&code)?;
+        let tokens = context.syntax_highlighter.highlight(&code)?;
 
         let top_line = viewport.top_line();
         let left_column = viewport.left_column();
@@ -241,7 +238,7 @@ impl BufferView {
 
 impl Drawable for BufferView {
     fn draw(&self, buffer: &mut RenderBuffer, context: &mut RenderContext) -> Result<()> {
-        if context.buffer_manager.current().language.is_plain_text() {
+        if context.document.language.is_plain_text() {
             self.render_plain_text(buffer, context)
         } else {
             match self.render_with_syntax_highlighting(buffer, context) {

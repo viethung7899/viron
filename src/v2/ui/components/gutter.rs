@@ -14,7 +14,7 @@ impl Drawable for Gutter {
             height,
             ..
         } = self.bounds(buffer, context);
-        let line_count = context.buffer_manager.current_buffer().line_count();
+        let line_count = context.document.buffer.line_count();
 
         for i in 0..(height) {
             let buffer_line = top_line + i;

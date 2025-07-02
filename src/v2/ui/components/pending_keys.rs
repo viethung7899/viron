@@ -10,7 +10,7 @@ impl Drawable for PendingKeys {
             start_row,
             start_col,
             width,
-            height,
+            ..
         } = self.bounds(buffer, context);
 
         let pending_keys = context.pending_keys.to_string();

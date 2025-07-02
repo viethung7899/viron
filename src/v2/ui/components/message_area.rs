@@ -20,7 +20,7 @@ impl Drawable for MessageArea {
         Ok(())
     }
 
-    fn bounds(&self, buffer: &RenderBuffer, context: &RenderContext) -> Bounds {
+    fn bounds(&self, buffer: &RenderBuffer, _context: &RenderContext) -> Bounds {
         Bounds {
             start_row: buffer.height - 1,
             start_col: 0,

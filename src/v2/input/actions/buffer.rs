@@ -47,6 +47,7 @@ impl OpenBuffer {
 impl Executable for OpenBuffer {
     fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         ctx.buffer_manager.open_file(&self.path)?;
+        ctx.syntax_highlighter.set_langauge(ctx.buffer_manager.current().language)?;
         Ok(())
     }
 }
@@ -90,6 +91,7 @@ impl Executable for WriteBuffer {
                     line_count,
                     content.len()
                 );
+                ctx.buffer_manager.current_mut().modified = false;
                 system::ShowMessage(Message::info(message)).execute(ctx)
             }
             Err(e) => system::ShowMessage(Message::error(format!("E: {e}"))).execute(ctx),

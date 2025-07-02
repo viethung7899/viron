@@ -4,7 +4,6 @@ use std::path::{Path, PathBuf};
 
 use crate::core::buffer::Buffer;
 use crate::core::document::Document;
-use crate::core::syntax::SyntaxHighlighter;
 
 pub struct BufferManager {
     // All open documents
@@ -13,8 +12,6 @@ pub struct BufferManager {
     current_index: usize,
     // Map from file paths to document indices for quick lookup
     path_to_index: HashMap<PathBuf, usize>,
-    // Syntax highlighter
-    syntax_highlighter: SyntaxHighlighter,
 }
 
 impl BufferManager {
@@ -27,7 +24,6 @@ impl BufferManager {
             documents,
             current_index: 0,
             path_to_index: HashMap::new(),
-            syntax_highlighter: SyntaxHighlighter::new(),
         }
     }
 
@@ -39,16 +35,6 @@ impl BufferManager {
     // Get the mutable current document
     pub fn current_mut(&mut self) -> &mut Document {
         &mut self.documents[self.current_index]
-    }
-
-    // Update syntax highlighting for the current buffer
-    pub fn update_syntax_highlighting(&mut self) -> Result<()> {
-        let language = self.current().language;
-
-        // Load/set the appropriate language parser
-        self.syntax_highlighter.set_langauge(language)?;
-
-        Ok(())
     }
 
     /// Get the current active buffer
@@ -82,9 +68,6 @@ impl BufferManager {
 
         // Set as current
         self.current_index = index;
-        
-        // Update syntax highlighting
-        self.update_syntax_highlighting()?;
 
         Ok(index)
     }
@@ -193,11 +176,6 @@ impl BufferManager {
                 is_modified: doc.modified,
             })
             .collect()
-    }
-
-    
-    pub fn get_syntax_highlighter(&mut self) -> &mut SyntaxHighlighter {
-        &mut self.syntax_highlighter
     }
 }
 

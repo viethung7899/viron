@@ -1,7 +1,7 @@
-use crate::core::buffer_manager::BufferManager;
 use crate::core::command::{CommandBuffer, SearchBuffer};
 use crate::core::cursor::Cursor;
 use crate::core::message::MessageManager;
+use crate::core::syntax::SyntaxHighlighter;
 use crate::core::viewport::Viewport;
 use crate::editor::Mode;
 use crate::ui::render_buffer::RenderBuffer;
@@ -12,12 +12,14 @@ pub mod compositor;
 pub mod render_buffer;
 pub mod theme;
 
+use crate::core::document::Document;
 use crate::input::keymaps::KeySequence;
 pub use components::Component;
 
 pub struct RenderContext<'a> {
     pub viewport: &'a Viewport,
-    pub buffer_manager: &'a mut BufferManager,
+    pub document: &'a Document,
+    pub syntax_highlighter: &'a mut SyntaxHighlighter,
     pub cursor: &'a Cursor,
     pub mode: &'a Mode,
     pub theme: &'a Theme,
