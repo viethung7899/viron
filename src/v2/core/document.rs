@@ -1,19 +1,27 @@
-use crate::core::buffer::Buffer;
+use crate::core::history::change::Change;
 use crate::core::syntax::LanguageType;
+use crate::core::{buffer::Buffer, history::History};
 use anyhow::{Context, Result};
 use std::path::{Path, PathBuf};
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct Document {
     pub buffer: Buffer,
     pub path: Option<PathBuf>,
     pub modified: bool,
     pub language: LanguageType,
+    pub history: History,
 }
 
 impl Document {
     pub fn new() -> Self {
-        Self::default()
+        Self {
+            buffer: Buffer::default(),
+            path: None,
+            modified: false,
+            language: LanguageType::PlainText,
+            history: History::new(1000),
+        }
     }
 
     pub fn from_file(path: &Path) -> Result<Self> {
@@ -27,6 +35,7 @@ impl Document {
             path: Some(path.to_path_buf()),
             modified: false,
             language,
+            history: History::new(1000),
         })
     }
 
@@ -57,5 +66,25 @@ impl Document {
             .and_then(|p| p.file_name())
             .and_then(|n| n.to_str())
             .map(|s| s.to_string())
+    }
+
+    pub fn undo(&mut self) -> Result<Change> {
+        if let Some(change) = self.history.undo() {
+            self.mark_modified();
+            self.buffer.apply_change(&change);
+            Ok(change)
+        } else {
+            Err(anyhow::anyhow!("No changes to undo"))
+        }
+    }
+
+    pub fn redo(&mut self) -> Result<Change> {
+        if let Some(change) = self.history.redo() {
+            self.mark_modified();
+            self.buffer.apply_change(&change);
+            Ok(change)
+        } else {
+            Err(anyhow::anyhow!("No changes to redo"))
+        }
     }
 }

@@ -185,7 +185,7 @@ pub struct MoveToViewportCenter;
 impl Executable for MoveToViewportCenter {
     fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         ctx.viewport.center_on_line(
-            ctx.cursor.get_position().row,
+            ctx.cursor.get_point().row,
             ctx.buffer_manager.current_buffer(),
         );
         ctx.compositor
@@ -248,7 +248,7 @@ impl Executable for GoToLine {
     fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         let buffer = ctx.buffer_manager.current_buffer();
         ctx.cursor.go_to_line(self.line_number, buffer, ctx.mode);
-        let new_line = ctx.cursor.get_position().row;
+        let new_line = ctx.cursor.get_point().row;
         let viewport = &ctx.viewport;
         if new_line < viewport.top_line() || new_line >= viewport.top_line() + viewport.height() {
             Action::execute(&MoveToViewportCenter, ctx)?;

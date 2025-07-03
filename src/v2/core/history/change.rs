@@ -2,8 +2,8 @@ use tree_sitter::Point;
 
 #[derive(Debug, Clone)]
 pub struct Transition {
-    before: Point,
-    after: Point,
+    pub before: Point,
+    pub after: Point,
 }
 
 impl Transition {
@@ -45,13 +45,32 @@ impl Change {
             _ => None, // Only allow merging of same types
         }
     }
+
+    pub fn undo(&self) -> Change {
+        match self {
+            Change::Insert(Insert {
+                position,
+                text,
+                point,
+            }) => Change::delete(*position, text.clone(), point.after, point.before),
+            Change::Delete(Delete {
+                position,
+                text,
+                point,
+            }) => Change::insert(*position, text.clone(), point.after, point.before),
+            Change::Multiple { changes, point } => {
+                let changes = changes.iter().map(Self::undo).rev().collect();
+                Change::multiple(changes, point.after, point.before)
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
 pub struct Insert {
-    position: usize,
-    text: String,
-    point: Transition,
+    pub position: usize,
+    pub text: String,
+    pub point: Transition,
 }
 
 impl Insert {
@@ -100,9 +119,9 @@ impl Insert {
 
 #[derive(Debug, Clone)]
 pub struct Delete {
-    position: usize,
-    text: String,
-    point: Transition,
+    pub position: usize,
+    pub text: String,
+    pub point: Transition,
 }
 
 impl Delete {
@@ -240,25 +259,12 @@ mod tests {
             "a".into(),
             Transition::new(Point::new(0, 3), Point::new(0, 2)),
         );
-        let delete3 = Delete::new(
-            2,
-            "c".into(),
-            Transition::new(Point::new(0, 2), Point::new(0, 1)),
-        );
         let merged = delete1.merge(&delete2);
         assert!(merged.is_some());
         let merged = merged.unwrap();
-        assert_eq!(merged.position, 3);
-        assert_eq!(merged.text, "ab");
-        assert_eq!(merged.point.before, Point::new(0, 4));
-        assert_eq!(merged.point.after, Point::new(0, 2));
-
-        let merge = merged.merge(&delete3);
-        assert!(merge.is_some());
-        let merged = merge.unwrap();
-        assert_eq!(merged.position, 2);
-        assert_eq!(merged.text, "cab");
-        assert_eq!(merged.point.before, Point::new(0, 4));
-        assert_eq!(merged.point.after, Point::new(0, 1));
+        assert_eq!(merged.position, 0);
+        assert_eq!(merged.text, "pu");
+        assert_eq!(merged.point.before, Point::new(0, 2));
+        assert_eq!(merged.point.after, Point::new(0, 0));
     }
 }

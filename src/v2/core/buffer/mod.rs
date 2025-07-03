@@ -1,6 +1,9 @@
 use tree_sitter::Point;
 
-use crate::core::buffer::gap_buffer::GapBuffer;
+use crate::core::{
+    buffer::gap_buffer::GapBuffer,
+    history::change::{Change, Delete, Insert},
+};
 
 pub mod gap_buffer;
 
@@ -138,6 +141,24 @@ impl Buffer {
         }
 
         Some((deleted_char, position))
+    }
+
+    pub fn apply_change(&mut self, change: &Change) {
+        match change {
+            Change::Insert(Insert { position, text, .. }) => {
+                self.insert_string(*position, &text);
+            }
+            Change::Delete(Delete { position, text, .. }) => {
+                for _ in text.chars() {
+                    self.delete_char(*position);
+                }
+            }
+            Change::Multiple { changes, .. } => {
+                for change in changes {
+                    self.apply_change(change);
+                }
+            }
+        }
     }
 
     // pub fn delete_current_line(&mut self, cursor: &mut Point) -> Option<String> {

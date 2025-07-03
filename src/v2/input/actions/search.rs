@@ -1,6 +1,8 @@
 use crate::core::message::Message;
 use crate::editor::Mode;
-use crate::input::actions::{impl_action, mode, movement, system, Action, ActionDefinition, Executable};
+use crate::input::actions::{
+    impl_action, mode, movement, system, Action, ActionDefinition, Executable,
+};
 use crate::input::actions::{ActionContext, ActionResult};
 
 #[derive(Debug, Clone)]
@@ -95,7 +97,7 @@ impl Executable for SearchSubmit {
         if let Err(e) = result {
             system::ShowMessage(Message::error(format!("E: {e}"))).execute(ctx)?;
         }
-        if let Some(point) = ctx.search_buffer.find_first(&ctx.cursor.get_position()) {
+        if let Some(point) = ctx.search_buffer.find_first(&ctx.cursor.get_point()) {
             movement::GoToPosition::new(point.row, point.column).execute(ctx)?;
         }
         Executable::execute(&mode::EnterMode::new(Mode::Normal), ctx)?;
@@ -112,7 +114,7 @@ pub struct FindNext;
 
 impl Executable for FindNext {
     fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
-        if let Some(point) = ctx.search_buffer.find_next(&ctx.cursor.get_position()) {
+        if let Some(point) = ctx.search_buffer.find_next(&ctx.cursor.get_point()) {
             movement::GoToPosition::new(point.row, point.column).execute(ctx)?;
         }
         ctx.compositor
@@ -132,7 +134,7 @@ pub struct FindPrevious;
 
 impl Executable for FindPrevious {
     fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
-        if let Some(point) = ctx.search_buffer.find_previous(&ctx.cursor.get_position()) {
+        if let Some(point) = ctx.search_buffer.find_previous(&ctx.cursor.get_point()) {
             movement::GoToPosition::new(point.row, point.column).execute(ctx)?;
         }
         ctx.compositor

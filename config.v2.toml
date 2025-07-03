@@ -34,6 +34,9 @@ theme = "themes/catppuchin/mocha.json"
 "n" = { type = "FindNext" }
 "N" = { type = "FindPrevious" }
 
+"u" = { type = "UndoBuffer" }
+"<Ctrl>r" = { type = "RedoBuffer" }
+
 [keymap.normal.a]
 type = "Composite"
 params = { description = "Insert mode with move right", actions = [
