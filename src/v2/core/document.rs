@@ -1,5 +1,5 @@
 use crate::core::history::change::Change;
-use crate::core::syntax::LanguageType;
+use crate::core::language::Language;
 use crate::core::{buffer::Buffer, history::History};
 use anyhow::{Context, Result};
 use std::path::{Path, PathBuf};
@@ -9,7 +9,7 @@ pub struct Document {
     pub buffer: Buffer,
     pub path: Option<PathBuf>,
     pub modified: bool,
-    pub language: LanguageType,
+    pub language: Language,
     pub history: History,
 }
 
@@ -19,7 +19,7 @@ impl Document {
             buffer: Buffer::default(),
             path: None,
             modified: false,
-            language: LanguageType::PlainText,
+            language: Language::PlainText,
             history: History::new(1000),
         }
     }
@@ -28,7 +28,7 @@ impl Document {
         let content = std::fs::read_to_string(path)
             .context(format!("Failed to read file: {}", path.display()))?;
 
-        let language = LanguageType::from_path(path);
+        let language = Language::from_path(path);
 
         Ok(Self {
             buffer: Buffer::from_string(&content),

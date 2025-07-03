@@ -4,6 +4,7 @@ pub mod command;
 pub mod cursor;
 pub mod document;
 pub mod history;
+pub mod language;
 pub mod message;
 pub mod syntax;
 pub mod viewport;
