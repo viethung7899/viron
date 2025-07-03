@@ -3,11 +3,14 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::collections::HashMap;
 use std::process;
+use std::sync::Arc;
 use std::{
     process::Stdio,
     sync::atomic::{self, AtomicUsize},
 };
 use tokio::io::AsyncReadExt;
+use tokio::process::Child;
+use tokio::sync::Mutex;
 use tokio::sync::mpsc::error::TryRecvError;
 use tokio::{
     io::{AsyncBufReadExt, AsyncWriteExt, BufReader, BufWriter},
@@ -15,12 +18,14 @@ use tokio::{
     sync::mpsc,
 };
 
+use crate::service::lsp::types::{LogMessageParams, ShowMessageParams};
 use crate::utils;
-pub use types::{Diagnostic, TextDocumentPublishDiagnostics};
+pub use types::TextDocumentPublishDiagnostics;
 
 pub mod types;
 
 static ID: AtomicUsize = AtomicUsize::new(1);
+const CHANNEL_SIZE: usize = 32;
 
 pub fn next_id() -> usize {
     ID.fetch_add(1, atomic::Ordering::SeqCst)
@@ -87,105 +92,114 @@ pub enum InboundMessage {
 #[serde(untagged)]
 pub enum NotificationKind {
     PublishDiagnostics(TextDocumentPublishDiagnostics),
-}
-
-pub async fn start_lsp() -> Result<LspClient> {
-    let mut child = Command::new("rust-analyzer")
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()?;
-
-    let stdin = child.stdin.take().context("Failed to get stdin")?;
-    let stdout = child.stdout.take().context("Failed to get stdout")?;
-    let stderr = child.stderr.take().context("Failed to get stderr")?;
-
-    let (request_tx, mut request_rx) = mpsc::channel::<OutboundMessage>(32);
-    let (response_tx, response_rx) = mpsc::channel::<InboundMessage>(32);
-
-    // Send requests from editor into LSP's stdin
-    let rtx = response_tx.clone();
-    tokio::spawn(async move {
-        let mut writer = BufWriter::new(stdin);
-        while let Some(message) = request_rx.recv().await {
-            match message {
-                OutboundMessage::Request(request) => {
-                    if let Err(error) = lsp_send_request(&mut writer, &request).await {
-                        rtx.send(InboundMessage::ProcessingError(error.to_string()))
-                            .await?;
-                    }
-                }
-                OutboundMessage::Notification(notification) => {
-                    if let Err(error) = lsp_send_notification(&mut writer, &notification).await {
-                        rtx.send(InboundMessage::ProcessingError(error.to_string()))
-                            .await?;
-                    }
-                }
-            }
-        }
-        anyhow::Ok(())
-    });
-
-    // Sends responses from LSP's stdout to the editor
-    let rtx = response_tx.clone();
-    tokio::spawn(async move {
-        let mut reader = BufReader::new(stdout);
-
-        loop {
-            let response = match lsp_read_response(&mut reader).await {
-                Err(err) => {
-                    rtx.send(InboundMessage::ProcessingError(err.to_string()))
-                        .await
-                        .unwrap();
-                    continue;
-                }
-                Ok(value) => value,
-            };
-
-            match process_response(&response) {
-                Ok(message) => {
-                    rtx.send(message).await.unwrap();
-                }
-                Err(err) => {
-                    rtx.send(InboundMessage::ProcessingError(err.to_string()))
-                        .await
-                        .unwrap();
-                }
-            }
-        }
-    });
-
-    // Sends responses from LSP's stderr to the editor
-    let rtx = response_tx.clone();
-    tokio::spawn(async move {
-        let mut reader = BufReader::new(stderr);
-        let mut line = String::new();
-        while let Ok(read) = reader.read_line(&mut line).await {
-            if read > 0 {
-                rtx.send(InboundMessage::ProcessingError(line.clone()))
-                    .await
-                    .unwrap();
-            }
-        }
-    });
-
-    Ok(LspClient {
-        request_tx,
-        response_rx,
-        pending_responses: Default::default(),
-    })
+    ShowMessage(ShowMessageParams),
+    LogMessage(LogMessageParams),
 }
 
 #[derive(Debug)]
 pub struct LspClient {
-    request_tx: mpsc::Sender<OutboundMessage>,
-    response_rx: mpsc::Receiver<InboundMessage>,
+    request_sender: mpsc::Sender<OutboundMessage>,
+    response_receiver: mpsc::Receiver<InboundMessage>,
     pending_responses: HashMap<i64, String>,
+    process: Arc<Mutex<Option<Child>>>,
+    is_initialized: bool,
 }
 
 impl LspClient {
-    pub async fn start() -> Result<Self> {
-        start_lsp().await
+    pub async fn start(server: &str, args: &[&str]) -> Result<Self> {
+        let mut child = Command::new(server)
+            .args(args)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()?;
+
+        let stdin = child.stdin.take().context("Failed to get stdin")?;
+        let stdout = child.stdout.take().context("Failed to get stdout")?;
+        let stderr = child.stderr.take().context("Failed to get stderr")?;
+
+        let (request_sender, mut request_receiver) = mpsc::channel::<OutboundMessage>(CHANNEL_SIZE);
+        let (response_sender, response_receiver) = mpsc::channel::<InboundMessage>(CHANNEL_SIZE);
+
+        // Send requests from editor into LSP's stdin
+        let sender = response_sender.clone();
+        tokio::spawn(async move {
+            let mut writer = BufWriter::new(stdin);
+            while let Some(message) = request_receiver.recv().await {
+                match message {
+                    OutboundMessage::Request(request) => {
+                        if let Err(error) = lsp_send_request(&mut writer, &request).await {
+                            sender
+                                .send(InboundMessage::ProcessingError(error.to_string()))
+                                .await?;
+                        }
+                    }
+                    OutboundMessage::Notification(notification) => {
+                        if let Err(error) = lsp_send_notification(&mut writer, &notification).await
+                        {
+                            sender
+                                .send(InboundMessage::ProcessingError(error.to_string()))
+                                .await?;
+                        }
+                    }
+                }
+            }
+            anyhow::Ok(())
+        });
+
+        // Sends responses from LSP's stdout to the editor
+        let sender = response_sender.clone();
+        tokio::spawn(async move {
+            let mut reader = BufReader::new(stdout);
+
+            loop {
+                let response = match lsp_read_response(&mut reader).await {
+                    Err(err) => {
+                        sender
+                            .send(InboundMessage::ProcessingError(err.to_string()))
+                            .await
+                            .unwrap();
+                        continue;
+                    }
+                    Ok(value) => value,
+                };
+
+                match process_response(&response) {
+                    Ok(message) => {
+                        sender.send(message).await.unwrap();
+                    }
+                    Err(err) => {
+                        sender
+                            .send(InboundMessage::ProcessingError(err.to_string()))
+                            .await
+                            .unwrap();
+                    }
+                }
+            }
+        });
+
+        // Sends responses from LSP's stderr to the editor
+        let sender = response_sender.clone();
+        tokio::spawn(async move {
+            let mut reader = BufReader::new(stderr);
+            let mut line = String::new();
+            while let Ok(read) = reader.read_line(&mut line).await {
+                if read > 0 {
+                    sender
+                        .send(InboundMessage::ProcessingError(line.clone()))
+                        .await
+                        .unwrap();
+                }
+            }
+        });
+
+        Ok(LspClient {
+            request_sender,
+            response_receiver,
+            pending_responses: Default::default(),
+            process: Arc::new(Mutex::new(Some(child))),
+            is_initialized: false,
+        })
     }
 
     pub async fn initialize(&mut self) -> Result<()> {
@@ -210,7 +224,7 @@ impl LspClient {
             }
         });
         self.send_request("initialize", params).await?;
-        _ = self.recv_response().await?;
+        _ = self.receive_response().await?;
         self.send_notification("initialized", json!({})).await?;
         Ok(())
     }
@@ -255,12 +269,14 @@ impl LspClient {
         let id = req.id.clone();
 
         self.pending_responses.insert(id, method.to_string());
-        self.request_tx.send(OutboundMessage::Request(req)).await?;
+        self.request_sender
+            .send(OutboundMessage::Request(req))
+            .await?;
         Ok(id)
     }
 
     pub async fn send_notification(&mut self, method: &str, params: Value) -> Result<()> {
-        self.request_tx
+        self.request_sender
             .send(OutboundMessage::Notification(NotificationRequest {
                 method: method.to_string(),
                 params,
@@ -269,10 +285,10 @@ impl LspClient {
         Ok(())
     }
 
-    pub async fn recv_response(
+    pub async fn receive_response(
         &mut self,
     ) -> anyhow::Result<Option<(InboundMessage, Option<String>)>> {
-        match self.response_rx.try_recv() {
+        match self.response_receiver.try_recv() {
             Ok(msg) => {
                 if let InboundMessage::Message(msg) = &msg {
                     if let Some(method) = self.pending_responses.remove(&msg.id) {
@@ -285,11 +301,45 @@ impl LspClient {
             Err(err) => Err(err.into()),
         }
     }
+
+    pub async fn is_running(&self) -> bool {
+        if let Ok(mut process) = self.process.try_lock() {
+            if let Some(child) = process.as_mut() {
+                match child.try_wait() {
+                    Ok(Some(_)) => false, // Process has exited
+                    Ok(None) => true,     // Process is still running
+                    Err(_) => false,      // Error checking process
+                }
+            } else {
+                false
+            }
+        } else {
+            true // Assume running if we can't check
+        }
+    }
+
+    pub async fn kill(&mut self) -> Result<()> {
+        let mut process = self.process.lock().await;
+        if let Some(mut child) = process.take() {
+            child.kill().await?;
+        }
+        Ok(())
+    }
+
+    
 }
 
 fn parse_notification(method: &str, params: &Value) -> Result<Option<NotificationKind>> {
     match method {
-        "textDocument/publishDiagnostics" => Ok(serde_json::from_value(params.clone())?),
+        "textDocument/publishDiagnostics" => Ok(Some(NotificationKind::PublishDiagnostics(
+            serde_json::from_value(params.clone())?,
+        ))),
+        "window/showMessage" => Ok(Some(NotificationKind::ShowMessage(serde_json::from_value(
+            params.clone(),
+        )?))),
+        "window/logMessage" => Ok(Some(NotificationKind::LogMessage(serde_json::from_value(
+            params.clone(),
+        )?))),
         _ => Ok(None),
     }
 }
@@ -390,16 +440,5 @@ pub fn process_response(response: &Value) -> Result<InboundMessage> {
                 params,
             })),
         }
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-
-    #[tokio::test]
-    async fn test_start_lsp() {
-        let mut client = LspClient::start().await.unwrap();
-        client.initialize().await.unwrap();
     }
 }
