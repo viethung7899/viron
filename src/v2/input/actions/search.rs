@@ -4,12 +4,14 @@ use crate::input::actions::{
     impl_action, mode, movement, system, Action, ActionDefinition, Executable,
 };
 use crate::input::actions::{ActionContext, ActionResult};
+use async_trait::async_trait;
 
 #[derive(Debug, Clone)]
 pub struct SearchMoveLeft;
 
+#[async_trait(?Send)]
 impl Executable for SearchMoveLeft {
-    fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+    async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         ctx.search_buffer.buffer.move_cursor_left();
         Ok(())
     }
@@ -18,8 +20,9 @@ impl Executable for SearchMoveLeft {
 #[derive(Debug, Clone)]
 pub struct SearchMoveRight;
 
+#[async_trait(?Send)]
 impl Executable for SearchMoveRight {
-    fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+    async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         ctx.search_buffer.buffer.move_cursor_right();
         Ok(())
     }
@@ -36,8 +39,9 @@ impl SearchInsertChar {
     }
 }
 
+#[async_trait(?Send)]
 impl Executable for SearchInsertChar {
-    fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+    async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         ctx.search_buffer.buffer.insert_char(self.ch);
         ctx.compositor
             .mark_dirty(&ctx.component_ids.search_box_id)?;
@@ -48,10 +52,11 @@ impl Executable for SearchInsertChar {
 #[derive(Debug, Clone)]
 pub struct SearchDeleteChar;
 
+#[async_trait(?Send)]
 impl Executable for SearchDeleteChar {
-    fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+    async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         if !ctx.search_buffer.buffer.delete_char() {
-            Executable::execute(&mode::EnterMode::new(Mode::Normal), ctx)?;
+            mode::EnterMode::new(Mode::Normal).execute(ctx).await?;
         }
         ctx.compositor
             .mark_dirty(&ctx.component_ids.search_box_id)?;
@@ -61,10 +66,11 @@ impl Executable for SearchDeleteChar {
 
 #[derive(Debug, Clone)]
 pub struct SearchBackspace;
+#[async_trait(?Send)]
 impl Executable for SearchBackspace {
-    fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+    async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         if !ctx.search_buffer.buffer.backspace() {
-            Executable::execute(&mode::EnterMode::new(Mode::Normal), ctx)?;
+            mode::EnterMode::new(Mode::Normal).execute(ctx).await?;
         }
         ctx.compositor
             .mark_dirty(&ctx.component_ids.search_box_id)?;
@@ -83,24 +89,25 @@ impl SearchSubmit {
     }
 }
 
+#[async_trait(?Send)]
 impl Executable for SearchSubmit {
-    fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+    async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         if self.pattern.is_empty() {
             return system::ShowMessage(Message::error(
                 "E: Search pattern cannot be empty".to_string(),
             ))
-            .execute(ctx);
+            .execute(ctx).await;
         }
         let result = ctx
             .search_buffer
             .search(&self.pattern, &ctx.buffer_manager.current_buffer());
         if let Err(e) = result {
-            system::ShowMessage(Message::error(format!("E: {e}"))).execute(ctx)?;
+            system::ShowMessage(Message::error(format!("E: {e}"))).execute(ctx).await?;
         }
         if let Some(point) = ctx.search_buffer.find_first(&ctx.cursor.get_point()) {
-            movement::GoToPosition::new(point.row, point.column).execute(ctx)?;
+            movement::GoToPosition::new(point.row, point.column).execute(ctx).await?;
         }
-        Executable::execute(&mode::EnterMode::new(Mode::Normal), ctx)?;
+        mode::EnterMode::new(Mode::Normal).execute(ctx).await?;
         ctx.compositor
             .mark_visible(&ctx.component_ids.search_box_id, true)?;
         ctx.compositor
@@ -112,10 +119,11 @@ impl Executable for SearchSubmit {
 #[derive(Debug, Clone)]
 pub struct FindNext;
 
+#[async_trait(?Send)]
 impl Executable for FindNext {
-    fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+    async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         if let Some(point) = ctx.search_buffer.find_next(&ctx.cursor.get_point()) {
-            movement::GoToPosition::new(point.row, point.column).execute(ctx)?;
+            movement::GoToPosition::new(point.row, point.column).execute(ctx).await?;
         }
         ctx.compositor
             .mark_visible(&ctx.component_ids.search_box_id, true)?;
@@ -132,10 +140,11 @@ impl_action!(FindNext, "Find next match", self {
 #[derive(Debug, Clone)]
 pub struct FindPrevious;
 
+#[async_trait(?Send)]
 impl Executable for FindPrevious {
-    fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+    async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         if let Some(point) = ctx.search_buffer.find_previous(&ctx.cursor.get_point()) {
-            movement::GoToPosition::new(point.row, point.column).execute(ctx)?;
+            movement::GoToPosition::new(point.row, point.column).execute(ctx).await?;
         }
         ctx.compositor
             .mark_visible(&ctx.component_ids.search_box_id, true)?;

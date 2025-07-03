@@ -1,7 +1,7 @@
-use std::fmt::Debug;
-
 use crate::editor::Mode;
 use crate::input::actions::{Action, ActionContext, ActionDefinition, ActionResult, Executable};
+use async_trait::async_trait;
+use std::fmt::Debug;
 
 #[derive(Debug, Clone)]
 pub struct EnterMode {
@@ -14,8 +14,9 @@ impl EnterMode {
     }
 }
 
+#[async_trait(?Send)]
 impl Executable for EnterMode {
-    fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+    async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         match (&ctx.mode, &self.mode) {
             (Mode::Command, _) => {
                 ctx.command_buffer.clear();

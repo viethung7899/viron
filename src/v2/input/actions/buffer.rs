@@ -1,16 +1,20 @@
+use async_trait::async_trait;
+
 use crate::core::message::Message;
 use crate::input::actions::{
-    impl_action, movement, system, Action, ActionContext, ActionDefinition, ActionResult,
-    Executable,
+    Action, ActionContext, ActionDefinition, ActionResult, Executable, impl_action, movement,
+    system,
 };
+
 use std::fmt::Debug;
 use std::path::PathBuf;
 
 #[derive(Debug, Clone)]
 pub struct NextBuffer;
 
+#[async_trait(?Send)]
 impl Executable for NextBuffer {
-    fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+    async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         ctx.buffer_manager.next_buffer();
         Ok(())
     }
@@ -23,8 +27,9 @@ impl_action!(NextBuffer, "Next buffer", self {
 #[derive(Debug, Clone)]
 pub struct PreviousBuffer;
 
+#[async_trait(?Send)]
 impl Executable for PreviousBuffer {
-    fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+    async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         ctx.buffer_manager.previous_buffer();
         Ok(())
     }
@@ -45,11 +50,12 @@ impl OpenBuffer {
     }
 }
 
+#[async_trait(?Send)]
 impl Executable for OpenBuffer {
-    fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+    async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         ctx.buffer_manager.open_file(&self.path)?;
         ctx.syntax_highlighter
-            .set_langauge(ctx.buffer_manager.current().language)?;
+            .set_language(ctx.buffer_manager.current().language)?;
         Ok(())
     }
 }
@@ -71,8 +77,9 @@ impl WriteBuffer {
     }
 }
 
+#[async_trait(?Send)]
 impl Executable for WriteBuffer {
-    fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+    async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         let current_document = ctx.buffer_manager.current();
         let path = self.path.clone().or(current_document.path.clone());
         let Some(path) = path else {
@@ -80,7 +87,8 @@ impl Executable for WriteBuffer {
                 "No path specified for writing the buffer. Please provide a valid path."
                     .to_string(),
             ))
-            .execute(ctx);
+            .execute(ctx)
+            .await;
         };
 
         let content = current_document.buffer.to_bytes();
@@ -94,9 +102,15 @@ impl Executable for WriteBuffer {
                     content.len()
                 );
                 ctx.buffer_manager.current_mut().modified = false;
-                system::ShowMessage(Message::info(message)).execute(ctx)
+                system::ShowMessage(Message::info(message))
+                    .execute(ctx)
+                    .await
             }
-            Err(e) => system::ShowMessage(Message::error(format!("E: {e}"))).execute(ctx),
+            Err(e) => {
+                system::ShowMessage(Message::error(format!("E: {e}")))
+                    .execute(ctx)
+                    .await
+            }
         }
     }
 }
@@ -110,16 +124,22 @@ impl_action!(WriteBuffer, "Write buffer", self {
 #[derive(Debug, Clone)]
 pub struct UndoBuffer;
 
+#[async_trait(?Send)]
 impl Executable for UndoBuffer {
-    fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+    async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         match ctx.buffer_manager.current_mut().undo() {
             Ok(change) => {
                 let point = change.point_after();
-                ctx.compositor.mark_dirty(&ctx.component_ids.buffer_view_id)?;
-                movement::GoToPosition::new(point.row, point.column).execute(ctx)?;
+                ctx.compositor
+                    .mark_dirty(&ctx.component_ids.buffer_view_id)?;
+                movement::GoToPosition::new(point.row, point.column)
+                    .execute(ctx)
+                    .await?;
             }
             Err(e) => {
-                system::ShowMessage(Message::error(e.to_string())).execute(ctx)?;
+                system::ShowMessage(Message::error(e.to_string()))
+                    .execute(ctx)
+                    .await?;
             }
         }
         Ok(())
@@ -132,19 +152,25 @@ impl_action!(UndoBuffer, "Undo", self {
 
 #[derive(Debug, Clone)]
 pub struct RedoBuffer;
+
+#[async_trait(?Send)]
 impl Executable for RedoBuffer {
-    fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+    async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         match ctx.buffer_manager.current_mut().redo() {
             Ok(change) => {
                 let point = change.point_after();
-                ctx.compositor.mark_dirty(&ctx.component_ids.buffer_view_id)?;
-                movement::GoToPosition::new(point.row, point.column).execute(ctx)?;
+                ctx.compositor
+                    .mark_dirty(&ctx.component_ids.buffer_view_id)?;
+                movement::GoToPosition::new(point.row, point.column)
+                    .execute(ctx)
+                    .await
             }
             Err(e) => {
-                system::ShowMessage(Message::error(e.to_string())).execute(ctx)?;
+                system::ShowMessage(Message::error(e.to_string()))
+                    .execute(ctx)
+                    .await
             }
         }
-        Ok(())
     }
 }
 

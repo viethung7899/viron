@@ -2,6 +2,7 @@ use crate::core::message::Message;
 use crate::input::actions::{
     impl_action, Action, ActionContext, ActionDefinition, ActionResult, Executable,
 };
+use async_trait::async_trait;
 
 #[derive(Debug, Clone)]
 pub struct QuitEditor {
@@ -14,8 +15,9 @@ impl QuitEditor {
     }
 }
 
+#[async_trait(?Send)]
 impl Executable for QuitEditor {
-    fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+    async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         // Access to the editor's running state
         *ctx.running = false;
         Ok(())
@@ -29,8 +31,9 @@ impl_action!(QuitEditor, "Quit the editor", self {
 #[derive(Debug, Clone)]
 pub struct ShowMessage(pub Message);
 
+#[async_trait(?Send)]
 impl Executable for ShowMessage {
-    fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+    async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         ctx.message.show_message(self.0.clone());
         ctx.compositor
             .mark_visible(&ctx.component_ids.message_area_id, true)?;

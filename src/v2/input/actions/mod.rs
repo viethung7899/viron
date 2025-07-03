@@ -1,15 +1,16 @@
-use anyhow::Result;
-use serde::{Deserialize, Serialize};
-use std::fmt::Debug;
-use std::path::PathBuf;
-
 use crate::core::buffer_manager::BufferManager;
 use crate::core::command::{CommandBuffer, SearchBuffer};
 use crate::core::message::MessageManager;
 use crate::core::{cursor::Cursor, viewport::Viewport};
 use crate::editor::Mode;
+use crate::service::lsp::LspClient;
 use crate::ui::components::ComponentIds;
 use crate::ui::compositor::Compositor;
+use anyhow::Result;
+use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
+use std::fmt::Debug;
+use std::path::PathBuf;
 
 pub type ActionResult = Result<()>;
 
@@ -44,17 +45,17 @@ pub struct ActionContext<'a> {
 
     pub compositor: &'a mut Compositor,
     pub component_ids: &'a ComponentIds,
+
+    pub lsp_client: &'a mut Option<LspClient>,
 }
 
+#[async_trait(?Send)]
 pub trait Executable {
-    fn execute(&self, ctx: &mut ActionContext) -> ActionResult;
+    async fn execute(&self, ctx: &mut ActionContext) -> ActionResult;
 }
 
 // The Action trait defines what all actions must implement
-pub trait Action: Debug + Send + Sync + Executable {
-    fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
-        Executable::execute(self, ctx)
-    }
+pub trait Action: Debug + Executable {
     fn describe(&self) -> &str;
     fn to_serializable(&self) -> ActionDefinition;
     fn clone_box(&self) -> Box<dyn Action>;
@@ -87,10 +88,11 @@ impl CompositeAction {
     }
 }
 
+#[async_trait(?Send)]
 impl Executable for CompositeAction {
-    fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+    async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         for action in &self.actions {
-            Executable::execute(action.as_ref(), ctx)?;
+            action.execute(ctx).await?;
         }
         Ok(())
     }

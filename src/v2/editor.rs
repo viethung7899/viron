@@ -244,7 +244,7 @@ impl Editor {
         Ok(())
     }
 
-    pub fn run(&mut self) -> Result<()> {
+    pub async fn run(&mut self) -> Result<()> {
         // Main event loop
         while self.running {
             let gutter_width = self.gutter_width();
@@ -281,23 +281,20 @@ impl Editor {
             match self.event_handler.next()? {
                 InputEvent::Key(key) => {
                     if let Some(action) = self.handle_key(key) {
-                        Executable::execute(
-                            action.as_ref(),
-                            &mut ActionContext {
-                                mode: &mut self.mode,
-                                viewport: &mut self.viewport,
-                                buffer_manager: &mut self.buffer_manager,
-                                command_buffer: &mut self.command_buffer,
-                                search_buffer: &mut self.search_buffer,
-                                message: &mut self.message_manager,
-                                syntax_highlighter: &mut self.syntax_highlighter,
-                                cursor: &mut self.cursor,
-                                running: &mut self.running,
-                                compositor: &mut self.compositor,
-                                component_ids: &mut self.component_ids,
-                                lsp_client: &mut self.lsp_client,
-                            },
-                        )?
+                        action.execute(&mut ActionContext {
+                            mode: &mut self.mode,
+                            viewport: &mut self.viewport,
+                            buffer_manager: &mut self.buffer_manager,
+                            command_buffer: &mut self.command_buffer,
+                            search_buffer: &mut self.search_buffer,
+                            message: &mut self.message_manager,
+                            syntax_highlighter: &mut self.syntax_highlighter,
+                            cursor: &mut self.cursor,
+                            running: &mut self.running,
+                            compositor: &mut self.compositor,
+                            component_ids: &mut self.component_ids,
+                            lsp_client: &mut self.lsp_client,
+                        }).await?;
                     }
                 }
                 InputEvent::Resize(width, height) => {

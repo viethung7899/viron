@@ -24,20 +24,18 @@ async fn main() -> Result<()> {
     // Parse command line arguments
     let args: Vec<String> = env::args().collect();
 
-    // Create and initialize editor
-    let mut editor = if let Some(file_name) = args.get(1) {
-        // If a file path is provided, create a new editor with that file
-        Editor::new_with_file(file_name)
-    } else {
-        // Otherwise, create a new editor without a file
-        Editor::new()
-    }?;
+    let mut editor = Editor::new()?;
 
     // Load the config
     editor.load_config(&Config::load_from_file("config.v2.toml")?)?;
 
+    if let Some(file_name) = args.get(1) {
+        // If a file path is provided, create a new editor with that file
+        editor.load_file(file_name).await?;
+    }
+
     // Set up error handling for the editor's run method
-    let result = editor.run();
+    let result = editor.run().await;
 
     // Always clean up terminal state, even if run_editor fails
     if let Err(e) = editor.cleanup() {
