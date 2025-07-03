@@ -3,6 +3,7 @@ use crate::editor::Mode;
 use crate::input::actions::{
     impl_action, Action, ActionContext, ActionDefinition, ActionResult, Executable,
 };
+use async_trait::async_trait;
 use std::fmt::Debug;
 
 #[derive(Debug, Clone)]
@@ -14,8 +15,9 @@ impl InsertChar {
     }
 }
 
+#[async_trait(?Send)]
 impl Executable for InsertChar {
-    fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+    async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         let current_point = ctx.cursor.get_point();
 
         let buffer = ctx.buffer_manager.current_buffer_mut();
@@ -40,6 +42,7 @@ impl Executable for InsertChar {
             .mark_dirty(&ctx.component_ids.buffer_view_id)?;
         ctx.compositor
             .mark_dirty(&ctx.component_ids.status_line_id)?;
+        ctx.search_buffer.reset();
         Ok(())
     }
 }
@@ -50,12 +53,14 @@ impl_action!(InsertChar, "Insert char", self {
 #[derive(Debug, Clone)]
 pub struct DeleteChar;
 
+
+#[async_trait(?Send)]
 impl Executable for DeleteChar {
-    fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+    async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         let document = ctx.buffer_manager.current_mut();
         let point = ctx.cursor.get_point();
         let position = document.buffer.cursor_position(&point);
-        if let Some((c, new_point)) = document.buffer.delete_char(position) {
+        if let Some((c, _)) = document.buffer.delete_char(position) {
             // Cursor stays in place after deletion
             document.mark_modified();
             document
@@ -66,6 +71,7 @@ impl Executable for DeleteChar {
             ctx.compositor
                 .mark_dirty(&ctx.component_ids.status_line_id)?;
         }
+        ctx.search_buffer.reset();
         Ok(())
     }
 }
@@ -77,8 +83,9 @@ impl_action!(DeleteChar, "Delete character", self {
 #[derive(Debug, Clone)]
 pub struct Backspace;
 
+#[async_trait(?Send)]
 impl Executable for Backspace {
-    fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+    async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         let document = ctx.buffer_manager.current_mut();
         let point = ctx.cursor.get_point();
         let position = document.buffer.cursor_position(&point);
@@ -96,6 +103,7 @@ impl Executable for Backspace {
                     .mark_dirty(&ctx.component_ids.buffer_view_id)?;
                 ctx.compositor
                     .mark_dirty(&ctx.component_ids.status_line_id)?;
+                ctx.search_buffer.reset();
             }
         }
         Ok(())
@@ -109,8 +117,9 @@ impl_action!(Backspace, "Backspace", self {
 #[derive(Debug, Clone)]
 pub struct InsertNewLine;
 
+#[async_trait(?Send)]
 impl Executable for InsertNewLine {
-    fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+    async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         let document = ctx.buffer_manager.current_mut();
         let point = ctx.cursor.get_point();
         let position = document.buffer.cursor_position(&point);
@@ -128,6 +137,7 @@ impl Executable for InsertNewLine {
             .mark_dirty(&ctx.component_ids.buffer_view_id)?;
         ctx.compositor
             .mark_dirty(&ctx.component_ids.status_line_id)?;
+        ctx.search_buffer.reset();
         Ok(())
     }
 }
@@ -139,8 +149,9 @@ impl_action!(InsertNewLine, "Insert new line", self {
 #[derive(Debug, Clone)]
 pub struct InsertNewLineBelow;
 
+#[async_trait(?Send)]
 impl Executable for InsertNewLineBelow {
-    fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+    async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         let document = ctx.buffer_manager.current_mut();
         let point = ctx.cursor.get_point();
 
@@ -169,6 +180,7 @@ impl Executable for InsertNewLineBelow {
             .mark_dirty(&ctx.component_ids.buffer_view_id)?;
         ctx.compositor
             .mark_dirty(&ctx.component_ids.status_line_id)?;
+        ctx.search_buffer.reset();
         Ok(())
     }
 }
@@ -180,8 +192,9 @@ impl_action!(InsertNewLineBelow, "Insert new line below", self {
 #[derive(Debug, Clone)]
 pub struct InsertNewLineAbove;
 
+#[async_trait(?Send)]
 impl Executable for InsertNewLineAbove {
-    fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+    async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         let document = ctx.buffer_manager.current_mut();
         let point = ctx.cursor.get_point();
 
@@ -214,6 +227,7 @@ impl Executable for InsertNewLineAbove {
             .mark_dirty(&ctx.component_ids.buffer_view_id)?;
         ctx.compositor
             .mark_dirty(&ctx.component_ids.status_line_id)?;
+        ctx.search_buffer.reset();
         Ok(())
     }
 }

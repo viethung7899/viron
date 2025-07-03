@@ -1,6 +1,7 @@
 use crate::input::actions::{
     impl_action, Action, ActionContext, ActionDefinition, ActionResult, Executable,
 };
+use async_trait::async_trait;
 use std::fmt::Debug;
 
 #[derive(Debug, Clone)]
@@ -14,8 +15,9 @@ impl MoveLeft {
     }
 }
 
+#[async_trait(?Send)]
 impl Executable for MoveLeft {
-    fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+    async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         for _ in 0..self.count {
             ctx.cursor
                 .move_left(ctx.buffer_manager.current_buffer(), ctx.mode);
@@ -41,8 +43,9 @@ impl MoveRight {
     }
 }
 
+#[async_trait(?Send)]
 impl Executable for MoveRight {
-    fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+    async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         for _ in 0..self.count {
             ctx.cursor
                 .move_right(ctx.buffer_manager.current_buffer(), ctx.mode);
@@ -68,8 +71,9 @@ impl MoveUp {
     }
 }
 
+#[async_trait(?Send)]
 impl Executable for MoveUp {
-    fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+    async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         for _ in 0..self.count {
             ctx.cursor
                 .move_up(ctx.buffer_manager.current_buffer(), ctx.mode);
@@ -95,8 +99,9 @@ impl MoveDown {
     }
 }
 
+#[async_trait(?Send)]
 impl Executable for MoveDown {
-    fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+    async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         for _ in 0..self.count {
             ctx.cursor
                 .move_down(ctx.buffer_manager.current_buffer(), ctx.mode);
@@ -114,8 +119,9 @@ impl_action!(MoveDown, "Move cursor down", self {
 #[derive(Debug, Clone)]
 pub struct MoveToLineStart;
 
+#[async_trait(?Send)]
 impl Executable for MoveToLineStart {
-    fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+    async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         ctx.cursor.move_to_line_start();
         ctx.cursor
             .find_next_word(ctx.buffer_manager.current_buffer());
@@ -132,8 +138,9 @@ impl_action!(MoveToLineStart, "Move to line start", self {
 #[derive(Debug, Clone)]
 pub struct MoveToLineEnd;
 
+#[async_trait(?Send)]
 impl Executable for MoveToLineEnd {
-    fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+    async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         ctx.cursor
             .move_to_line_end(ctx.buffer_manager.current_buffer(), ctx.mode);
         ctx.compositor
@@ -149,8 +156,9 @@ impl_action!(MoveToLineEnd, "Move to line end", self {
 #[derive(Debug, Clone)]
 pub struct MoveToTop;
 
+#[async_trait(?Send)]
 impl Executable for MoveToTop {
-    fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+    async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         ctx.cursor.move_to_top();
         ctx.compositor
             .mark_dirty(&ctx.component_ids.status_line_id)?;
@@ -165,8 +173,9 @@ impl_action!(MoveToTop, "Move to top of buffer", self {
 #[derive(Debug, Clone)]
 pub struct MoveToBottom;
 
+#[async_trait(?Send)]
 impl Executable for MoveToBottom {
-    fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+    async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         ctx.cursor
             .move_to_bottom(ctx.buffer_manager.current_buffer(), ctx.mode);
         ctx.compositor
@@ -182,8 +191,9 @@ impl_action!(MoveToBottom, "Move to bottom of buffer", self {
 #[derive(Debug, Clone)]
 pub struct MoveToViewportCenter;
 
+#[async_trait(?Send)]
 impl Executable for MoveToViewportCenter {
-    fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+    async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         ctx.viewport.center_on_line(
             ctx.cursor.get_point().row,
             ctx.buffer_manager.current_buffer(),
@@ -202,8 +212,9 @@ impl_action!(MoveToViewportCenter, "Move viewport to center of buffer", self {
 #[derive(Debug, Clone)]
 pub struct MoveToNextWord;
 
+#[async_trait(?Send)]
 impl Executable for MoveToNextWord {
-    fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+    async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         ctx.cursor
             .find_next_word(ctx.buffer_manager.current_buffer());
         ctx.compositor
@@ -219,8 +230,9 @@ impl_action!(MoveToNextWord, "Move to next word", self {
 #[derive(Debug, Clone)]
 pub struct MoveToPreviousWord;
 
+#[async_trait(?Send)]
 impl Executable for MoveToPreviousWord {
-    fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+    async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         ctx.cursor
             .find_previous_word(ctx.buffer_manager.current_buffer());
         ctx.compositor
@@ -244,14 +256,15 @@ impl GoToLine {
     }
 }
 
+#[async_trait(?Send)]
 impl Executable for GoToLine {
-    fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+    async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         let buffer = ctx.buffer_manager.current_buffer();
         ctx.cursor.go_to_line(self.line_number, buffer, ctx.mode);
         let new_line = ctx.cursor.get_point().row;
         let viewport = &ctx.viewport;
         if new_line < viewport.top_line() || new_line >= viewport.top_line() + viewport.height() {
-            Action::execute(&MoveToViewportCenter, ctx)?;
+            MoveToViewportCenter.execute(ctx).await?;
         }
         ctx.compositor
             .mark_dirty(&ctx.component_ids.status_line_id)?;
@@ -274,9 +287,10 @@ impl GoToPosition {
         Self { row, column }
     }
 }
+#[async_trait(?Send)]
 impl Executable for GoToPosition {
-    fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
-        Executable::execute(&GoToLine::new(self.row), ctx)?;
+    async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+        GoToLine::new(self.row).execute(ctx).await?;
         let buffer = ctx.buffer_manager.current_buffer();
         ctx.cursor.go_to_column(self.column, buffer, ctx.mode);
         ctx.compositor

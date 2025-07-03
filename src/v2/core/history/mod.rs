@@ -39,8 +39,6 @@ impl History {
 
         if should_group {
             if let Some(last_change) = self.changes.pop_back() {
-                log::info!("Last change: {:?}", last_change);
-                log::info!("Current change: {:?}", change);
                 if let Some(merged) = last_change.merge(&change) {
                     self.changes.push_back(merged);
                 } else {

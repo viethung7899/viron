@@ -68,6 +68,13 @@ impl Document {
             .map(|s| s.to_string())
     }
 
+    pub fn full_file_path(&self) -> Option<PathBuf> {
+        let current = std::env::current_dir().ok()?;
+        self.path
+            .as_ref()
+            .map(|p| current.join(p))
+    }
+
     pub fn undo(&mut self) -> Result<Change> {
         if let Some(change) = self.history.undo() {
             self.mark_modified();

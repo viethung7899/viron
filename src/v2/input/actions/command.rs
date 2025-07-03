@@ -1,3 +1,5 @@
+use async_trait::async_trait;
+
 use crate::core::message::Message;
 use crate::editor::Mode;
 use crate::input::actions::{mode, system, Executable};
@@ -7,8 +9,9 @@ use crate::input::command_parser::parse_command;
 #[derive(Debug, Clone)]
 pub struct CommandMoveLeft;
 
+#[async_trait(?Send)]
 impl Executable for CommandMoveLeft {
-    fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+    async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         ctx.command_buffer.move_cursor_left();
         Ok(())
     }
@@ -17,8 +20,9 @@ impl Executable for CommandMoveLeft {
 #[derive(Debug, Clone)]
 pub struct CommandMoveRight;
 
+#[async_trait(?Send)]
 impl Executable for CommandMoveRight {
-    fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+    async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         ctx.command_buffer.move_cursor_right();
         Ok(())
     }
@@ -35,8 +39,9 @@ impl CommandInsertChar {
     }
 }
 
+#[async_trait(?Send)]
 impl Executable for CommandInsertChar {
-    fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+    async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         ctx.command_buffer.insert_char(self.ch);
         ctx.compositor
             .mark_dirty(&ctx.component_ids.command_line_id)?;
@@ -47,10 +52,11 @@ impl Executable for CommandInsertChar {
 #[derive(Debug, Clone)]
 pub struct CommandDeleteChar;
 
+#[async_trait(?Send)]
 impl Executable for CommandDeleteChar {
-    fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+    async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         if !ctx.command_buffer.delete_char() {
-            Executable::execute(&mode::EnterMode::new(Mode::Normal), ctx)?;
+            Executable::execute(&mode::EnterMode::new(Mode::Normal), ctx).await?;
         }
         ctx.compositor
             .mark_dirty(&ctx.component_ids.command_line_id)?;
@@ -60,10 +66,12 @@ impl Executable for CommandDeleteChar {
 
 #[derive(Debug, Clone)]
 pub struct CommandBackspace;
+
+#[async_trait(?Send)]
 impl Executable for CommandBackspace {
-    fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+    async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         if !ctx.command_buffer.backspace() {
-            Executable::execute(&mode::EnterMode::new(Mode::Normal), ctx)?;
+            Executable::execute(&mode::EnterMode::new(Mode::Normal), ctx).await?;
         }
         ctx.compositor
             .mark_dirty(&ctx.component_ids.command_line_id)?;
@@ -74,15 +82,30 @@ impl Executable for CommandBackspace {
 #[derive(Debug, Clone)]
 pub struct CommandExecute;
 
+#[async_trait(?Send)]
 impl Executable for CommandExecute {
-    fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+    async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         let input = ctx.command_buffer.content();
-        Executable::execute(&mode::EnterMode::new(Mode::Normal), ctx)?;
+        Executable::execute(&mode::EnterMode::new(Mode::Normal), ctx).await?;
 
-        let result =
-            parse_command(&input).and_then(|action| Executable::execute(action.as_ref(), ctx));
-        if let Err(err) = result {
-            system::ShowMessage(Message::error(format!("E: {err}"))).execute(ctx)?;
+        match parse_command(&input) {
+            Ok(action) => match action.as_ref().execute(ctx).await {
+                Ok(_) => {
+                    ctx.command_buffer.clear();
+                    ctx.compositor
+                        .mark_visible(&ctx.component_ids.command_line_id, false)?;
+                }
+                Err(err) => {
+                    system::ShowMessage(Message::error(format!("E: {err}")))
+                        .execute(ctx)
+                        .await?;
+                }
+            },
+            Err(err) => {
+                system::ShowMessage(Message::error(format!("E: {err}")))
+                    .execute(ctx)
+                    .await?;
+            }
         }
 
         Ok(())
