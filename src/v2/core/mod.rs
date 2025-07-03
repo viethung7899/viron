@@ -3,6 +3,7 @@ pub mod buffer_manager;
 pub mod command;
 pub mod cursor;
 pub mod document;
+pub mod history;
 pub mod message;
 pub mod syntax;
 pub mod viewport;
