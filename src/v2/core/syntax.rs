@@ -1,16 +1,14 @@
-mod language;
-
 use std::{collections::HashMap, ops::Range};
 
 use anyhow::{Ok, Result};
 use tree_sitter::{Parser, Point, Query, QueryCursor, StreamingIterator};
 
-pub use language::LanguageType;
+use crate::core::language::Language;
 
 pub struct SyntaxHighlighter {
     parser: Parser,
-    language: Option<LanguageType>,
-    queries: HashMap<LanguageType, Query>,
+    language: Option<Language>,
+    queries: HashMap<Language, Query>,
 }
 
 #[derive(Debug, Clone)]
@@ -30,7 +28,7 @@ impl SyntaxHighlighter {
         }
     }
 
-    pub fn set_langauge(&mut self, language: LanguageType) -> Result<()> {
+    pub fn set_langauge(&mut self, language: Language) -> Result<()> {
         if self.language == Some(language) {
             return Ok(());
         }

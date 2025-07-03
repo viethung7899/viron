@@ -1,9 +1,7 @@
-use std::path::Path;
-use tree_sitter::Language;
-use tree_sitter_rust::HIGHLIGHTS_QUERY;
+use std::{env, fs, path::Path};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
-pub enum LanguageType {
+pub enum Language {
     Rust,
     JavaScript,
     TypeScript,
@@ -21,9 +19,9 @@ pub enum LanguageType {
     PlainText, // Fallback for unsupported languages
 }
 
-impl LanguageType {
+impl Language {
     pub fn is_plain_text(&self) -> bool {
-        return self == &LanguageType::PlainText;
+        return self == &Language::PlainText;
     }
 
     pub fn from_extension(extension: &str) -> Self {
@@ -73,7 +71,7 @@ impl LanguageType {
         }
     }
 
-    pub fn get_tree_sitter_language(&self) -> Option<Language> {
+    pub fn get_tree_sitter_language(&self) -> Option<tree_sitter::Language> {
         match self {
             Self::Rust => Some(tree_sitter_rust::LANGUAGE.into()),
             _ => None,
@@ -82,8 +80,28 @@ impl LanguageType {
 
     pub fn get_highlight_query(&self) -> Option<&str> {
         match self {
-            Self::Rust => Some(HIGHLIGHTS_QUERY),
+            Self::Rust => Some(tree_sitter_rust::HIGHLIGHTS_QUERY),
             _ => None,
         }
     }
+
+    pub fn get_lsp_executable(&self) -> Option<&str> {
+        let executable = match self {
+            Self::Rust => Some("rust-analyzer"),
+            _ => None,
+        };
+        executable.filter(|&executable| is_program_in_path(executable))
+    }
+}
+
+fn is_program_in_path(program: &str) -> bool {
+    if let Ok(path) = env::var("PATH") {
+        for p in path.split(":") {
+            let p_str = format!("{}/{}", p, program);
+            if fs::metadata(p_str).is_ok() {
+                return true;
+            }
+        }
+    }
+    false
 }
