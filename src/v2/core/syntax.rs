@@ -28,7 +28,7 @@ impl SyntaxHighlighter {
         }
     }
 
-    pub fn set_langauge(&mut self, language: Language) -> Result<()> {
+    pub fn set_language(&mut self, language: Language) -> Result<()> {
         if self.language == Some(language) {
             return Ok(());
         }

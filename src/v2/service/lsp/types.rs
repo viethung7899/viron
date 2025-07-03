@@ -9,6 +9,29 @@ pub struct TextDocumentPublishDiagnostics {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ShowMessageParams {
+    #[serde(rename = "type")]
+    pub typ: MessageType,
+    pub message: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LogMessageParams {
+    #[serde(rename = "type")]
+    pub typ: MessageType,
+    pub message: String,
+}
+
+#[derive(Debug, Clone, Serialize_repr, Deserialize_repr)]
+#[repr(u8)]
+pub enum MessageType {
+    Error = 1,
+    Warning = 2,
+    Info = 3,
+    Log = 4,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Diagnostic {
     pub range: Range,
     #[serde(default)]

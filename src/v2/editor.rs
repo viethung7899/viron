@@ -1,16 +1,3 @@
-use anyhow::Result;
-use crossterm::{
-    cursor,
-    event::{KeyCode, KeyEvent, KeyModifiers},
-    execute,
-    terminal::{self, ClearType},
-};
-use crossterm::{queue, style, QueueableCommand};
-use serde::{Deserialize, Serialize};
-use std::io::{self, Stdout, Write};
-use std::path::Path;
-
-use crate::core::cursor::Cursor;
 use crate::core::syntax::SyntaxHighlighter;
 use crate::core::viewport::Viewport;
 use crate::core::{buffer_manager::BufferManager, message::MessageManager};
@@ -25,11 +12,23 @@ use crate::ui::components::{
     BufferView, CommandLine, ComponentIds, Gutter, MessageArea, PendingKeys, SearchBox, StatusLine,
 };
 use crate::ui::compositor::Compositor;
-use crate::ui::{theme::Theme, Component, RenderContext};
+use crate::ui::{Component, RenderContext, theme::Theme};
 use crate::{
     config::Config,
     core::command::{CommandBuffer, SearchBuffer},
 };
+use crate::{core::cursor::Cursor, service::lsp::LspClient};
+use anyhow::{Context, Result};
+use crossterm::{QueueableCommand, queue, style};
+use crossterm::{
+    cursor,
+    event::{KeyCode, KeyEvent, KeyModifiers},
+    execute,
+    terminal::{self, ClearType},
+};
+use serde::{Deserialize, Serialize};
+use std::io::{self, Stdout, Write};
+use std::path::Path;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Mode {
@@ -95,7 +94,11 @@ pub struct Editor {
     pending_keys: KeySequence,
     event_handler: EventHandler,
 
+    // LSP
+    lsp_client: Option<LspClient>,
+
     // State
+    lsp_enabled: bool,
     running: bool,
 }
 
@@ -186,18 +189,53 @@ impl Editor {
             pending_keys,
             event_handler,
 
+            lsp_client: None,
+
+            lsp_enabled: false,
             running: true,
         })
     }
 
-    pub fn new_with_file(path: impl AsRef<Path>) -> Result<Self> {
-        let mut editor = Self::new()?;
-        editor.buffer_manager.open_file(path.as_ref())?;
-        editor
-            .syntax_highlighter
-            .set_langauge(editor.buffer_manager.current().language)?;
-        editor.update_viewport_for_gutter_width(editor.gutter_width())?;
-        Ok(editor)
+    pub async fn load_file(&mut self, path: impl AsRef<Path>) -> Result<()> {
+        // Open the file in the buffer manager
+        self.buffer_manager.open_file(path.as_ref())?;
+
+        // Initialize the syntax highlighter with the current file's language
+        let language = self.buffer_manager.current().language;
+        self.syntax_highlighter.set_language(language)?;
+
+        // Set the gutter width based on the number of lines in the file
+        self.update_viewport_for_gutter_width(self.gutter_width())?;
+
+        // Load the LSP for the opened file
+        if !self.lsp_enabled {
+            return Ok(());
+        }
+
+        let server_cmd = language
+            .get_lsp_server()
+            .context("LSP server not configured")?;
+        self.start_lsp_server(server_cmd).await?;
+        Ok(())
+    }
+
+    async fn start_lsp_server(&mut self, server_cmd: &str) -> Result<()> {
+        if self.lsp_client.is_some() {
+            return Ok(()); // Already running
+        }
+
+        let mut client = LspClient::start(server_cmd, &[]).await?;
+        client.initialize().await?;
+
+        // Send didOpen for current buffer
+        let document = self.buffer_manager.current();
+        let file = document.file_name().unwrap_or("untitled".to_string());
+        let contents = document.buffer.to_string();
+
+        client.did_open(&file, &contents).await?;
+
+        self.lsp_client = Some(client);
+        Ok(())
     }
 
     pub fn load_config(&mut self, config: &Config) -> Result<()> {
@@ -257,6 +295,7 @@ impl Editor {
                                 running: &mut self.running,
                                 compositor: &mut self.compositor,
                                 component_ids: &mut self.component_ids,
+                                lsp_client: &mut self.lsp_client,
                             },
                         )?
                     }
