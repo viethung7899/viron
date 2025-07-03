@@ -16,7 +16,7 @@ impl Drawable for StatusLine {
 
         let left = format!(" {} ", context.mode.to_name().to_uppercase());
 
-        let cursor = context.cursor.get_position();
+        let cursor = context.cursor.get_point();
         let right = format!(" {}:{} ", cursor.row + 1, cursor.column + 1);
 
         let file = format!(

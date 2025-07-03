@@ -13,11 +13,11 @@ impl Cursor {
         Self::default()
     }
 
-    pub fn get_position(&self) -> Point {
+    pub fn get_point(&self) -> Point {
         self.position.clone()
     }
 
-    pub fn set_position(&mut self, position: Point) {
+    pub fn set_point(&mut self, position: Point) {
         self.position = position;
         self.preferred_column = position.column;
     }

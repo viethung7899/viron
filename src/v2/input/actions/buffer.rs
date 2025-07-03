@@ -1,6 +1,7 @@
 use crate::core::message::Message;
 use crate::input::actions::{
-    impl_action, system, Action, ActionContext, ActionDefinition, ActionResult, Executable,
+    impl_action, movement, system, Action, ActionContext, ActionDefinition, ActionResult,
+    Executable,
 };
 use std::fmt::Debug;
 use std::path::PathBuf;
@@ -47,7 +48,8 @@ impl OpenBuffer {
 impl Executable for OpenBuffer {
     fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         ctx.buffer_manager.open_file(&self.path)?;
-        ctx.syntax_highlighter.set_langauge(ctx.buffer_manager.current().language)?;
+        ctx.syntax_highlighter
+            .set_langauge(ctx.buffer_manager.current().language)?;
         Ok(())
     }
 }
@@ -103,4 +105,49 @@ impl_action!(WriteBuffer, "Write buffer", self {
     ActionDefinition::WriteBuffer {
         path: self.path.as_ref().map(|p| p.to_string_lossy().to_string()),
     }
+});
+
+#[derive(Debug, Clone)]
+pub struct UndoBuffer;
+
+impl Executable for UndoBuffer {
+    fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+        match ctx.buffer_manager.current_mut().undo() {
+            Ok(change) => {
+                let point = change.point_after();
+                ctx.compositor.mark_dirty(&ctx.component_ids.buffer_view_id)?;
+                movement::GoToPosition::new(point.row, point.column).execute(ctx)?;
+            }
+            Err(e) => {
+                system::ShowMessage(Message::error(e.to_string())).execute(ctx)?;
+            }
+        }
+        Ok(())
+    }
+}
+
+impl_action!(UndoBuffer, "Undo", self {
+    ActionDefinition::UndoBuffer
+});
+
+#[derive(Debug, Clone)]
+pub struct RedoBuffer;
+impl Executable for RedoBuffer {
+    fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+        match ctx.buffer_manager.current_mut().redo() {
+            Ok(change) => {
+                let point = change.point_after();
+                ctx.compositor.mark_dirty(&ctx.component_ids.buffer_view_id)?;
+                movement::GoToPosition::new(point.row, point.column).execute(ctx)?;
+            }
+            Err(e) => {
+                system::ShowMessage(Message::error(e.to_string())).execute(ctx)?;
+            }
+        }
+        Ok(())
+    }
+}
+
+impl_action!(RedoBuffer, "Redo", self {
+    ActionDefinition::RedoBuffer
 });

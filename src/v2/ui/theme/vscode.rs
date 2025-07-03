@@ -1,6 +1,6 @@
 use std::{collections::HashMap, u8};
 
-use anyhow::{Error, Result, bail};
+use anyhow::{Result, bail};
 use crossterm::style::Color;
 use once_cell::sync::Lazy;
 use serde::Deserialize;

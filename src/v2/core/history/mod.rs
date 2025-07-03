@@ -5,10 +5,11 @@ use std::{
 
 use crate::core::history::change::Change;
 
-mod change;
+pub mod change;
 
+#[derive(Debug, Clone, Default)]
 pub struct History {
-    undos: VecDeque<Change>,
+    changes: VecDeque<Change>,
     redos: VecDeque<Change>,
     max_size: usize,
     last_action_time: Option<std::time::Instant>,
@@ -18,7 +19,7 @@ pub struct History {
 impl History {
     pub fn new(size: usize) -> Self {
         Self {
-            undos: VecDeque::with_capacity(size),
+            changes: VecDeque::with_capacity(size),
             redos: VecDeque::with_capacity(size),
             max_size: size,
             last_action_time: None,
@@ -37,29 +38,32 @@ impl History {
         });
 
         if should_group {
-            if let Some(last_change) = self.undos.pop_back() {
+            if let Some(last_change) = self.changes.pop_back() {
+                log::info!("Last change: {:?}", last_change);
+                log::info!("Current change: {:?}", change);
                 if let Some(merged) = last_change.merge(&change) {
-                    self.undos.push_back(merged);
+                    self.changes.push_back(merged);
                 } else {
-                    self.undos.push_back(last_change);
-                    self.undos.push_back(change);
+                    self.changes.push_back(last_change);
+                    self.changes.push_back(change);
                 }
             }
         } else {
-            self.undos.push_back(change);
+            self.changes.push_back(change);
         }
 
         self.last_action_time = Some(now);
         // Ensure we don't exceed max size
-        while self.undos.len() > self.max_size {
-            self.undos.pop_front();
+        while self.changes.len() > self.max_size {
+            self.changes.pop_front();
         }
     }
 
     pub fn undo(&mut self) -> Option<Change> {
-        if let Some(change) = self.undos.pop_back() {
-            self.redos.push_back(change.clone());
-            Some(change)
+        if let Some(change) = self.changes.pop_back() {
+            let undo = change.undo();
+            self.redos.push_back(change);
+            Some(undo)
         } else {
             None
         }
@@ -67,7 +71,7 @@ impl History {
 
     pub fn redo(&mut self) -> Option<Change> {
         if let Some(change) = self.redos.pop_back() {
-            self.undos.push_back(change.clone());
+            self.changes.push_back(change.clone());
             Some(change)
         } else {
             None
@@ -75,7 +79,7 @@ impl History {
     }
 
     pub fn can_undo(&self) -> bool {
-        !self.undos.is_empty()
+        !self.changes.is_empty()
     }
 
     pub fn can_redo(&self) -> bool {
@@ -83,8 +87,12 @@ impl History {
     }
 
     pub fn clear(&mut self) {
-        self.undos.clear();
+        self.changes.clear();
         self.redos.clear();
         self.last_action_time = None;
+    }
+
+    pub fn break_group(&mut self) {
+        self.last_action_time = Some(Instant::now());
     }
 }

@@ -307,7 +307,7 @@ impl Editor {
     }
 
     fn show_cursor_in_buffer(&mut self) -> Result<()> {
-        let cursor = self.cursor.get_position();
+        let cursor = self.cursor.get_point();
         let viewport = &self.viewport;
         let gutter_size = self.gutter_width();
 

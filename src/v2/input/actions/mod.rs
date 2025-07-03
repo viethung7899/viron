@@ -190,6 +190,8 @@ pub enum ActionDefinition {
     WriteBuffer {
         path: Option<String>,
     },
+    UndoBuffer,
+    RedoBuffer,
 
     // System actions
     Quit {
@@ -253,6 +255,8 @@ pub fn create_action_from_definition(definition: &ActionDefinition) -> Box<dyn A
             let path_buf = path.as_ref().map(PathBuf::from);
             Box::new(WriteBuffer::new(path_buf))
         }
+        ActionDefinition::UndoBuffer => Box::new(UndoBuffer),
+        ActionDefinition::RedoBuffer => Box::new(RedoBuffer),
 
         // System actions
         ActionDefinition::Quit { force } => Box::new(QuitEditor::new(*force)),
