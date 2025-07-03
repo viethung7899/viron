@@ -44,8 +44,6 @@ impl SearchBuffer {
             .flatten()
             .collect();
 
-        log::info!("{:?}", self.results);
-
         Ok(())
     }
 
@@ -55,10 +53,10 @@ impl SearchBuffer {
             return None;
         }
         // Binary search for the first occurrence
-        let index = match self.results.binary_search(point) {
-            Ok(i) => i,
-            Err(i) => i.checked_sub(1).unwrap_or(0),
-        };
+        let index = self
+            .results
+            .binary_search(point)
+            .unwrap_or_else(|i| i.checked_sub(1).unwrap_or(0));
         self.current = Some(index);
         Some(self.results[index].clone())
     }

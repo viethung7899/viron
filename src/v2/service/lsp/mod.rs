@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::process;
 use std::sync::Arc;
@@ -10,8 +10,8 @@ use std::{
 };
 use tokio::io::AsyncReadExt;
 use tokio::process::Child;
-use tokio::sync::Mutex;
 use tokio::sync::mpsc::error::TryRecvError;
+use tokio::sync::Mutex;
 use tokio::{
     io::{AsyncBufReadExt, AsyncWriteExt, BufReader, BufWriter},
     process::{ChildStdin, ChildStdout, Command},
@@ -247,13 +247,13 @@ impl LspClient {
 
     pub async fn goto_definition(
         &mut self,
-        file: &str,
+        uri: &str,
         line: usize,
         character: usize,
     ) -> anyhow::Result<i64> {
         let params = json!({
             "textDocument": {
-                "uri": format!("file://{}", utils::absolutize(file)?.to_string_lossy()),
+                "uri": uri,
             },
             "position": {
                 "line": line,
@@ -325,8 +325,6 @@ impl LspClient {
         }
         Ok(())
     }
-
-    
 }
 
 fn parse_notification(method: &str, params: &Value) -> Result<Option<NotificationKind>> {

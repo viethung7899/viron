@@ -85,7 +85,7 @@ impl Language {
         }
     }
 
-    pub fn get_lsp_executable(&self) -> Option<&str> {
+    pub fn get_lsp_server(&self) -> Option<&str> {
         let executable = match self {
             Self::Rust => Some("rust-analyzer"),
             _ => None,

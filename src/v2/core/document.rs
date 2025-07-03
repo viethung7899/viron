@@ -74,7 +74,14 @@ impl Document {
             .as_ref()
             .map(|p| current.join(p))
     }
+    
+    pub fn uri(&self) -> Option<String> {
+        self.full_file_path()
+            .and_then(|p| p.to_str().map(|s| s.to_string()))
+            .map(|s| format!("file://{}", s))
+    }
 
+    
     pub fn undo(&mut self) -> Result<Change> {
         if let Some(change) = self.history.undo() {
             self.mark_modified();

@@ -37,6 +37,8 @@ theme = "themes/catppuchin/mocha.json"
 "u" = { type = "UndoBuffer" }
 "<Ctrl>r" = { type = "RedoBuffer" }
 
+"gd" = { type = "GoToDefinition" }
+
 [keymap.normal.a]
 type = "Composite"
 params = { description = "Insert mode with move right", actions = [

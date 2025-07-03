@@ -17,6 +17,7 @@ pub type ActionResult = Result<()>;
 mod buffer;
 mod command;
 mod editing;
+mod lsp;
 mod mode;
 mod movement;
 mod search;
@@ -25,6 +26,7 @@ mod system;
 pub use buffer::*;
 pub use command::*;
 pub use editing::*;
+pub use lsp::*;
 pub use mode::*;
 pub use movement::*;
 pub use search::*;
@@ -195,6 +197,9 @@ pub enum ActionDefinition {
     UndoBuffer,
     RedoBuffer,
 
+    // LSP actions
+    GoToDefinition,
+
     // System actions
     Quit {
         force: bool,
@@ -259,6 +264,9 @@ pub fn create_action_from_definition(definition: &ActionDefinition) -> Box<dyn A
         }
         ActionDefinition::UndoBuffer => Box::new(UndoBuffer),
         ActionDefinition::RedoBuffer => Box::new(RedoBuffer),
+
+        // LSP actions
+        ActionDefinition::GoToDefinition => Box::new(GoToDefinition),
 
         // System actions
         ActionDefinition::Quit { force } => Box::new(QuitEditor::new(*force)),
