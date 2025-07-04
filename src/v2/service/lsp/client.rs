@@ -1,3 +1,5 @@
+use super::types::{LogMessageParams, ShowMessageParams, TextDocumentPublishDiagnostics};
+use crate::core::language::Language;
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -17,8 +19,6 @@ use tokio::{
     process::Command,
     sync::mpsc,
 };
-
-use super::types::{LogMessageParams, ShowMessageParams, TextDocumentPublishDiagnostics};
 
 static ID: AtomicUsize = AtomicUsize::new(1);
 const CHANNEL_SIZE: usize = 32;
@@ -94,16 +94,17 @@ pub enum NotificationKind {
 
 #[derive(Debug)]
 pub struct LspClient {
+    pub(super) language: Language,
     request_sender: mpsc::Sender<OutboundMessage>,
     response_receiver: mpsc::Receiver<InboundMessage>,
     pending_responses: HashMap<i64, String>,
     process: Arc<Mutex<Option<Child>>>,
-    is_initialized: bool,
 }
 
 impl LspClient {
-    pub async fn start(server: &str, args: &[&str]) -> Result<Self> {
-        let mut child = Command::new(server)
+    pub async fn start(language: Language, args: &[&str]) -> Result<Self> {
+        let command = language.get_language_server().context("Language is not supported")?;
+        let mut child = Command::new(command)
             .args(args)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
@@ -193,11 +194,11 @@ impl LspClient {
         });
 
         Ok(LspClient {
+            language,
             request_sender,
             response_receiver,
             pending_responses: Default::default(),
             process: Arc::new(Mutex::new(Some(child))),
-            is_initialized: false,
         })
     }
 
@@ -231,7 +232,7 @@ impl LspClient {
         let params = json!({
             "textDocument": {
                 "uri": uri,
-                "languageId": "rust",
+                "languageId": self.language.to_str(),
                 "version": 1,
                 "text": contents,
             }

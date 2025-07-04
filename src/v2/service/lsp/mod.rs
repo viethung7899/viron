@@ -6,6 +6,7 @@ pub use types::Diagnostic;
 
 use anyhow::Result;
 
+use crate::core::language::Language;
 use crate::{
     core::message::Message,
     input::actions,
@@ -15,7 +16,6 @@ use crate::{
 #[derive(Debug, Default)]
 pub struct LspService {
     client: Option<LspClient>,
-    command: Option<String>,
     diagnostics: HashMap<String, Vec<Diagnostic>>,
     enabled: bool,
 }
@@ -26,7 +26,6 @@ impl LspService {
     pub fn new() -> Self {
         Self {
             client: None,
-            command: None,
             diagnostics: HashMap::new(),
             enabled: true,
         }
@@ -51,27 +50,30 @@ impl LspService {
         self.client.is_some()
     }
 
-    pub async fn start_server(
-        &mut self,
-        server_cmd: &str,
-        uri: &str,
-        contents: &str,
-    ) -> Result<()> {
-        if self.client.is_some() || !self.enabled {
-            return Ok(());
+    pub async fn start_server(&mut self, language: Language) -> Result<Option<&mut LspClient>> {
+        if !self.enabled {
+            return Ok(None);
         }
 
-        let mut client = LspClient::start(server_cmd, &[]).await?;
+        // Check if the language server is already running for the given language
+        if let Some(old_client) = &self.client {
+            if old_client.language == language {
+                return Ok(self.client.as_mut());
+            } else {
+                self.shutdown().await?;
+            }
+        }
+
+        let Ok(mut client) = LspClient::start(language, &[]).await else {
+            self.shutdown().await?;
+            return Ok(None);
+        };
 
         client.initialize().await?;
         log::info!("LSP client initialized");
 
-        client.did_open(&uri, contents).await?;
-        log::info!("LSP client did open file: {}", uri);
-
         self.client = Some(client);
-        self.command = Some(server_cmd.to_string());
-        Ok(())
+        Ok(self.client.as_mut())
     }
 
     pub async fn shutdown(&mut self) -> Result<()> {
@@ -79,22 +81,19 @@ impl LspService {
             client.shutdown().await?;
         }
         self.client = None;
-        self.command = None;
         Ok(())
     }
 
     pub async fn restart(
         &mut self,
-        server_cmd: &str,
-        file_path: &str,
-        contents: &str,
-    ) -> Result<()> {
+        language: Language
+    ) -> Result<Option<&mut LspClient>> {
         // Shutdown existing client
         self.shutdown().await?;
 
         // Enable and start new client
         self.enabled = true;
-        self.start_server(server_cmd, file_path, contents).await
+        self.start_server(language).await
     }
 
     pub async fn handle_message(&mut self) -> Option<LspAction> {
