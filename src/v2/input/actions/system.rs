@@ -5,18 +5,10 @@ use crate::input::actions::{
 use async_trait::async_trait;
 
 #[derive(Debug, Clone)]
-pub struct QuitEditor {
-    force: bool,
-}
-
-impl QuitEditor {
-    pub fn new(force: bool) -> Self {
-        Self { force }
-    }
-}
+pub struct Quit;
 
 #[async_trait(?Send)]
-impl Executable for QuitEditor {
+impl Executable for Quit {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         // Access to the editor's running state
         *ctx.running = false;
@@ -24,9 +16,7 @@ impl Executable for QuitEditor {
     }
 }
 
-impl_action!(QuitEditor, "Quit the editor", self {
-    ActionDefinition::Quit { force: self.force }
-});
+impl_action!(Quit, "Quit the editor", ActionDefinition::Quit);
 
 #[derive(Debug, Clone)]
 pub struct ShowMessage(pub Message);

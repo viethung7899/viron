@@ -134,6 +134,22 @@ macro_rules! impl_action {
             fn to_serializable(&$self) -> ActionDefinition $definition_block
         }
     };
+
+    ($action_type:ty, $description:expr, $definition:expr) => {
+        impl Action for $action_type {
+            fn clone_box(&self) -> Box<dyn Action> {
+                Box::new(self.clone())
+            }
+
+            fn describe(&self) -> &str {
+                $description
+            }
+
+            fn to_serializable(&self) -> ActionDefinition {
+                $definition
+            }
+        }
+    };
 }
 
 use crate::core::syntax::SyntaxHighlighter;
@@ -196,14 +212,15 @@ pub enum ActionDefinition {
     },
     UndoBuffer,
     RedoBuffer,
+    CloseBuffer {
+        force: bool,
+    },
 
     // LSP actions
     GoToDefinition,
 
     // System actions
-    Quit {
-        force: bool,
-    },
+    Quit,
 
     // Composite actions
     Composite {
@@ -264,12 +281,13 @@ pub fn create_action_from_definition(definition: &ActionDefinition) -> Box<dyn A
         }
         ActionDefinition::UndoBuffer => Box::new(UndoBuffer),
         ActionDefinition::RedoBuffer => Box::new(RedoBuffer),
+        ActionDefinition::CloseBuffer { force } => Box::new(CloseBuffer::force(*force)),
 
         // LSP actions
         ActionDefinition::GoToDefinition => Box::new(GoToDefinition),
 
         // System actions
-        ActionDefinition::Quit { force } => Box::new(QuitEditor::new(*force)),
+        ActionDefinition::Quit => Box::new(Quit),
 
         ActionDefinition::Composite {
             description,
