@@ -1,3 +1,4 @@
+use crate::service::lsp::types::DiagnosticSeverity;
 use crate::ui::theme::vscode::VsCodeTheme;
 use anyhow::Result;
 use crossterm::style::{Attribute, Attributes, Color, Colors, ContentStyle};
@@ -178,21 +179,26 @@ impl Default for DiagnosticColors {
 
 impl From<&VsCodeTheme> for DiagnosticColors {
     fn from(vscode: &VsCodeTheme) -> Self {
+        let background = vscode.get_color("editor.background");
         let error = Colors {
             foreground: vscode.get_color("errorLens.errorForeground"),
-            background: vscode.get_color("errorLens.errorBackground"),
+            background: vscode
+                .get_color_with_alpha("errorLens.errorBackground", background.as_ref()),
         };
         let hint = Colors {
             foreground: vscode.get_color("errorLens.hintForeground"),
-            background: vscode.get_color("errorLens.hintBackground"),
+            background: vscode
+                .get_color_with_alpha("errorLens.hintBackground", background.as_ref()),
         };
         let info = Colors {
             foreground: vscode.get_color("errorLens.infoForeground"),
-            background: vscode.get_color("errorLens.infoBackground"),
+            background: vscode
+                .get_color_with_alpha("errorLens.infoBackground", background.as_ref()),
         };
         let warning = Colors {
             foreground: vscode.get_color("errorLens.warningForeground"),
-            background: vscode.get_color("errorLens.warningBackground"),
+            background: vscode
+                .get_color_with_alpha("errorLens.warningBackground", background.as_ref()),
         };
         DiagnosticColors {
             error,
@@ -229,6 +235,20 @@ impl Theme {
         Style {
             foreground: self.colors.editor.foreground,
             background: self.colors.editor.background,
+            ..Default::default()
+        }
+    }
+
+    pub fn get_diagnostic_style(&self, severity: &DiagnosticSeverity) -> Style {
+        let colors = match severity {
+            DiagnosticSeverity::Error => &self.colors.diagnostic.error,
+            DiagnosticSeverity::Warning => &self.colors.diagnostic.warning,
+            DiagnosticSeverity::Information => &self.colors.diagnostic.info,
+            DiagnosticSeverity::Hint => &self.colors.diagnostic.hint,
+        };
+        Style {
+            foreground: colors.foreground,
+            background: colors.background,
             ..Default::default()
         }
     }

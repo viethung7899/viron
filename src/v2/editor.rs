@@ -225,16 +225,12 @@ impl Editor {
 
         let document = self.buffer_manager.current();
 
-        let Some(full_path) = document.full_file_path() else {
+        let Some(uri) = document.uri() else {
             return Ok(());
         };
 
         self.lsp_service
-            .start_server(
-                server_cmd,
-                &full_path.to_string_lossy().to_string(),
-                &document.buffer.to_string(),
-            )
+            .start_server(server_cmd, &uri, &document.buffer.to_string())
             .await
     }
 
@@ -293,12 +289,15 @@ impl Editor {
 
         self.scroll_viewport()?;
 
+        let document = self.buffer_manager.current();
+        let uri = document.uri().unwrap_or_default();
+
         let mut context = RenderContext {
             theme: &self.theme,
             cursor: &self.cursor,
-            document: self.buffer_manager.current(),
+            document,
             syntax_highlighter: &mut self.syntax_highlighter,
-            diagnostics: self.lsp_service.get_diagnostics(),
+            diagnostics: self.lsp_service.get_diagnostics(&uri),
             mode: &self.mode,
             viewport: &self.viewport,
             command_buffer: &self.command_buffer,
