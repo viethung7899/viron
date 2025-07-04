@@ -4,7 +4,6 @@ mod editor;
 mod input;
 mod service;
 mod ui;
-mod utils;
 
 use crate::config::Config;
 use anyhow::Result;
@@ -38,8 +37,8 @@ async fn main() -> Result<()> {
     let result = editor.run().await;
 
     // Always clean up terminal state, even if run_editor fails
-    if let Err(e) = editor.cleanup() {
-        eprintln!("Error cleaning up terminal: {}", e);
+    if let Err(e) = editor.cleanup().await {
+        log::error!("Error cleaning up terminal: {}", e);
     }
 
     panic::set_hook(Box::new(|info| {
@@ -51,7 +50,7 @@ async fn main() -> Result<()> {
             terminal::LeaveAlternateScreen,
         );
         _ = terminal::disable_raw_mode();
-        eprintln!("{}", info);
+        log::error!("{}", info);
     }));
 
     // Return the result from run_editor

@@ -3,7 +3,7 @@ use crate::core::command::{CommandBuffer, SearchBuffer};
 use crate::core::message::MessageManager;
 use crate::core::{cursor::Cursor, viewport::Viewport};
 use crate::editor::Mode;
-use crate::service::lsp::LspClient;
+use crate::service::LspService;
 use crate::ui::components::ComponentIds;
 use crate::ui::compositor::Compositor;
 use anyhow::Result;
@@ -48,7 +48,7 @@ pub struct ActionContext<'a> {
     pub compositor: &'a mut Compositor,
     pub component_ids: &'a ComponentIds,
 
-    pub lsp_client: &'a mut Option<LspClient>,
+    pub lsp_service: &'a mut LspService,
 }
 
 #[async_trait(?Send)]
