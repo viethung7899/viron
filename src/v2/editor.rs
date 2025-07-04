@@ -14,18 +14,18 @@ use crate::ui::components::{
     BufferView, CommandLine, ComponentIds, Gutter, MessageArea, PendingKeys, SearchBox, StatusLine,
 };
 use crate::ui::compositor::Compositor;
-use crate::ui::{theme::Theme, Component, RenderContext};
+use crate::ui::{Component, RenderContext, theme::Theme};
 use crate::{
     config::Config,
     core::command::{CommandBuffer, SearchBuffer},
 };
 use anyhow::Result;
+use crossterm::{ExecutableCommand, QueueableCommand, style};
 use crossterm::{
     cursor,
     event::{KeyCode, KeyEvent, KeyModifiers},
     terminal::{self, ClearType},
 };
-use crossterm::{style, ExecutableCommand, QueueableCommand};
 use serde::{Deserialize, Serialize};
 use std::io::{self, Stdout, Write};
 use std::path::{Path, PathBuf};
@@ -201,7 +201,7 @@ impl Editor {
 
         if let Some(file) = file {
             let action = actions::OpenBuffer::new(PathBuf::from(file.as_ref()));
-            editor.execute_action(Box::new(action)).await?;
+            editor.execute_action(&action).await?;
         };
 
         Ok(editor)
@@ -209,7 +209,7 @@ impl Editor {
 
     pub async fn load_file(&mut self, path: impl AsRef<Path>) -> Result<()> {
         let action = actions::OpenBuffer::new(PathBuf::from(path.as_ref()));
-        self.execute_action(Box::new(action)).await
+        self.execute_action(&action).await
     }
 
     pub fn load_config(&mut self, config: &Config) -> Result<()> {
@@ -226,7 +226,7 @@ impl Editor {
             match self.event_handler.next().await? {
                 InputEvent::Key(key) => {
                     if let Some(action) = self.handle_key(key) {
-                        self.execute_action(action).await?;
+                        self.execute_action(action.as_ref()).await?;
                     }
                 }
                 InputEvent::Resize(width, height) => {
@@ -243,7 +243,7 @@ impl Editor {
         Ok(())
     }
 
-    async fn execute_action(&mut self, action: Box<dyn Executable>) -> Result<()> {
+    async fn execute_action(&mut self, action: &dyn Executable) -> Result<()> {
         let mut context = ActionContext {
             mode: &mut self.mode,
             viewport: &mut self.viewport,
@@ -410,7 +410,7 @@ impl Editor {
     async fn handle_tick(&mut self) -> Result<()> {
         let actions = self.lsp_service.handle_message().await;
         if let Some(action) = actions {
-            self.execute_action(action).await?;
+            self.execute_action(action.as_ref()).await?;
         }
         Ok(())
     }
