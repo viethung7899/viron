@@ -6,10 +6,8 @@ use std::path::PathBuf;
 use types::Diagnostic;
 
 use crate::core::language::Language;
-use crate::input::actions::ActionDefinition::OpenBuffer;
 use crate::service::lsp::types::DefinitionResult;
 use crate::{
-    core::message::Message,
     input::actions,
     service::lsp::client::{InboundMessage, LspClient, NotificationKind},
 };
@@ -130,7 +128,7 @@ impl LspService {
                     Ok(action) => {
                         return action;
                     }
-                    Err(err) => {
+                    Err(_err) => {
                         log::warn!("Unhandled LSP response for method: {}", method);
                     }
                 }

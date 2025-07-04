@@ -2,7 +2,7 @@ use super::types::{LogMessageParams, ShowMessageParams, TextDocumentPublishDiagn
 use crate::core::language::Language;
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::collections::HashMap;
 use std::process;
 use std::sync::Arc;
@@ -12,8 +12,8 @@ use std::{
 };
 use tokio::io::{AsyncBufRead, AsyncReadExt, AsyncWrite};
 use tokio::process::Child;
-use tokio::sync::mpsc::error::TryRecvError;
 use tokio::sync::Mutex;
+use tokio::sync::mpsc::error::TryRecvError;
 use tokio::{
     io::{AsyncBufReadExt, AsyncWriteExt, BufReader, BufWriter},
     process::Command,
@@ -103,7 +103,9 @@ pub struct LspClient {
 
 impl LspClient {
     pub async fn start(language: Language, args: &[&str]) -> Result<Self> {
-        let command = language.get_language_server().context("Language is not supported")?;
+        let command = language
+            .get_language_server()
+            .context("Language is not supported")?;
         let mut child = Command::new(command)
             .args(args)
             .stdin(Stdio::piped())
@@ -146,37 +148,39 @@ impl LspClient {
 
         // Sends responses from LSP's stdout to the editor
         let sender = response_sender.clone();
-        tokio::spawn(async move {
-            let mut reader = BufReader::new(stdout);
-
-            loop {
-                let response = lsp_read_response(&mut reader).await;
-                match response {
-                    Err(err) => {
-                        sender
-                            .send(InboundMessage::ProcessingError(err.to_string()))
-                            .await?;
-                        continue;
-                    }
-                    Ok(Some(value)) => {
-                        let message = match process_response(&value) {
-                            Ok(msg) => msg,
-                            Err(err) => {
-                                sender
-                                    .send(InboundMessage::ProcessingError(err.to_string()))
-                                    .await?;
-                                continue;
-                            }
-                        };
-                        sender.send(message).await?;
-                    }
-                    _ => {}
-                }
-            }
-
+        tokio::spawn(
             #[allow(unreachable_code)]
-            anyhow::Ok(())
-        });
+            async move {
+                let mut reader = BufReader::new(stdout);
+
+                loop {
+                    let response = lsp_read_response(&mut reader).await;
+                    match response {
+                        Err(err) => {
+                            sender
+                                .send(InboundMessage::ProcessingError(err.to_string()))
+                                .await?;
+                            continue;
+                        }
+                        Ok(Some(value)) => {
+                            let message = match process_response(&value) {
+                                Ok(msg) => msg,
+                                Err(err) => {
+                                    sender
+                                        .send(InboundMessage::ProcessingError(err.to_string()))
+                                        .await?;
+                                    continue;
+                                }
+                            };
+                            sender.send(message).await?;
+                        }
+                        _ => {}
+                    }
+                }
+
+                anyhow::Ok(())
+            },
+        );
 
         // Sends responses from LSP's stderr to the editor
         let sender = response_sender.clone();
