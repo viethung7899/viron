@@ -77,7 +77,7 @@ pub struct ResponseError {
 
 #[derive(Debug)]
 pub enum InboundMessage {
-    Message(ResponseMessage),
+    Response(ResponseMessage),
     Notification(NotificationKind),
     UnknownNotification(Notification),
     Error(ResponseError),
@@ -290,9 +290,9 @@ impl LspClient {
     ) -> anyhow::Result<Option<(InboundMessage, Option<String>)>> {
         match self.response_receiver.try_recv() {
             Ok(msg) => {
-                if let InboundMessage::Message(msg) = &msg {
+                if let InboundMessage::Response(msg) = &msg {
                     if let Some(method) = self.pending_responses.remove(&msg.id) {
-                        return Ok(Some((InboundMessage::Message(msg.clone()), Some(method))));
+                        return Ok(Some((InboundMessage::Response(msg.clone()), Some(method))));
                     }
                 }
                 Ok(Some((msg, None)))
@@ -336,7 +336,7 @@ impl LspClient {
 
         while start_time.elapsed() < timeout_duration {
             if let Some((message, _)) = self.receive_response().await? {
-                if let InboundMessage::Message(response) = message {
+                if let InboundMessage::Response(response) = message {
                     if response.id == shutdown_id {
                         break;
                     }
@@ -459,8 +459,8 @@ pub fn process_response(response: &Value) -> Result<InboundMessage> {
         let result = response
             .get("result")
             .cloned()
-            .context("Expcted property - result")?;
-        Ok(InboundMessage::Message(ResponseMessage { id, result }))
+            .context("Expected property - result")?;
+        Ok(InboundMessage::Response(ResponseMessage { id, result }))
     } else {
         let method = response
             .get("method")

@@ -67,13 +67,14 @@ impl BufferManager {
 
         // Load the document
         let document = Document::from_file(path);
+        let full_path = document.full_file_path().unwrap();
 
         // Add to documents list
         let index = self.documents.len();
         self.documents.push(document);
 
         // Update path mapping
-        self.path_to_index.insert(path.to_path_buf(), index);
+        self.path_to_index.insert(full_path, index);
 
         // Set as current
         self.current_index = index;

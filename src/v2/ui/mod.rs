@@ -4,7 +4,6 @@ use crate::core::message::MessageManager;
 use crate::core::syntax::SyntaxHighlighter;
 use crate::core::viewport::Viewport;
 use crate::editor::Mode;
-use crate::service::lsp::Diagnostic;
 use crate::ui::render_buffer::RenderBuffer;
 use crate::ui::theme::Theme;
 
@@ -15,6 +14,7 @@ pub mod theme;
 
 use crate::core::document::Document;
 use crate::input::keymaps::KeySequence;
+use crate::service::lsp::types::Diagnostic;
 pub use components::Component;
 
 pub struct RenderContext<'a> {
