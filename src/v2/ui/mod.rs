@@ -4,6 +4,7 @@ use crate::core::message::MessageManager;
 use crate::core::syntax::SyntaxHighlighter;
 use crate::core::viewport::Viewport;
 use crate::editor::Mode;
+use crate::service::lsp::Diagnostic;
 use crate::ui::render_buffer::RenderBuffer;
 use crate::ui::theme::Theme;
 
@@ -20,13 +21,14 @@ pub struct RenderContext<'a> {
     pub viewport: &'a Viewport,
     pub document: &'a Document,
     pub syntax_highlighter: &'a mut SyntaxHighlighter,
+    pub diagnostics: &'a [Diagnostic],
     pub cursor: &'a Cursor,
     pub mode: &'a Mode,
     pub theme: &'a Theme,
     pub command_buffer: &'a CommandBuffer,
     pub search_buffer: &'a SearchBuffer,
     pub message_manager: &'a MessageManager,
-    pub pending_keys: &'a KeySequence
+    pub pending_keys: &'a KeySequence,
 }
 
 pub struct Bounds {

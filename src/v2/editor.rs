@@ -1,3 +1,4 @@
+use crate::core::cursor::Cursor;
 use crate::core::syntax::SyntaxHighlighter;
 use crate::core::viewport::Viewport;
 use crate::core::{buffer_manager::BufferManager, message::MessageManager};
@@ -8,24 +9,23 @@ use crate::input::{
     actions::ActionContext,
     events::{EventHandler, InputEvent},
 };
+use crate::service::LspService;
 use crate::ui::components::{
     BufferView, CommandLine, ComponentIds, Gutter, MessageArea, PendingKeys, SearchBox, StatusLine,
 };
 use crate::ui::compositor::Compositor;
-use crate::ui::{Component, RenderContext, theme::Theme};
+use crate::ui::{theme::Theme, Component, RenderContext};
 use crate::{
     config::Config,
     core::command::{CommandBuffer, SearchBuffer},
 };
-use crate::{core::cursor::Cursor, service::lsp::LspClient};
-use anyhow::{Context, Result};
-use crossterm::{QueueableCommand, queue, style};
+use anyhow::Result;
 use crossterm::{
     cursor,
     event::{KeyCode, KeyEvent, KeyModifiers},
-    execute,
     terminal::{self, ClearType},
 };
+use crossterm::{style, ExecutableCommand, QueueableCommand};
 use serde::{Deserialize, Serialize};
 use std::io::{self, Stdout, Write};
 use std::path::Path;
@@ -94,11 +94,10 @@ pub struct Editor {
     pending_keys: KeySequence,
     event_handler: EventHandler,
 
-    // LSP
-    lsp_client: Option<LspClient>,
+    // Services
+    lsp_service: LspService,
 
     // State
-    lsp_enabled: bool,
     running: bool,
 }
 
@@ -107,12 +106,10 @@ impl Editor {
         // Initialize terminal
         terminal::enable_raw_mode()?;
         let mut stdout = io::stdout();
-        execute!(
-            stdout,
-            terminal::EnterAlternateScreen,
-            cursor::Hide,
-            terminal::Clear(ClearType::All)
-        )?;
+        stdout
+            .execute(terminal::EnterAlternateScreen)?
+            .execute(cursor::Hide)?
+            .execute(terminal::Clear(ClearType::All))?;
 
         let (width, height) = terminal::size()?;
 
@@ -166,6 +163,9 @@ impl Editor {
         let pending_keys = KeySequence::new();
         let event_handler = EventHandler::new();
 
+        // Create LSP service
+        let lsp_service = LspService::new();
+
         Ok(Self {
             width: width as usize,
             height: height as usize,
@@ -189,9 +189,8 @@ impl Editor {
             pending_keys,
             event_handler,
 
-            lsp_client: None,
+            lsp_service,
 
-            lsp_enabled: false,
             running: true,
         })
     }
@@ -208,34 +207,35 @@ impl Editor {
         self.update_viewport_for_gutter_width(self.gutter_width())?;
 
         // Load the LSP for the opened file
-        if !self.lsp_enabled {
+        if !self.lsp_service.is_enabled() {
             return Ok(());
         }
 
-        let server_cmd = language
-            .get_lsp_server()
-            .context("LSP server not configured")?;
-        self.start_lsp_server(server_cmd).await?;
+        if let Some(cmd) = language.get_language_server() {
+            log::info!("Start {cmd}");
+            self.start_langauge_server(cmd).await?;
+        }
         Ok(())
     }
 
-    async fn start_lsp_server(&mut self, server_cmd: &str) -> Result<()> {
-        if self.lsp_client.is_some() {
+    async fn start_langauge_server(&mut self, server_cmd: &str) -> Result<()> {
+        if self.lsp_service.is_running() {
             return Ok(()); // Already running
         }
 
-        let mut client = LspClient::start(server_cmd, &[]).await?;
-        client.initialize().await?;
-
-        // Send didOpen for current buffer
         let document = self.buffer_manager.current();
-        let file = document.file_name().unwrap_or("untitled".to_string());
-        let contents = document.buffer.to_string();
 
-        client.did_open(&file, &contents).await?;
+        let Some(full_path) = document.full_file_path() else {
+            return Ok(());
+        };
 
-        self.lsp_client = Some(client);
-        Ok(())
+        self.lsp_service
+            .start_server(
+                server_cmd,
+                &full_path.to_string_lossy().to_string(),
+                &document.buffer.to_string(),
+            )
+            .await
     }
 
     pub fn load_config(&mut self, config: &Config) -> Result<()> {
@@ -247,63 +247,73 @@ impl Editor {
     pub async fn run(&mut self) -> Result<()> {
         // Main event loop
         while self.running {
-            let gutter_width = self.gutter_width();
-            self.update_viewport_for_gutter_width(gutter_width)?;
-
-            self.scroll_viewport()?;
-
-            // Get document and syntax highlighter separately to avoid simultaneous borrowing
-
-            self.stdout.queue(cursor::Hide)?;
-
-            let mut context = RenderContext {
-                theme: &self.theme,
-                cursor: &self.cursor,
-                document: self.buffer_manager.current(),
-                syntax_highlighter: &mut self.syntax_highlighter,
-                mode: &self.mode,
-                viewport: &self.viewport,
-                command_buffer: &self.command_buffer,
-                search_buffer: &self.search_buffer,
-                message_manager: &self.message_manager,
-                pending_keys: &self.pending_keys,
-            };
-
-            self.compositor.render(&mut context, &mut self.stdout)?;
-
-            self.show_cursor()?;
-            self.stdout.flush()?;
-
-            // Clean up messages after rendering
-            self.post_render_cleanup()?;
+            self.render()?;
 
             // Handle events
-            match self.event_handler.next()? {
+            match self.event_handler.next().await? {
                 InputEvent::Key(key) => {
                     if let Some(action) = self.handle_key(key) {
-                        action.execute(&mut ActionContext {
-                            mode: &mut self.mode,
-                            viewport: &mut self.viewport,
-                            buffer_manager: &mut self.buffer_manager,
-                            command_buffer: &mut self.command_buffer,
-                            search_buffer: &mut self.search_buffer,
-                            message: &mut self.message_manager,
-                            syntax_highlighter: &mut self.syntax_highlighter,
-                            cursor: &mut self.cursor,
-                            running: &mut self.running,
-                            compositor: &mut self.compositor,
-                            component_ids: &mut self.component_ids,
-                            lsp_client: &mut self.lsp_client,
-                        }).await?;
+                        self.execute_action(action).await?;
                     }
                 }
                 InputEvent::Resize(width, height) => {
                     self.handle_resize(width as usize, height as usize)?;
                 }
+                InputEvent::Tick => {
+                    self.handle_tick().await?;
+                }
                 _ => {}
             }
         }
 
+        Ok(())
+    }
+
+    async fn execute_action(&mut self, action: Box<dyn Executable>) -> Result<()> {
+        let mut context = ActionContext {
+            mode: &mut self.mode,
+            viewport: &mut self.viewport,
+            buffer_manager: &mut self.buffer_manager,
+            command_buffer: &mut self.command_buffer,
+            search_buffer: &mut self.search_buffer,
+            message: &mut self.message_manager,
+            syntax_highlighter: &mut self.syntax_highlighter,
+            cursor: &mut self.cursor,
+            running: &mut self.running,
+            compositor: &mut self.compositor,
+            component_ids: &mut self.component_ids,
+            lsp_service: &mut self.lsp_service,
+        };
+        action.execute(&mut context).await
+    }
+
+    fn render(&mut self) -> Result<()> {
+        let gutter_width = self.gutter_width();
+        self.update_viewport_for_gutter_width(gutter_width)?;
+
+        self.scroll_viewport()?;
+
+        let mut context = RenderContext {
+            theme: &self.theme,
+            cursor: &self.cursor,
+            document: self.buffer_manager.current(),
+            syntax_highlighter: &mut self.syntax_highlighter,
+            diagnostics: self.lsp_service.get_diagnostics(),
+            mode: &self.mode,
+            viewport: &self.viewport,
+            command_buffer: &self.command_buffer,
+            search_buffer: &self.search_buffer,
+            message_manager: &self.message_manager,
+            pending_keys: &self.pending_keys,
+        };
+
+        self.stdout.queue(cursor::Hide)?;
+        self.compositor.render(&mut context, &mut self.stdout)?;
+        self.show_cursor()?;
+        self.stdout.flush()?;
+
+        // Clean up messages after rendering
+        self.post_render_cleanup()?;
         Ok(())
     }
 
@@ -351,34 +361,29 @@ impl Editor {
         let screen_col = cursor.column - viewport.left_column();
 
         if screen_row < viewport.height() && screen_col < viewport.width() {
-            queue!(
-                self.stdout,
-                cursor::MoveTo((screen_col + gutter_size) as u16, screen_row as u16),
-                cursor::Show,
-            )?;
-        } else {
-            queue!(self.stdout, cursor::Hide)?;
+            self.stdout
+                .queue(cursor::MoveTo(
+                    (screen_col + gutter_size) as u16,
+                    screen_row as u16,
+                ))?
+                .queue(cursor::Show)?;
         }
         Ok(())
     }
 
     fn show_cursor_in_command_line(&mut self) -> Result<()> {
         let position = self.command_buffer.cursor_position();
-        queue!(
-            self.stdout,
-            cursor::MoveTo(position as u16 + 1, self.height as u16 - 1),
-            cursor::Show,
-        )?;
+        self.stdout
+            .queue(cursor::MoveTo(position as u16 + 1, self.height as u16 - 1))?
+            .queue(cursor::Show)?;
         Ok(())
     }
 
     fn show_cursor_in_search_box(&mut self) -> Result<()> {
         let position = self.search_buffer.buffer.cursor_position();
-        queue!(
-            self.stdout,
-            cursor::MoveTo(position as u16 + 1, self.height as u16 - 1),
-            cursor::Show,
-        )?;
+        self.stdout
+            .queue(cursor::MoveTo(position as u16 + 1, self.height as u16 - 1))?
+            .queue(cursor::Show)?;
         Ok(())
     }
 
@@ -425,6 +430,14 @@ impl Editor {
             Mode::Search => self.handle_default_search_event(&key_event),
             _ => None,
         }
+    }
+
+    async fn handle_tick(&mut self) -> Result<()> {
+        let actions = self.lsp_service.handle_message().await;
+        if let Some(action) = actions {
+            self.execute_action(action).await?;
+        }
+        Ok(())
     }
 
     fn handle_default_insert_event(
@@ -481,15 +494,14 @@ impl Editor {
         }
     }
 
-    pub fn cleanup(&mut self) -> Result<()> {
+    pub async fn cleanup(mut self) -> Result<()> {
         // Restore terminal state
-        execute!(
-            self.stdout,
-            style::ResetColor,
-            cursor::Show,
-            terminal::LeaveAlternateScreen
-        )?;
+        self.stdout
+            .execute(style::ResetColor)?
+            .execute(cursor::Show)?
+            .execute(terminal::LeaveAlternateScreen)?;
         terminal::disable_raw_mode()?;
+        tokio::spawn(async move { self.lsp_service.shutdown().await });
 
         Ok(())
     }
