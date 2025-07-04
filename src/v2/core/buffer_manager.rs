@@ -27,6 +27,16 @@ impl BufferManager {
         }
     }
 
+    pub fn new_with_file(path: &Path) -> Self {
+        let mut manager = Self {
+            documents: Vec::new(),
+            current_index: 0,
+            path_to_index: HashMap::new(),
+        };
+        manager.open_file(path);
+        manager
+    }
+
     // Get the current active document
     pub fn current(&self) -> &Document {
         &self.documents[self.current_index]
@@ -48,16 +58,15 @@ impl BufferManager {
     }
 
     /// Open a file and add it to the buffer list
-    pub fn open_file(&mut self, path: &Path) -> Result<usize> {
+    pub fn open_file(&mut self, path: &Path) -> usize {
         // Check if file is already open
         if let Some(&index) = self.path_to_index.get(path) {
             self.current_index = index;
-            return Ok(index);
+            return index;
         }
 
         // Load the document
-        let document = Document::from_file(path)
-            .context(format!("Failed to open file: {}", path.display()))?;
+        let document = Document::from_file(path);
 
         // Add to documents list
         let index = self.documents.len();
@@ -68,8 +77,8 @@ impl BufferManager {
 
         // Set as current
         self.current_index = index;
-
-        Ok(index)
+        
+        index
     }
 
     /// Save the current buffer to its file

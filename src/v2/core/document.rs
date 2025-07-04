@@ -24,19 +24,19 @@ impl Document {
         }
     }
 
-    pub fn from_file(path: &Path) -> Result<Self> {
+    pub fn from_file(path: &Path) -> Self {
         let content = std::fs::read_to_string(path)
-            .context(format!("Failed to read file: {}", path.display()))?;
+            .unwrap_or_default();
 
         let language = Language::from_path(path);
 
-        Ok(Self {
+        Self {
             buffer: Buffer::from_string(&content),
             path: Some(path.to_path_buf()),
             modified: false,
             language,
             history: History::new(1000),
-        })
+        }
     }
 
     pub fn save(&mut self) -> Result<()> {
