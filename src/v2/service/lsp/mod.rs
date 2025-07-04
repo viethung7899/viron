@@ -1,6 +1,7 @@
 mod client;
-mod types;
+pub mod types;
 
+use std::collections::HashMap;
 pub use types::Diagnostic;
 
 use anyhow::Result;
@@ -15,7 +16,7 @@ use crate::{
 pub struct LspService {
     client: Option<LspClient>,
     command: Option<String>,
-    diagnostics: Vec<Diagnostic>,
+    diagnostics: HashMap<String, Vec<Diagnostic>>,
     enabled: bool,
 }
 
@@ -26,7 +27,7 @@ impl LspService {
         Self {
             client: None,
             command: None,
-            diagnostics: Vec::new(),
+            diagnostics: HashMap::new(),
             enabled: true,
         }
     }
@@ -53,7 +54,7 @@ impl LspService {
     pub async fn start_server(
         &mut self,
         server_cmd: &str,
-        file_path: &str,
+        uri: &str,
         contents: &str,
     ) -> Result<()> {
         if self.client.is_some() || !self.enabled {
@@ -64,11 +65,9 @@ impl LspService {
 
         client.initialize().await?;
         log::info!("LSP client initialized");
-        
-        let uri = format!("file://{}", file_path);
 
         client.did_open(&uri, contents).await?;
-        log::info!("LSP client did open file: {}", file_path);
+        log::info!("LSP client did open file: {}", uri);
 
         self.client = Some(client);
         self.command = Some(server_cmd.to_string());
@@ -147,18 +146,17 @@ impl LspService {
                 None
             }
             NotificationKind::PublishDiagnostics(diagnostics) => {
-                self.diagnostics = diagnostics.diagnostics;
-                if self.diagnostics.is_empty() {
-                    return None;
-                }
-                let message =
-                    Message::info(format!("Found {} diagnotics in", self.diagnostics.len()));
-                Some(Box::new(actions::ShowMessage(message)))
+                self.diagnostics
+                    .insert(diagnostics.uri.unwrap_or_default(), diagnostics.diagnostics);
+                Some(Box::new(actions::RefreshBuffer))
             }
         }
     }
 
-    pub fn get_diagnostics(&self) -> &[Diagnostic] {
-        &self.diagnostics
+    pub fn get_diagnostics(&self, uri: &str) -> &[Diagnostic] {
+        self.diagnostics
+            .get(uri)
+            .map(|d| d.as_slice())
+            .unwrap_or_default()
     }
 }

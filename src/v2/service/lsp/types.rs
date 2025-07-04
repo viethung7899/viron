@@ -22,7 +22,7 @@ pub struct LogMessageParams {
     pub message: String,
 }
 
-#[derive(Debug, Clone, Serialize_repr, Deserialize_repr)]
+#[derive(Debug, Clone, Serialize_repr, Deserialize_repr, PartialOrd, PartialEq, Eq, Ord)]
 #[repr(u8)]
 pub enum MessageType {
     Error = 1,
@@ -67,7 +67,9 @@ pub struct Position {
     pub character: usize,
 }
 
-#[derive(Debug, Clone, Serialize_repr, Deserialize_repr, Default)]
+#[derive(
+    Debug, Clone, Serialize_repr, Deserialize_repr, Default, PartialOrd, PartialEq, Eq, Ord,
+)]
 #[repr(usize)]
 pub enum DiagnosticSeverity {
     #[default]

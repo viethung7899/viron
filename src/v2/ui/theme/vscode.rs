@@ -1,6 +1,6 @@
-use std::{collections::HashMap, u8};
+use std::collections::HashMap;
 
-use anyhow::{Result, bail};
+use anyhow::{bail, Result};
 use crossterm::style::Color;
 use once_cell::sync::Lazy;
 use serde::Deserialize;
@@ -157,14 +157,14 @@ fn parse_rgba(s: &str, background: Option<&Color>) -> Result<Color> {
     let a = if color.len() == 8 {
         u8::from_str_radix(&s[6..8], 16)?
     } else {
-        u8::MAX
+        255
     };
 
-    if a == u8::MAX {
+    if a == 255 {
         return Ok(Color::Rgb { r, g, b });
     };
 
-    let alpha = a as f32 / 255.0;
+    let alpha = (a as f32 / 255.0).powi(3);
     let [r, g, b] = [(r, bg_r), (g, bg_g), (b, bg_b)].map(|(fg, bg)| {
         let fg = fg as f32 * alpha;
         let bg = *bg as f32 * (1.0 - alpha);

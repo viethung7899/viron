@@ -1,3 +1,4 @@
+use crate::service::lsp::types::DiagnosticSeverity;
 use crate::ui::render_buffer::RenderBuffer;
 use crate::ui::theme::Style;
 use crate::ui::{Bounds, Drawable, RenderContext};
@@ -5,6 +6,8 @@ use anyhow::Result;
 use std::ops::Add;
 use std::str::from_utf8;
 use tree_sitter::Point;
+
+const DIAGNOSTIC_MARGIN: usize = 4;
 
 pub struct BufferView;
 
@@ -234,21 +237,65 @@ impl BufferView {
         }
         Ok(())
     }
+
+    fn draw_diagnostics(
+        &self,
+        render_buffer: &mut RenderBuffer,
+        context: &mut RenderContext,
+    ) -> Result<()> {
+        let bounds = self.bounds(render_buffer, context);
+        let buffer = &context.document.buffer;
+        let viewport = context.viewport;
+        let starting_line = viewport.top_line();
+        let ending_line = starting_line + bounds.height;
+
+        let visible_diagnostics = context
+            .diagnostics
+            .iter()
+            .filter(|d| {
+                let start = &d.range.start;
+                start.line >= starting_line && start.line < ending_line
+            })
+            .filter(|d| d.severity <= DiagnosticSeverity::Warning);
+
+        for diagnostic in visible_diagnostics {
+            let Some(message) = diagnostic.message.lines().next() else {
+                continue;
+            };
+            let formatted = format!("■  {message}");
+            let line = diagnostic.range.start.line;
+            let line_length = buffer.get_line_length(line);
+            let column = line_length + DIAGNOSTIC_MARGIN;
+
+            let formatted: String = formatted
+                .chars()
+                .skip(viewport.left_column().saturating_sub(column))
+                .collect();
+
+            let style = context.theme.get_diagnostic_style(&diagnostic.severity);
+
+            render_buffer.set_text(
+                line - starting_line,
+                column
+                    .saturating_sub(viewport.left_column())
+                    .add(bounds.start_col),
+                &formatted,
+                &style,
+            );
+        }
+        Ok(())
+    }
 }
 
 impl Drawable for BufferView {
     fn draw(&self, buffer: &mut RenderBuffer, context: &mut RenderContext) -> Result<()> {
         if context.document.language.is_plain_text() {
-            self.render_plain_text(buffer, context)
-        } else {
-            match self.render_with_syntax_highlighting(buffer, context) {
-                Ok(_) => Ok(()),
-                Err(e) => {
-                    log::error!("Failed to render buffer with syntax highlighting: {}", e);
-                    self.render_plain_text(buffer, context)
-                }
-            }
+            self.render_plain_text(buffer, context)?;
+        } else if let Err(e) = self.render_with_syntax_highlighting(buffer, context) {
+            log::error!("Failed to render buffer with syntax highlighting: {}", e);
+            self.render_plain_text(buffer, context)?;
         }
+        self.draw_diagnostics(buffer, context)
     }
 
     fn bounds(&self, render_buffer: &RenderBuffer, context: &RenderContext<'_>) -> Bounds {

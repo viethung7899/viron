@@ -177,3 +177,15 @@ impl Executable for RedoBuffer {
 impl_action!(RedoBuffer, "Redo", self {
     ActionDefinition::RedoBuffer
 });
+
+#[derive(Debug, Clone)]
+pub struct RefreshBuffer;
+
+#[async_trait(?Send)]
+impl Executable for RefreshBuffer {
+    async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+        ctx.compositor
+            .mark_dirty(&ctx.component_ids.buffer_view_id)?;
+        Ok(())
+    }
+}
