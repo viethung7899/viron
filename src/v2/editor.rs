@@ -28,7 +28,7 @@ use crossterm::{
 use crossterm::{style, ExecutableCommand, QueueableCommand};
 use serde::{Deserialize, Serialize};
 use std::io::{self, Stdout, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Mode {
@@ -102,7 +102,7 @@ pub struct Editor {
 }
 
 impl Editor {
-    pub fn new() -> Result<Self> {
+    pub async fn new(file: Option<impl AsRef<Path>>) -> Result<Self> {
         // Initialize terminal
         terminal::enable_raw_mode()?;
         let mut stdout = io::stdout();
@@ -114,7 +114,12 @@ impl Editor {
         let (width, height) = terminal::size()?;
 
         // Create core components
-        let buffer_manager = BufferManager::new();
+
+        let buffer_manager = file
+            .as_ref()
+            .map(|file| BufferManager::new_with_file(file.as_ref()))
+            .unwrap_or(BufferManager::new());
+
         let command_buffer = CommandBuffer::new();
         let message_manager = MessageManager::new();
         let search_buffer = SearchBuffer::new();
@@ -166,7 +171,7 @@ impl Editor {
         // Create LSP service
         let lsp_service = LspService::new();
 
-        Ok(Self {
+        let mut editor = Self {
             width: width as usize,
             height: height as usize,
 
@@ -192,37 +197,19 @@ impl Editor {
             lsp_service,
 
             running: true,
-        })
+        };
+
+        if let Some(file) = file {
+            let action = actions::OpenBuffer::new(PathBuf::from(file.as_ref()));
+            editor.execute_action(Box::new(action)).await?;
+        };
+
+        Ok(editor)
     }
 
     pub async fn load_file(&mut self, path: impl AsRef<Path>) -> Result<()> {
-        // Open the file in the buffer manager
-        self.buffer_manager.open_file(path.as_ref())?;
-
-        // Initialize the syntax highlighter with the current file's language
-        let language = self.buffer_manager.current().language;
-        self.syntax_highlighter.set_language(language)?;
-
-        // Set the gutter width based on the number of lines in the file
-        self.update_viewport_for_gutter_width(self.gutter_width())?;
-
-        self.start_langauge_server().await?;
-        Ok(())
-    }
-
-    async fn start_langauge_server(&mut self) -> Result<()> {
-        let document = self.buffer_manager.current();
-        let language = document.language.clone();
-
-        if let Some(client) = self.lsp_service.start_server(language).await? {
-            let Some(uri) = document.uri() else {
-                return Ok(());
-            };
-            let content = document.buffer.to_string();
-            client.did_open(&uri, &content).await?;
-        };
-
-        Ok(())
+        let action = actions::OpenBuffer::new(PathBuf::from(path.as_ref()));
+        self.execute_action(Box::new(action)).await
     }
 
     pub fn load_config(&mut self, config: &Config) -> Result<()> {
@@ -234,9 +221,8 @@ impl Editor {
     pub async fn run(&mut self) -> Result<()> {
         // Main event loop
         while self.running {
-            self.render()?;
-
             // Handle events
+            self.render()?;
             match self.event_handler.next().await? {
                 InputEvent::Key(key) => {
                     if let Some(action) = self.handle_key(key) {
@@ -245,6 +231,7 @@ impl Editor {
                 }
                 InputEvent::Resize(width, height) => {
                     self.handle_resize(width as usize, height as usize)?;
+                    self.post_render_cleanup()?;
                 }
                 InputEvent::Tick => {
                     self.handle_tick().await?;
@@ -302,8 +289,6 @@ impl Editor {
         self.show_cursor()?;
         self.stdout.flush()?;
 
-        // Clean up messages after rendering
-        self.post_render_cleanup()?;
         Ok(())
     }
 
