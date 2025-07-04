@@ -10,6 +10,7 @@ pub struct BufferManager {
     documents: Vec<Document>,
     // Index of the currently active document
     current_index: usize,
+
     // Map from file paths to document indices for quick lookup
     path_to_index: HashMap<PathBuf, usize>,
 }
@@ -45,22 +46,24 @@ impl BufferManager {
 
     /// Open a file and add it to the buffer list
     pub fn open_file(&mut self, path: &Path) -> usize {
+        let mut absolute_path = std::env::current_dir().unwrap_or_default();
+        absolute_path.push(path);
+
         // Check if file is already open
-        if let Some(&index) = self.path_to_index.get(path) {
+        if let Some(&index) = self.path_to_index.get(&absolute_path) {
             self.current_index = index;
             return index;
         }
 
         // Load the document
         let document = Document::from_file(path);
-        let full_path = document.full_file_path().unwrap();
 
         // Add to documents list
         let index = self.documents.len();
         self.documents.push(document);
 
         // Update path mapping
-        self.path_to_index.insert(full_path, index);
+        self.path_to_index.insert(absolute_path, index);
 
         // Set as current
         self.current_index = index;
@@ -97,39 +100,27 @@ impl BufferManager {
     }
 
     /// Close the current buffer
-    pub fn close_current(&mut self) -> Result<()> {
-        if self.documents.len() <= 1 {
-            return Err(anyhow::anyhow!("Cannot close the last buffer"));
-        }
-
+    pub fn close_current(&mut self) -> Document {
         // Remove from path mapping if it has a path
-        if let Some(path) = self.current().path.clone() {
+        let document = self.documents.remove(self.current_index);
+
+        if let Some(path) = document.full_file_path() {
             self.path_to_index.remove(&path);
         }
 
-        // Remove the document
-        self.documents.remove(self.current_index);
-
         // Update indices in the path_to_index map
-        self.path_to_index = self
-            .path_to_index
-            .iter()
-            .map(|(path, &index)| {
-                let new_index = if index > self.current_index {
-                    index - 1
-                } else {
-                    index
-                };
-                (path.clone(), new_index)
-            })
-            .collect();
+        for index in self.path_to_index.values_mut() {
+            if *index > self.current_index {
+                *index -= 1;
+            }
+        }
 
         // Update current index
         if self.current_index >= self.documents.len() {
-            self.current_index = self.documents.len() - 1;
+            self.current_index = self.documents.len().saturating_sub(1);
         }
 
-        Ok(())
+        document
     }
 
     /// Switch to the next buffer

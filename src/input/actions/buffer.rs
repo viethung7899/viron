@@ -157,8 +157,14 @@ impl Executable for CloseBuffer {
             .await;
         }
 
-        if let Err(e) = ctx.buffer_manager.close_current() {
-            log::info!("No more buffers to close: {}", e);
+        let document = ctx.buffer_manager.close_current();
+        if let Some(client) = ctx.lsp_service.get_client_mut() {
+            if let Some(uri) = document.uri() {
+                client.did_close(&uri).await?;
+            }
+        }
+
+        if ctx.buffer_manager.is_empty() {
             *ctx.running = false;
         } else {
             after_buffer_change(ctx).await?;
@@ -167,7 +173,7 @@ impl Executable for CloseBuffer {
     }
 }
 
-impl_action!(CloseBuffer, "Quit the editor", self {
+impl_action!(CloseBuffer, "Close the current buffer", self {
     ActionDefinition::CloseBuffer { force: self.force }
 });
 

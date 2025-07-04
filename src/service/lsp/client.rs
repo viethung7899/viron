@@ -2,7 +2,7 @@ use super::types::{LogMessageParams, ShowMessageParams, TextDocumentPublishDiagn
 use crate::core::language::Language;
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::process;
 use std::sync::Arc;
@@ -12,8 +12,8 @@ use std::{
 };
 use tokio::io::{AsyncBufRead, AsyncReadExt, AsyncWrite};
 use tokio::process::Child;
-use tokio::sync::Mutex;
 use tokio::sync::mpsc::error::TryRecvError;
+use tokio::sync::Mutex;
 use tokio::{
     io::{AsyncBufReadExt, AsyncWriteExt, BufReader, BufWriter},
     process::Command,
@@ -243,6 +243,19 @@ impl LspClient {
         });
 
         self.send_notification("textDocument/didOpen", params)
+            .await?;
+
+        Ok(())
+    }
+
+    pub async fn did_close(&mut self, uri: &str) -> anyhow::Result<()> {
+        let params = json!({
+            "textDocument": {
+                "uri": uri,
+            }
+        });
+
+        self.send_notification("textDocument/didClose", params)
             .await?;
 
         Ok(())
