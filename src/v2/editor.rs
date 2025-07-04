@@ -206,32 +206,23 @@ impl Editor {
         // Set the gutter width based on the number of lines in the file
         self.update_viewport_for_gutter_width(self.gutter_width())?;
 
-        // Load the LSP for the opened file
-        if !self.lsp_service.is_enabled() {
-            return Ok(());
-        }
-
-        if let Some(cmd) = language.get_language_server() {
-            log::info!("Start {cmd}");
-            self.start_langauge_server(cmd).await?;
-        }
+        self.start_langauge_server().await?;
         Ok(())
     }
 
-    async fn start_langauge_server(&mut self, server_cmd: &str) -> Result<()> {
-        if self.lsp_service.is_running() {
-            return Ok(()); // Already running
-        }
-
+    async fn start_langauge_server(&mut self) -> Result<()> {
         let document = self.buffer_manager.current();
+        let language = document.language.clone();
 
-        let Some(uri) = document.uri() else {
-            return Ok(());
+        if let Some(client) = self.lsp_service.start_server(language).await? {
+            let Some(uri) = document.uri() else {
+                return Ok(());
+            };
+            let content = document.buffer.to_string();
+            client.did_open(&uri, &content).await?;
         };
 
-        self.lsp_service
-            .start_server(server_cmd, &uri, &document.buffer.to_string())
-            .await
+        Ok(())
     }
 
     pub fn load_config(&mut self, config: &Config) -> Result<()> {
