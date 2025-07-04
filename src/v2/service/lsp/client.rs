@@ -258,13 +258,12 @@ impl LspClient {
                 "character": character,
             }
         });
-        self.send_notification("textDocument/gotoDefinition", params)
-            .await?;
+        self.send_request("textDocument/definition", params).await?;
 
         Ok(())
     }
 
-    pub async fn send_request(&mut self, method: &str, params: Value) -> Result<i64> {
+    async fn send_request(&mut self, method: &str, params: Value) -> Result<i64> {
         let req = Request::new(method, params);
         let id = req.id.clone();
 
@@ -388,7 +387,7 @@ pub async fn lsp_send_request<W: Unpin + AsyncWrite>(
     });
     let body = serde_json::to_string(&req)?;
     let req = format!("Content-Length: {}\r\n\r\n{}", body.len(), body);
-    log::info!("=> {}", req);
+    log::info!("=> {}", body);
     writer.write_all(req.as_bytes()).await?;
     writer.flush().await?;
 
@@ -406,7 +405,7 @@ pub async fn lsp_send_notification<W: Unpin + AsyncWrite>(
     });
     let body = serde_json::to_string(&req)?;
     let req = format!("Content-Length: {}\r\n\r\n{}", body.len(), body);
-    log::info!("=> {}", req);
+    log::info!("=> {}", body);
     writer.write_all(req.as_bytes()).await?;
     writer.flush().await?;
 
@@ -419,7 +418,6 @@ pub async fn lsp_read_response<R: Unpin + AsyncBufRead>(reader: &mut R) -> Resul
     if read_size <= 0 {
         return Ok(None);
     }
-    log::info!("=> It should be content line {:?}", line);
     let length = line
         .strip_prefix("Content-Length: ")
         .context("Expected Content-Length header")?
@@ -429,6 +427,8 @@ pub async fn lsp_read_response<R: Unpin + AsyncBufRead>(reader: &mut R) -> Resul
 
     let mut body = vec![0; length];
     reader.read_exact(&mut body).await?;
+
+    log::info!("<= {}", String::from_utf8_lossy(&body));
 
     let json: Value = serde_json::from_slice(&body)?;
     Ok(Some(json))
