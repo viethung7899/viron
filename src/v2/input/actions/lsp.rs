@@ -1,7 +1,7 @@
 use crate::core::message::Message;
 use crate::input::actions::Action;
 use crate::input::actions::{
-    ActionContext, ActionDefinition, ActionResult, Executable, impl_action, system,
+    impl_action, system, ActionContext, ActionDefinition, ActionResult, Executable,
 };
 use async_trait::async_trait;
 
@@ -16,13 +16,13 @@ impl Executable for GoToDefinition {
                 .execute(ctx)
                 .await;
         };
-        
+
         let Some(lsp) = ctx.lsp_service.get_client_mut() else {
             return system::ShowMessage(Message::error("LSP client is not available".to_string()))
                 .execute(ctx)
                 .await;
         };
-        
+
         let point = ctx.cursor.get_point();
         if let Err(err) = lsp.goto_definition(&uri, point.row, point.column).await {
             return system::ShowMessage(Message::error(format!("Error: {}", err)))
@@ -33,6 +33,4 @@ impl Executable for GoToDefinition {
     }
 }
 
-impl_action!(GoToDefinition, "Go to definition", self {
-    ActionDefinition::GoToDefinition
-});
+impl_action!(GoToDefinition, "Go to definition", ActionDefinition::GoToDefinition);

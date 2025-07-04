@@ -131,9 +131,11 @@ impl Executable for MoveToLineStart {
     }
 }
 
-impl_action!(MoveToLineStart, "Move to line start", self {
+impl_action!(
+    MoveToLineStart,
+    "Move to line start",
     ActionDefinition::MoveToLineStart
-});
+);
 
 #[derive(Debug, Clone)]
 pub struct MoveToLineEnd;
@@ -149,9 +151,11 @@ impl Executable for MoveToLineEnd {
     }
 }
 
-impl_action!(MoveToLineEnd, "Move to line end", self {
+impl_action!(
+    MoveToLineEnd,
+    "Move to line end",
     ActionDefinition::MoveToLineEnd
-});
+);
 
 #[derive(Debug, Clone)]
 pub struct MoveToTop;
@@ -159,16 +163,11 @@ pub struct MoveToTop;
 #[async_trait(?Send)]
 impl Executable for MoveToTop {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
-        ctx.cursor.move_to_top();
-        ctx.compositor
-            .mark_dirty(&ctx.component_ids.status_line_id)?;
-        Ok(())
+        GoToLine::new(0).execute(ctx).await
     }
 }
 
-impl_action!(MoveToTop, "Move to top of buffer", self {
-    ActionDefinition::MoveToTop
-});
+impl_action!(MoveToTop, "Move to top of buffer", ActionDefinition::MoveToTop);
 
 #[derive(Debug, Clone)]
 pub struct MoveToBottom;
@@ -176,17 +175,12 @@ pub struct MoveToBottom;
 #[async_trait(?Send)]
 impl Executable for MoveToBottom {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
-        ctx.cursor
-            .move_to_bottom(ctx.buffer_manager.current_buffer(), ctx.mode);
-        ctx.compositor
-            .mark_dirty(&ctx.component_ids.status_line_id)?;
-        Ok(())
+        let line_count = ctx.buffer_manager.current_buffer().line_count();
+        GoToLine::new(line_count.saturating_sub(1)).execute(ctx).await
     }
 }
 
-impl_action!(MoveToBottom, "Move to bottom of buffer", self {
-    ActionDefinition::MoveToBottom
-});
+impl_action!(MoveToBottom, "Move to bottom of buffer", ActionDefinition::MoveToBottom);
 
 #[derive(Debug, Clone)]
 pub struct MoveToViewportCenter;
@@ -205,9 +199,7 @@ impl Executable for MoveToViewportCenter {
     }
 }
 
-impl_action!(MoveToViewportCenter, "Move viewport to center of buffer", self {
-    ActionDefinition::MoveToViewportCenter
-});
+impl_action!(MoveToViewportCenter, "Move viewport to center of buffer", ActionDefinition::MoveToViewportCenter);
 
 #[derive(Debug, Clone)]
 pub struct MoveToNextWord;
@@ -223,9 +215,7 @@ impl Executable for MoveToNextWord {
     }
 }
 
-impl_action!(MoveToNextWord, "Move to next word", self {
-    ActionDefinition::MoveToNextWord
-});
+impl_action!(MoveToNextWord, "Move to next word", ActionDefinition::MoveToNextWord);
 
 #[derive(Debug, Clone)]
 pub struct MoveToPreviousWord;
@@ -241,9 +231,7 @@ impl Executable for MoveToPreviousWord {
     }
 }
 
-impl_action!(MoveToPreviousWord, "Move to previous word", self {
-    ActionDefinition::MoveToPreviousWord
-});
+impl_action!(MoveToPreviousWord, "Move to previous word", ActionDefinition::MoveToPreviousWord);
 
 #[derive(Debug, Clone)]
 pub struct GoToLine {

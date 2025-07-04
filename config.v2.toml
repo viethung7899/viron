@@ -2,7 +2,7 @@ theme = "themes/catppuchin/mocha.json"
 
 # Keybindings for normal mode
 [keymap.normal]
-"q" = { type = "Quit", params = { force = true } }
+"q" = { type = "Quit" }
 "<Esc>" = { type = "EnterMode", params = { mode = "normal" } }
 
 "h" = { type = "MoveLeft", params = { count = 1 } }

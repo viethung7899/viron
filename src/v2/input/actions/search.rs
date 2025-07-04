@@ -96,16 +96,21 @@ impl Executable for SearchSubmit {
             return system::ShowMessage(Message::error(
                 "E: Search pattern cannot be empty".to_string(),
             ))
-            .execute(ctx).await;
+            .execute(ctx)
+            .await;
         }
         let result = ctx
             .search_buffer
             .search(&self.pattern, &ctx.buffer_manager.current_buffer());
         if let Err(e) = result {
-            system::ShowMessage(Message::error(format!("E: {e}"))).execute(ctx).await?;
+            system::ShowMessage(Message::error(format!("E: {e}")))
+                .execute(ctx)
+                .await?;
         }
         if let Some(point) = ctx.search_buffer.find_first(&ctx.cursor.get_point()) {
-            movement::GoToPosition::new(point.row, point.column).execute(ctx).await?;
+            movement::GoToPosition::new(point.row, point.column)
+                .execute(ctx)
+                .await?;
         }
         mode::EnterMode::new(Mode::Normal).execute(ctx).await?;
         ctx.compositor
@@ -123,7 +128,9 @@ pub struct FindNext;
 impl Executable for FindNext {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         if let Some(point) = ctx.search_buffer.find_next(&ctx.cursor.get_point()) {
-            movement::GoToPosition::new(point.row, point.column).execute(ctx).await?;
+            movement::GoToPosition::new(point.row, point.column)
+                .execute(ctx)
+                .await?;
         }
         ctx.compositor
             .mark_visible(&ctx.component_ids.search_box_id, true)?;
@@ -133,9 +140,7 @@ impl Executable for FindNext {
     }
 }
 
-impl_action!(FindNext, "Find next match", self {
-    ActionDefinition::FindNext
-});
+impl_action!(FindNext, "Find next match", ActionDefinition::FindNext);
 
 #[derive(Debug, Clone)]
 pub struct FindPrevious;
@@ -144,7 +149,9 @@ pub struct FindPrevious;
 impl Executable for FindPrevious {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         if let Some(point) = ctx.search_buffer.find_previous(&ctx.cursor.get_point()) {
-            movement::GoToPosition::new(point.row, point.column).execute(ctx).await?;
+            movement::GoToPosition::new(point.row, point.column)
+                .execute(ctx)
+                .await?;
         }
         ctx.compositor
             .mark_visible(&ctx.component_ids.search_box_id, true)?;
@@ -154,6 +161,8 @@ impl Executable for FindPrevious {
     }
 }
 
-impl_action!(FindPrevious, "Find previous match", self {
+impl_action!(
+    FindPrevious,
+    "Find previous match",
     ActionDefinition::FindPrevious
-});
+);

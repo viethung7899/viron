@@ -11,10 +11,10 @@ pub fn parse_command(input: &str) -> Result<Box<dyn Executable>> {
     let command = parts[0];
 
     let definition = match command.to_lowercase().as_str() {
-        "q" | "quit" => Ok(ActionDefinition::Quit {
+        "q" | "quit" => Ok(ActionDefinition::CloseBuffer {
             force: parts.get(1).map_or(false, |&arg| arg == "!"),
         }),
-        "q!" | "quit!" => Ok(ActionDefinition::Quit { force: true }),
+        "q!" | "quit!" => Ok(ActionDefinition::CloseBuffer { force: true }),
         "w" | "write" => {
             let path = parts.get(1).map(|&s| s.to_string());
             Ok(ActionDefinition::WriteBuffer { path })
@@ -25,7 +25,7 @@ pub fn parse_command(input: &str) -> Result<Box<dyn Executable>> {
                 description: "Write and quit".to_string(),
                 actions: vec![
                     ActionDefinition::WriteBuffer { path },
-                    ActionDefinition::Quit { force: false },
+                    ActionDefinition::CloseBuffer { force: false },
                 ],
             })
         }

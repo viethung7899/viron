@@ -53,7 +53,6 @@ impl_action!(InsertChar, "Insert char", self {
 #[derive(Debug, Clone)]
 pub struct DeleteChar;
 
-
 #[async_trait(?Send)]
 impl Executable for DeleteChar {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
@@ -76,9 +75,7 @@ impl Executable for DeleteChar {
     }
 }
 
-impl_action!(DeleteChar, "Delete character", self {
-    ActionDefinition::DeleteChar
-});
+impl_action!(DeleteChar, "Delete character", ActionDefinition::DeleteChar);
 
 #[derive(Debug, Clone)]
 pub struct Backspace;
@@ -110,9 +107,7 @@ impl Executable for Backspace {
     }
 }
 
-impl_action!(Backspace, "Backspace", self {
-    ActionDefinition::Backspace
-});
+impl_action!(Backspace, "Backspace", ActionDefinition::Backspace);
 
 #[derive(Debug, Clone)]
 pub struct InsertNewLine;
@@ -142,9 +137,11 @@ impl Executable for InsertNewLine {
     }
 }
 
-impl_action!(InsertNewLine, "Insert new line", self {
+impl_action!(
+    InsertNewLine,
+    "Insert new line",
     ActionDefinition::InsertNewLine
-});
+);
 
 #[derive(Debug, Clone)]
 pub struct InsertNewLineBelow;
@@ -185,9 +182,11 @@ impl Executable for InsertNewLineBelow {
     }
 }
 
-impl_action!(InsertNewLineBelow, "Insert new line below", self {
+impl_action!(
+    InsertNewLineBelow,
+    "Insert new line below",
     ActionDefinition::InsertNewLineBelow
-});
+);
 
 #[derive(Debug, Clone)]
 pub struct InsertNewLineAbove;
@@ -232,6 +231,8 @@ impl Executable for InsertNewLineAbove {
     }
 }
 
-impl_action!(InsertNewLineAbove, "Insert new line above", self {
+impl_action!(
+    InsertNewLineAbove,
+    "Insert new line above",
     ActionDefinition::InsertNewLineAbove
-});
+);
