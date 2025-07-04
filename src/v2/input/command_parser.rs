@@ -44,7 +44,7 @@ pub fn parse_command(input: &str) -> Result<Box<dyn Executable>> {
         "bp" | "bprevious" => Ok(Box::new(PreviousBuffer)),
         cmd => {
             if let Ok(line_number) = cmd.parse::<usize>() {
-                Ok(Box::new(GoToLine::new(line_number)))
+                Ok(Box::new(GoToLine::new(line_number.saturating_sub(1))))
             } else {
                 Err(anyhow!("Command not found {}", input))
             }

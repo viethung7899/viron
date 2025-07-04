@@ -14,7 +14,7 @@ impl EventHandler {
     pub fn new() -> Self {
         Self {
             event_stream: EventStream::new(),
-            tick_interval: interval(Duration::from_millis(16)),
+            tick_interval: interval(Duration::from_millis(500)),
         }
     }
 
