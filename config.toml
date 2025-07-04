@@ -1,64 +1,87 @@
 theme = "themes/catppuchin/mocha.json"
-tab_size = 4
-log_file = "/tmp/viron.log"
 
-[keys.normal]
-"w" = "MoveToNextWord"
-"b" = "MoveToPreviousWord"
-"q" = "Quit"
-"u" = "Undo"
-"k" = "MoveUp"
-"j" = "MoveDown"
-"l" = "MoveRight"
-"h" = "MoveLeft"
-"Up" = "MoveUp"
-"Down" = "MoveDown"
-"Left" = "MoveLeft"
-"Right" = "MoveRight"
-"0" = "MoveToLineStart"
-"$" = "MoveToLineEnd"
-"Home" = "MoveToLineStart"
-"End" = "MoveToLineEnd"
-"G" = "MoveToBottom"
-"o" = [{ EnterMode = "Insert" }, "MoveToLineEnd", "InsertNewLineAtCursor"]
-"O" = "InsertNewLineAtCurrentLine"
-"x" = "DeleteCharAtCursor"
-"Ctrl-b" = "PageUp"
-"Ctrl-f" = "PageDown"
+# Keybindings for normal mode
+[keymap.normal]
+"q" = { type = "Quit" }
+"<Esc>" = { type = "EnterMode", params = { mode = "normal" } }
 
-"i" = { EnterMode = "Insert" }
-"a" = [{ EnterMode = "Insert" }, "MoveRight"]
+"h" = { type = "MoveLeft", params = { count = 1 } }
+"j" = { type = "MoveDown", params = { count = 1 } }
+"k" = { type = "MoveUp", params = { count = 1 } }
+"l" = { type = "MoveRight", params = { count = 1 } }
+"<Left>" = { type = "MoveLeft", params = { count = 1 } }
+"<Right>" = { type = "MoveRight", params = { count = 1 } }
+"<Up>" = { type = "MoveUp", params = { count = 1 } }
+"<Down>" = { type = "MoveDown", params = { count = 1 } }
 
-":" = { EnterMode = "Command" }
-"/" = { EnterMode = "Search" }
-"n" = "FindNext"
-"N" = "FindPrevious"
+"$" = { type = "MoveToLineEnd" }
+"0" = { type = "MoveToLineStart" }
+"<Home>" = { type = "MoveToLineStart" }
+"<End>" = { type = "MoveToLineEnd" }
+"gg" = { type = "MoveToTop" }
+"G" = { type = "MoveToBottom" }
+"zz" = { type = "MoveToViewportCenter" }
 
-[keys.normal.g]
-"g" = "MoveToTop"
-"d" = "GotoDefinition"
+"w" = { type = "MoveToNextWord" }
+"b" = { type = "MoveToPreviousWord" }
 
-[keys.normal.d]
-"d" = "DeleteCurrentLine"
-"w" = "DeleteWord"
+"x" = { type = "DeleteChar" }
 
-[keys.normal.z]
-"z" = "MoveToViewportCenter"
+"i" = { type = "EnterMode", params = { mode = "insert" } }
+":" = { type = "EnterMode", params = { mode = "command" } }
+"/" = { type = "EnterMode", params = { mode = "search" } }
 
-[keys.insert]
-"Esc" = { EnterMode = "Normal" }
-"Up" = "MoveUp"
-"Down" = "MoveDown"
-"Left" = "MoveLeft"
-"Right" = "MoveRight"
-"Delete" = "DeleteCharAtCursor"
-"Backspace" = "BackspaceCharAtCursor"
-"Enter" = "InsertNewLineAtCursor"
-"Tab" = "InsertTabAtCursor"
+"n" = { type = "FindNext" }
+"N" = { type = "FindPrevious" }
 
-[keys.command]
-"Esc" = { EnterMode = "Normal" }
-"Left" = "MoveLeft"
-"Right" = "MoveRight"
-"Backspace" = "BackspaceCharAtCursor"
-"Enter" = "ExecuteCommand"
+"u" = { type = "UndoBuffer" }
+"<Ctrl>r" = { type = "RedoBuffer" }
+
+"gd" = { type = "GoToDefinition" }
+
+[keymap.normal.a]
+type = "Composite"
+params = { description = "Insert mode with move right", actions = [
+    { type = "EnterMode", params = { mode = "insert" } },
+    { type = "MoveRight", params = { count = 1 } }
+] }
+
+[keymap.normal.A]
+type = "Composite"
+params = { description = "Insert mode at line end", actions = [
+    { type = "EnterMode", params = { mode = "insert" } },
+    { type = "MoveToLineEnd" }
+] }
+
+[keymap.normal.o]
+type = "Composite"
+params = { description = "Insert new line at cursor", actions = [
+    { type = "EnterMode", params = { mode = "insert" } },
+    { type = "InsertNewLineBelow" }
+] }
+
+[keymap.normal.O]
+type = "Composite"
+params = { description = "Insert new line at current line", actions = [
+    { type = "EnterMode", params = { mode = "insert" } },
+    { type = "InsertNewLineAbove" }
+] }
+
+# Keybindings for insert mode
+[keymap.insert]
+"<Esc>" = { type = "EnterMode", params = { mode = "normal" } }
+"<Delete>" = { type = "DeleteChar" }
+"<Backspace>" = { type = "Backspace" }
+"<Enter>" = { type = "InsertNewLine" }
+"<Left>" = { type = "MoveLeft", params = { count = 1 } }
+"<Right>" = { type = "MoveRight", params = { count = 1 } }
+"<Up>" = { type = "MoveUp", params = { count = 1 } }
+"<Down>" = { type = "MoveDown", params = { count = 1 } }
+"<Home>" = { type = "MoveToLineStart" }
+"<End>" = { type = "MoveToLineEnd" }
+
+[keymap.command]
+"<Esc>" = { type = "EnterMode", params = { mode = "normal" } }
+
+[keymap.search]
+"<Esc>" = { type = "EnterMode", params = { mode = "normal" } }

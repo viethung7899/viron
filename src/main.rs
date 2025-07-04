@@ -1,54 +1,68 @@
-mod v1;
+mod config;
+mod core;
+mod editor;
+mod input;
+mod service;
+mod ui;
 
-use std::{io::stdout, panic};
-
-use crossterm::{ExecutableCommand, event, terminal};
-use once_cell::sync::OnceCell;
-use v1::config::Config;
-use v1::editor::Editor;
-use v1::logger::Logger;
-use v1::lsp::LspClient;
-use v1::theme;
+use crate::config::Config;
+use anyhow::Result;
+use crossterm::terminal::ClearType;
+use crossterm::{cursor, terminal};
+use editor::Editor;
+use std::{env, io::stdout, panic};
 
 #[tokio::main]
-async fn main() -> anyhow::Result<()> {
-    let toml = std::fs::read_to_string("config.v2.toml")?;
-    let config: Config = toml::from_str(&toml)?;
+async fn main() -> Result<()> {
+    // Enable better panic messages
+    better_panic::install();
 
-    let file = std::env::args().nth(1);
-    let theme = theme::parse_vscode_theme(&config.theme)?;
+    // Initialize logging if needed
+    setup_log()?;
 
-    if let Some(log_file) = &config.log_file {
-        LOGGER.get_or_init(|| Some(Logger::new(log_file)));
-    } else {
-        LOGGER.get_or_init(|| None);
+    // Parse command line arguments
+    let args: Vec<String> = env::args().collect();
+    let file_name = args.get(1);
+
+    let mut editor = Editor::new(file_name).await?;
+
+    // Load the config
+    editor.load_config(&Config::load_from_file("config.toml")?)?;
+
+    // Set up error handling for the editor's run method
+    let result = editor.run().await;
+
+    // Always clean up terminal state, even if run_editor fails
+    if let Err(e) = editor.cleanup().await {
+        log::error!("Error cleaning up terminal: {}", e);
     }
-
-    let mut lsp = LspClient::start().await?;
-    lsp.initialize().await?;
-
-    let mut editor = Editor::new(config, theme, lsp, file).await?;
 
     panic::set_hook(Box::new(|info| {
         let mut stdout = stdout();
-        _ = stdout.execute(terminal::LeaveAlternateScreen);
-        _ = stdout.execute(event::DisableMouseCapture);
+        _ = crossterm::execute!(
+            stdout,
+            terminal::Clear(ClearType::All),
+            cursor::Show,
+            terminal::LeaveAlternateScreen,
+        );
         _ = terminal::disable_raw_mode();
-        eprintln!("{}", info);
+        log::error!("{}", info);
     }));
 
-    editor.run().await
+    // Return the result from run_editor
+    result
 }
 
-#[allow(unused)]
-static LOGGER: OnceCell<Option<Logger>> = OnceCell::new();
+fn setup_log() -> Result<()> {
+    use env_logger::{Builder, Target};
+    use log::LevelFilter;
+    use std::fs::File;
 
-#[macro_export]
-macro_rules! log {
-    ($($args:tt)*) => {
-        let message = format!($($args)*);
-        if let Some(logger) = $crate::LOGGER.get_or_init(|| Some($crate::Logger::new("target/debug/viron.log"))) {
-            logger.log(&message);
-        }
-    };
+    let file = File::create("/tmp/viron.log")?;
+    Builder::new()
+        .target(Target::Pipe(Box::new(file)))
+        .filter(None, LevelFilter::Info)
+        .init();
+
+    Ok(())
 }
