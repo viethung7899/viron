@@ -2,6 +2,9 @@ use async_trait::async_trait;
 
 use crate::core::message::Message;
 use crate::input::actions::{impl_action, system, Action, ActionContext, ActionResult, Executable};
+use crate::input::actions::{
+    Action, ActionContext, ActionDefinition, ActionResult, Executable, impl_action, system,
+};
 
 use crate::input::actions::definition::ActionDefinition;
 use std::fmt::Debug;
@@ -105,8 +108,15 @@ impl Executable for WriteBuffer {
             .await;
         };
 
-        let content = current_document.buffer.to_bytes();
+        let content = current_document.buffer.to_string();
         let line_count = current_document.buffer.line_count();
+
+        if let Some(uri) = current_document.uri() {
+            if let Some(client) = ctx.lsp_service.get_client_mut() {
+                client.did_save(&uri, &content).await?;
+            }
+        }
+
         match std::fs::write(&path, &content) {
             Ok(_) => {
                 let message = format!(

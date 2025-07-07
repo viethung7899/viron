@@ -216,7 +216,7 @@ impl LspClient {
         Ok(())
     }
 
-    pub async fn did_open(&mut self, uri: &str, contents: &str) -> anyhow::Result<()> {
+    pub async fn did_open(&mut self, uri: &str, contents: &str) -> Result<()> {
         let params = json!({
             "textDocument": {
                 "uri": uri,
@@ -232,7 +232,20 @@ impl LspClient {
         Ok(())
     }
 
-    pub async fn did_close(&mut self, uri: &str) -> anyhow::Result<()> {
+    pub async fn did_save(&mut self, uri: &str, contents: &str) -> Result<()> {
+        let params = json!({
+            "textDocument": {
+                "uri": uri,
+            },
+            "text": contents,
+        });
+
+        self.send_notification("textDocument/didSave", params)
+            .await?;
+        Ok(())
+    }
+
+    pub async fn did_close(&mut self, uri: &str) -> Result<()> {
         let params = json!({
             "textDocument": {
                 "uri": uri,
@@ -250,7 +263,7 @@ impl LspClient {
         uri: &str,
         line: usize,
         character: usize,
-    ) -> anyhow::Result<()> {
+    ) -> Result<()> {
         let params = json!({
             "textDocument": {
                 "uri": uri,
@@ -286,9 +299,7 @@ impl LspClient {
         Ok(())
     }
 
-    pub async fn receive_response(
-        &mut self,
-    ) -> anyhow::Result<Option<(InboundMessage, Option<String>)>> {
+    pub async fn receive_response(&mut self) -> Result<Option<(InboundMessage, Option<String>)>> {
         match self.response_receiver.try_recv() {
             Ok(msg) => {
                 if let InboundMessage::Response(msg) = &msg {
@@ -376,10 +387,7 @@ fn parse_notification(method: &str, params: &Value) -> Result<Option<Notificatio
     }
 }
 
-pub async fn lsp_send_request<W: Unpin + AsyncWrite>(
-    writer: &mut W,
-    req: &Request,
-) -> anyhow::Result<i64> {
+pub async fn lsp_send_request<W: Unpin + AsyncWrite>(writer: &mut W, req: &Request) -> Result<i64> {
     let id = req.id;
     let req = json!({
         "id": req.id,
