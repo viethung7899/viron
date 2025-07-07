@@ -2,8 +2,8 @@ use async_trait::async_trait;
 
 use crate::core::message::Message;
 use crate::input::actions::{
-    Action, ActionContext, ActionDefinition, ActionResult, Executable, impl_action, movement,
-    system,
+    impl_action, movement, system, Action, ActionContext, ActionDefinition, ActionResult,
+    Executable,
 };
 
 use std::fmt::Debug;
@@ -52,7 +52,11 @@ impl Executable for PreviousBuffer {
     }
 }
 
-impl_action!(PreviousBuffer, "Previous buffer", ActionDefinition::PreviousBuffer);
+impl_action!(
+    PreviousBuffer,
+    "Previous buffer",
+    ActionDefinition::PreviousBuffer
+);
 
 #[derive(Debug, Clone)]
 pub struct OpenBuffer {
@@ -178,20 +182,20 @@ impl Executable for UndoBuffer {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         match ctx.buffer_manager.current_mut().undo() {
             Ok(change) => {
-                let point = change.point_after();
                 ctx.compositor
                     .mark_dirty(&ctx.component_ids.buffer_view_id)?;
-                movement::GoToPosition::new(point.row, point.column)
-                    .execute(ctx)
-                    .await?;
+                ctx.cursor
+                    .set_point(change.point_after(), ctx.buffer_manager.current_buffer());
+                let (row, column) = ctx.cursor.get_display_cursor();
+
+                movement::GoToPosition::new(row, column).execute(ctx).await
             }
             Err(e) => {
                 system::ShowMessage(Message::error(e.to_string()))
                     .execute(ctx)
-                    .await?;
+                    .await
             }
         }
-        Ok(())
     }
 }
 
@@ -205,12 +209,13 @@ impl Executable for RedoBuffer {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         match ctx.buffer_manager.current_mut().redo() {
             Ok(change) => {
-                let point = change.point_after();
                 ctx.compositor
                     .mark_dirty(&ctx.component_ids.buffer_view_id)?;
-                movement::GoToPosition::new(point.row, point.column)
-                    .execute(ctx)
-                    .await
+                ctx.cursor
+                    .set_point(change.point_after(), ctx.buffer_manager.current_buffer());
+                let (row, column) = ctx.cursor.get_display_cursor();
+
+                movement::GoToPosition::new(row, column).execute(ctx).await
             }
             Err(e) => {
                 system::ShowMessage(Message::error(e.to_string()))

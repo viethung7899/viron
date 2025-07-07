@@ -209,14 +209,14 @@ impl Buffer {
     pub fn apply_edit(&mut self, change: &Edit) {
         match change {
             Edit::Insert(Insert {
-                byte_position: position,
+                start_byte: position,
                 text,
                 ..
             }) => {
                 self.insert_string(*position, &text);
             }
             Edit::Delete(Delete {
-                byte_position: position,
+                start_byte: position,
                 text,
                 ..
             }) => {
