@@ -12,6 +12,11 @@ pub fn get_initialize_params(workspace_uri: impl ToString) -> InitializeParams {
                         .link_support(false)
                         .build(),
                 )
+                .general(
+                    GeneralCapabilities::builder()
+                        .position_encoding(vec![PositionEncodingKind::Utf8])
+                        .build(),
+                )
                 .build(),
         )
         .build();
