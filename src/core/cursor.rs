@@ -128,6 +128,7 @@ impl Cursor {
         } else {
             self.char_column = line_length.saturating_sub(1);
         }
+        self.sync_byte_column(buffer);
         self.preferred_column = self.char_column;
     }
 

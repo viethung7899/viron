@@ -1,7 +1,7 @@
 use crate::core::history::change::Change;
 use crate::editor::Mode;
 use crate::input::actions::{
-    Action, ActionContext, ActionDefinition, ActionResult, Executable, impl_action,
+    impl_action, Action, ActionContext, ActionDefinition, ActionResult, Executable,
 };
 use async_trait::async_trait;
 use std::fmt::Debug;
@@ -161,17 +161,21 @@ impl Executable for InsertNewLineBelow {
 
         // Move cursor to end of the current line
         ctx.cursor.move_to_line_end(&document.buffer, &Mode::Insert);
-        let position = document.buffer.cursor_position(&ctx.cursor.get_point());
+        let byte_position = document.buffer.cursor_position(&ctx.cursor.get_point());
 
         // Insert newline at end of current line followed by indentation
         let insert_text = format!("\n{}", indentation);
-        let new_position = document.buffer.insert_string(position, &insert_text);
-        let new_point = document.buffer.point_at_position(new_position);
+        document.buffer.insert_string(byte_position, &insert_text);
+
+        // Position cursor at the start of the new line after indentation
+        let mut new_point = point.clone();
+        new_point.row += 1;
+        new_point.column = indentation.len();
 
         ctx.cursor.set_point(new_point, &document.buffer);
         document
             .history
-            .push(Change::insert(position, insert_text, point, new_point));
+            .push(Change::insert(byte_position, insert_text, point, new_point));
         document.mark_modified();
         ctx.compositor
             .mark_dirty(&ctx.component_ids.buffer_view_id)?;
@@ -205,23 +209,24 @@ impl Executable for InsertNewLineAbove {
             .collect::<String>();
 
         // Move cursor to beginning of current line
-        ctx.cursor.move_to_line_start();
-        let position = document.buffer.cursor_position(&ctx.cursor.get_point());
+        let mut new_point = point.clone();
+        new_point.column = 0;
+        let byte_position = document.buffer.cursor_position(&new_point);
+        log::info!("Point: {:?}, Byte Position: {}", new_point, byte_position);
 
         // Insert indentation followed by newline
         let insert_text = format!("{}\n", indentation);
-        document.buffer.insert_string(position, &insert_text);
+        document.buffer.insert_string(byte_position, &insert_text);
 
         // Position cursor at end of the new line (after indentation)
-        let cursor_position = position + indentation.len();
-        let new_point = document.buffer.point_at_position(cursor_position);
+        new_point.column = indentation.len();
 
         ctx.cursor.set_point(new_point, &document.buffer);
 
         document.mark_modified();
         document
             .history
-            .push(Change::insert(position, insert_text, point, new_point));
+            .push(Change::insert(byte_position, insert_text, point, new_point));
         ctx.compositor
             .mark_dirty(&ctx.component_ids.buffer_view_id)?;
         ctx.compositor
