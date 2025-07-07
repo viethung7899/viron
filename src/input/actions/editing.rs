@@ -1,10 +1,28 @@
 use crate::core::history::edit::Edit;
+use crate::core::message::Message;
 use crate::editor::Mode;
 use crate::input::actions::{
-    impl_action, Action, ActionContext, ActionDefinition, ActionResult, Executable,
+    impl_action, movement, system, Action, ActionContext, ActionDefinition, ActionResult,
+    Executable,
 };
 use async_trait::async_trait;
 use std::fmt::Debug;
+
+fn after_edit(ctx: &mut ActionContext, edit: &Edit) -> ActionResult {
+    let document = ctx.buffer_manager.current_mut();
+    document.mark_modified();
+
+    if let Some(syntax_engine) = document.syntax_engine.as_mut() {
+        syntax_engine.apply_edit(&edit)?;
+    }
+
+    ctx.compositor
+        .mark_dirty(&ctx.component_ids.buffer_view_id)?;
+    ctx.compositor
+        .mark_dirty(&ctx.component_ids.status_line_id)?;
+    ctx.search_buffer.reset();
+    Ok(())
+}
 
 #[derive(Debug, Clone)]
 pub struct InsertChar(char);
@@ -26,24 +44,17 @@ impl Executable for InsertChar {
         let new_position = buffer.insert_char(byte_start, self.0);
         let new_point = buffer.point_at_position(new_position);
 
-        ctx.cursor.set_point(new_point.clone(), buffer);
+        ctx.cursor.set_point(new_point, buffer);
 
-        let document = ctx.buffer_manager.current_mut();
-        document.mark_modified();
-
-        document.history.push(Edit::insert(
+        let edit = Edit::insert(
             byte_start,
             current_point,
             self.0.to_string(),
             current_point,
             new_point,
-        ));
-
-        ctx.compositor
-            .mark_dirty(&ctx.component_ids.buffer_view_id)?;
-        ctx.compositor
-            .mark_dirty(&ctx.component_ids.status_line_id)?;
-        ctx.search_buffer.reset();
+        );
+        after_edit(ctx, &edit)?;
+        ctx.buffer_manager.current_mut().history.push(edit);
         Ok(())
     }
 }
@@ -62,16 +73,10 @@ impl Executable for DeleteChar {
         let byte_start = document.buffer.cursor_position(&point);
         if let Some((c, _)) = document.buffer.delete_char(byte_start) {
             // Cursor stays in place after deletion
-            document.mark_modified();
-            document
-                .history
-                .push(Edit::delete(byte_start, point, c.to_string(), point, point));
-            ctx.compositor
-                .mark_dirty(&ctx.component_ids.buffer_view_id)?;
-            ctx.compositor
-                .mark_dirty(&ctx.component_ids.status_line_id)?;
+            let edit = Edit::delete(byte_start, point, c.to_string(), point, point);
+            after_edit(ctx, &edit)?;
+            ctx.buffer_manager.current_mut().history.push(edit);
         }
-        ctx.search_buffer.reset();
         Ok(())
     }
 }
@@ -90,20 +95,10 @@ impl Executable for Backspace {
         ctx.cursor.move_left(&document.buffer, ctx.mode, true);
         if position > 0 {
             if let Some((c, new_position)) = document.buffer.delete_char(position - 1) {
-                document.mark_modified();
                 let new_point = document.buffer.point_at_position(new_position);
-                document.history.push(Edit::delete(
-                    position - 1,
-                    new_point,
-                    c.to_string(),
-                    point,
-                    new_point,
-                ));
-                ctx.compositor
-                    .mark_dirty(&ctx.component_ids.buffer_view_id)?;
-                ctx.compositor
-                    .mark_dirty(&ctx.component_ids.status_line_id)?;
-                ctx.search_buffer.reset();
+                let edit = Edit::delete(position - 1, point, c.to_string(), point, new_point);
+                after_edit(ctx, &edit)?;
+                ctx.buffer_manager.current_mut().history.push(edit);
             }
         }
         Ok(())
@@ -123,20 +118,10 @@ impl Executable for InsertNewLine {
         let byte_start = document.buffer.cursor_position(&point);
         let new_position = document.buffer.insert_char(byte_start, '\n');
         let new_point = document.buffer.point_at_position(new_position);
-        document.mark_modified();
-        document.history.push(Edit::insert(
-            byte_start,
-            point,
-            "\n".to_string(),
-            point,
-            new_point.clone(),
-        ));
         ctx.cursor.set_point(new_point, &document.buffer);
-        ctx.compositor
-            .mark_dirty(&ctx.component_ids.buffer_view_id)?;
-        ctx.compositor
-            .mark_dirty(&ctx.component_ids.status_line_id)?;
-        ctx.search_buffer.reset();
+        let edit = Edit::insert(byte_start, point, "\n".to_string(), point, new_point);
+        after_edit(ctx, &edit)?;
+        ctx.buffer_manager.current_mut().history.push(edit);
         Ok(())
     }
 }
@@ -178,19 +163,9 @@ impl Executable for InsertNewLineBelow {
         new_point.column = indentation.len();
 
         ctx.cursor.set_point(new_point, &document.buffer);
-        document.history.push(Edit::insert(
-            byte_start,
-            start_point,
-            insert_text,
-            point,
-            new_point,
-        ));
-        document.mark_modified();
-        ctx.compositor
-            .mark_dirty(&ctx.component_ids.buffer_view_id)?;
-        ctx.compositor
-            .mark_dirty(&ctx.component_ids.status_line_id)?;
-        ctx.search_buffer.reset();
+        let edit = Edit::insert(byte_start, start_point, insert_text, point, new_point);
+        after_edit(ctx, &edit)?;
+        ctx.buffer_manager.current_mut().history.push(edit);
         Ok(())
     }
 }
@@ -231,20 +206,10 @@ impl Executable for InsertNewLineAbove {
         new_point.column = indentation.len();
 
         ctx.cursor.set_point(new_point, &document.buffer);
+        let edit = Edit::insert(start_byte, start_point, insert_text, point, new_point);
 
-        document.mark_modified();
-        document.history.push(Edit::insert(
-            start_byte,
-            start_point,
-            insert_text,
-            point,
-            new_point,
-        ));
-        ctx.compositor
-            .mark_dirty(&ctx.component_ids.buffer_view_id)?;
-        ctx.compositor
-            .mark_dirty(&ctx.component_ids.status_line_id)?;
-        ctx.search_buffer.reset();
+        after_edit(ctx, &edit)?;
+        ctx.buffer_manager.current_mut().history.push(edit);
         Ok(())
     }
 }
@@ -254,3 +219,57 @@ impl_action!(
     "Insert new line above",
     ActionDefinition::InsertNewLineAbove
 );
+
+#[derive(Debug, Clone)]
+pub struct Undo;
+
+#[async_trait(?Send)]
+impl Executable for Undo {
+    async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+        match ctx.buffer_manager.current_mut().undo() {
+            Ok(edit) => {
+                ctx.cursor
+                    .set_point(edit.point_after(), ctx.buffer_manager.current_buffer());
+                let (row, column) = ctx.cursor.get_display_cursor();
+                movement::GoToPosition::new(row, column)
+                    .execute(ctx)
+                    .await?;
+                after_edit(ctx, &edit)
+            }
+            Err(e) => {
+                system::ShowMessage(Message::error(e.to_string()))
+                    .execute(ctx)
+                    .await
+            }
+        }
+    }
+}
+
+impl_action!(Undo, "Undo", ActionDefinition::Undo);
+
+#[derive(Debug, Clone)]
+pub struct Redo;
+
+#[async_trait(?Send)]
+impl Executable for Redo {
+    async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+        match ctx.buffer_manager.current_mut().redo() {
+            Ok(edit) => {
+                ctx.cursor
+                    .set_point(edit.point_after(), ctx.buffer_manager.current_buffer());
+                let (row, column) = ctx.cursor.get_display_cursor();
+                movement::GoToPosition::new(row, column)
+                    .execute(ctx)
+                    .await?;
+                after_edit(ctx, &edit)
+            }
+            Err(e) => {
+                system::ShowMessage(Message::error(e.to_string()))
+                    .execute(ctx)
+                    .await
+            }
+        }
+    }
+}
+
+impl_action!(Redo, "Redo", ActionDefinition::Redo);

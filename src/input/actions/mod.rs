@@ -228,8 +228,8 @@ pub enum ActionDefinition {
     WriteBuffer {
         path: Option<String>,
     },
-    UndoBuffer,
-    RedoBuffer,
+    Undo,
+    Redo,
     CloseBuffer {
         force: bool,
     },
@@ -297,8 +297,8 @@ pub fn create_action_from_definition(definition: &ActionDefinition) -> Box<dyn A
             let path_buf = path.as_ref().map(PathBuf::from);
             Box::new(WriteBuffer::new(path_buf))
         }
-        ActionDefinition::UndoBuffer => Box::new(UndoBuffer),
-        ActionDefinition::RedoBuffer => Box::new(RedoBuffer),
+        ActionDefinition::Undo => Box::new(Undo),
+        ActionDefinition::Redo => Box::new(Redo),
         ActionDefinition::CloseBuffer { force } => Box::new(CloseBuffer::force(*force)),
 
         // LSP actions
