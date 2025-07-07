@@ -493,7 +493,8 @@ impl Editor {
 
         // Only update if the width actually changed
         if self.viewport.width() != required_viewport_width {
-            self.viewport.resize(required_viewport_width, self.height);
+            self.viewport
+                .resize(required_viewport_width, height as usize - 2);
             self.compositor.mark_all_dirty();
         }
         Ok(())

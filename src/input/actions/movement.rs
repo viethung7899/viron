@@ -6,22 +6,23 @@ use std::fmt::Debug;
 
 #[derive(Debug, Clone)]
 pub struct MoveLeft {
-    count: usize,
+    previous_line: bool,
 }
 
 impl MoveLeft {
-    pub fn new(count: usize) -> Self {
-        Self { count }
+    pub fn new(previous_line: bool) -> Self {
+        Self { previous_line }
     }
 }
 
 #[async_trait(?Send)]
 impl Executable for MoveLeft {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
-        for _ in 0..self.count {
-            ctx.cursor
-                .move_left(ctx.buffer_manager.current_buffer(), ctx.mode);
-        }
+        ctx.cursor.move_left(
+            ctx.buffer_manager.current_buffer(),
+            ctx.mode,
+            self.previous_line,
+        );
         ctx.compositor
             .mark_dirty(&ctx.component_ids.status_line_id)?;
         Ok(())
@@ -29,27 +30,28 @@ impl Executable for MoveLeft {
 }
 
 impl_action!(MoveLeft, "Move cursor left", self {
-    ActionDefinition::MoveLeft { count: self.count }
+    ActionDefinition::MoveLeft { previous_line: self.previous_line }
 });
 
 #[derive(Debug, Clone)]
 pub struct MoveRight {
-    count: usize,
+    next_line: bool,
 }
 
 impl MoveRight {
-    pub fn new(count: usize) -> Self {
-        Self { count }
+    pub fn new(next_line: bool) -> Self {
+        Self { next_line }
     }
 }
 
 #[async_trait(?Send)]
 impl Executable for MoveRight {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
-        for _ in 0..self.count {
-            ctx.cursor
-                .move_right(ctx.buffer_manager.current_buffer(), ctx.mode);
-        }
+        ctx.cursor.move_right(
+            ctx.buffer_manager.current_buffer(),
+            ctx.mode,
+            self.next_line,
+        );
         ctx.compositor
             .mark_dirty(&ctx.component_ids.status_line_id)?;
         Ok(())
@@ -57,64 +59,40 @@ impl Executable for MoveRight {
 }
 
 impl_action!(MoveRight, "Move cursor right", self {
-    ActionDefinition::MoveRight { count: self.count }
+    ActionDefinition::MoveRight { next_line: self.next_line }
 });
 
 #[derive(Debug, Clone)]
-pub struct MoveUp {
-    count: usize,
-}
-
-impl MoveUp {
-    pub fn new(count: usize) -> Self {
-        Self { count }
-    }
-}
+pub struct MoveUp;
 
 #[async_trait(?Send)]
 impl Executable for MoveUp {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
-        for _ in 0..self.count {
-            ctx.cursor
-                .move_up(ctx.buffer_manager.current_buffer(), ctx.mode);
-        }
+        ctx.cursor
+            .move_up(ctx.buffer_manager.current_buffer(), ctx.mode);
         ctx.compositor
             .mark_dirty(&ctx.component_ids.status_line_id)?;
         Ok(())
     }
 }
 
-impl_action!(MoveUp, "Move cursor up", self {
-    ActionDefinition::MoveUp { count: self.count }
-});
+impl_action!(MoveUp, "Move cursor up", ActionDefinition::MoveUp);
 
 #[derive(Debug, Clone)]
-pub struct MoveDown {
-    count: usize,
-}
-
-impl MoveDown {
-    pub fn new(count: usize) -> Self {
-        Self { count }
-    }
-}
+pub struct MoveDown;
 
 #[async_trait(?Send)]
 impl Executable for MoveDown {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
-        for _ in 0..self.count {
-            ctx.cursor
-                .move_down(ctx.buffer_manager.current_buffer(), ctx.mode);
-        }
+        ctx.cursor
+            .move_down(ctx.buffer_manager.current_buffer(), ctx.mode);
         ctx.compositor
             .mark_dirty(&ctx.component_ids.status_line_id)?;
         Ok(())
     }
 }
 
-impl_action!(MoveDown, "Move cursor down", self {
-    ActionDefinition::MoveDown { count: self.count }
-});
+impl_action!(MoveDown, "Move cursor down", ActionDefinition::MoveDown);
 
 #[derive(Debug, Clone)]
 pub struct MoveToLineStart;

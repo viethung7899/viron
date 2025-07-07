@@ -5,17 +5,19 @@ theme = "themes/catppuchin/mocha.json"
 "q" = { type = "Quit" }
 "<Esc>" = { type = "EnterMode", params = { mode = "normal" } }
 
-"h" = { type = "MoveLeft", params = { count = 1 } }
-"j" = { type = "MoveDown", params = { count = 1 } }
-"k" = { type = "MoveUp", params = { count = 1 } }
-"l" = { type = "MoveRight", params = { count = 1 } }
-"<Left>" = { type = "MoveLeft", params = { count = 1 } }
-"<Right>" = { type = "MoveRight", params = { count = 1 } }
-"<Up>" = { type = "MoveUp", params = { count = 1 } }
-"<Down>" = { type = "MoveDown", params = { count = 1 } }
+"h" = { type = "MoveLeft", params = { previous_line = false } }
+"j" = { type = "MoveDown" }
+"k" = { type = "MoveUp" }
+"l" = { type = "MoveRight", params = { next_line = false } }
+"<Left>" = { type = "MoveLeft", params = { previous_line = false } }
+"<Right>" = { type = "MoveRight", params = { next_line = false } }
+"<Up>" = { type = "MoveUp" }
+"<Down>" = { type = "MoveDown" }
+"<Backspace>" = { type = "MoveLeft", params = { previous_line = true } }
 
 "$" = { type = "MoveToLineEnd" }
 "0" = { type = "MoveToLineStart" }
+
 "<Home>" = { type = "MoveToLineStart" }
 "<End>" = { type = "MoveToLineEnd" }
 "gg" = { type = "MoveToTop" }
@@ -39,33 +41,25 @@ theme = "themes/catppuchin/mocha.json"
 
 "gd" = { type = "GoToDefinition" }
 
-[keymap.normal.a]
-type = "Composite"
-params = { description = "Insert mode with move right", actions = [
+"a" = { type = "Composite", params = { description = "Insert after the cursor", actions = [
     { type = "EnterMode", params = { mode = "insert" } },
-    { type = "MoveRight", params = { count = 1 } }
-] }
+    { type = "MoveRight", params = { next_line = true } }
+] } }
 
-[keymap.normal.A]
-type = "Composite"
-params = { description = "Insert mode at line end", actions = [
+"A" = { type = "Composite", params = { description = "Insert at the end of the line", actions = [
     { type = "EnterMode", params = { mode = "insert" } },
     { type = "MoveToLineEnd" }
-] }
+] } }
 
-[keymap.normal.o]
-type = "Composite"
-params = { description = "Insert new line at cursor", actions = [
+"o" = { type = "Composite", params = { description = "Insert new line below the current line", actions = [
     { type = "InsertNewLineBelow" },
     { type = "EnterMode", params = { mode = "insert" } }
-] }
+] } }
 
-[keymap.normal.O]
-type = "Composite"
-params = { description = "Insert new line at current line", actions = [
+"O" = { type = "Composite", params = { description = "Insert new line above the current line", actions = [
     { type = "InsertNewLineAbove" },
     { type = "EnterMode", params = { mode = "insert" } }
-] }
+] } }
 
 # Keybindings for insert mode
 [keymap.insert]
@@ -73,10 +67,10 @@ params = { description = "Insert new line at current line", actions = [
 "<Delete>" = { type = "DeleteChar" }
 "<Backspace>" = { type = "Backspace" }
 "<Enter>" = { type = "InsertNewLine" }
-"<Left>" = { type = "MoveLeft", params = { count = 1 } }
-"<Right>" = { type = "MoveRight", params = { count = 1 } }
-"<Up>" = { type = "MoveUp", params = { count = 1 } }
-"<Down>" = { type = "MoveDown", params = { count = 1 } }
+"<Left>" = { type = "MoveLeft", params = { previous_line = true } }
+"<Right>" = { type = "MoveRight", params = { next_line = true } }
+"<Up>" = { type = "MoveUp" }
+"<Down>" = { type = "MoveDown" }
 "<Home>" = { type = "MoveToLineStart" }
 "<End>" = { type = "MoveToLineEnd" }
 
