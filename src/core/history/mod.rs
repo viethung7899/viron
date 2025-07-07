@@ -3,14 +3,14 @@ use std::{
     time::{Duration, Instant},
 };
 
-use crate::core::history::change::Change;
+use crate::core::history::edit::Edit;
 
-pub mod change;
+pub mod edit;
 
 #[derive(Debug, Clone, Default)]
 pub struct History {
-    changes: VecDeque<Change>,
-    redos: VecDeque<Change>,
+    changes: VecDeque<Edit>,
+    redos: VecDeque<Edit>,
     max_size: usize,
     last_action_time: Option<std::time::Instant>,
     group_timeout: Duration,
@@ -27,7 +27,7 @@ impl History {
         }
     }
 
-    pub fn push(&mut self, change: Change) {
+    pub fn push(&mut self, change: Edit) {
         self.redos.clear();
 
         let now = Instant::now();
@@ -57,7 +57,7 @@ impl History {
         }
     }
 
-    pub fn undo(&mut self) -> Option<Change> {
+    pub fn undo(&mut self) -> Option<Edit> {
         if let Some(change) = self.changes.pop_back() {
             let undo = change.undo();
             self.redos.push_back(change);
@@ -67,7 +67,7 @@ impl History {
         }
     }
 
-    pub fn redo(&mut self) -> Option<Change> {
+    pub fn redo(&mut self) -> Option<Edit> {
         if let Some(change) = self.redos.pop_back() {
             self.changes.push_back(change.clone());
             Some(change)

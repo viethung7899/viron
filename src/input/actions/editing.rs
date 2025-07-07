@@ -1,4 +1,4 @@
-use crate::core::history::change::Change;
+use crate::core::history::edit::Edit;
 use crate::editor::Mode;
 use crate::input::actions::{
     impl_action, Action, ActionContext, ActionDefinition, ActionResult, Executable,
@@ -31,7 +31,7 @@ impl Executable for InsertChar {
         let document = ctx.buffer_manager.current_mut();
         document.mark_modified();
 
-        document.history.push(Change::insert(
+        document.history.push(Edit::insert(
             position,
             self.0.to_string(),
             current_point,
@@ -64,7 +64,7 @@ impl Executable for DeleteChar {
             document.mark_modified();
             document
                 .history
-                .push(Change::delete(position, c.to_string(), point, point));
+                .push(Edit::delete(position, c.to_string(), point, point));
             ctx.compositor
                 .mark_dirty(&ctx.component_ids.buffer_view_id)?;
             ctx.compositor
@@ -90,7 +90,7 @@ impl Executable for Backspace {
         if position > 0 {
             if let Some((c, new_position)) = document.buffer.delete_char(position - 1) {
                 document.mark_modified();
-                document.history.push(Change::delete(
+                document.history.push(Edit::delete(
                     position - 1,
                     c.to_string(),
                     point,
@@ -121,7 +121,7 @@ impl Executable for InsertNewLine {
         let new_position = document.buffer.insert_char(position, '\n');
         let new_point = document.buffer.point_at_position(new_position);
         document.mark_modified();
-        document.history.push(Change::insert(
+        document.history.push(Edit::insert(
             position,
             "\n".to_string(),
             point,
@@ -175,7 +175,7 @@ impl Executable for InsertNewLineBelow {
         ctx.cursor.set_point(new_point, &document.buffer);
         document
             .history
-            .push(Change::insert(byte_position, insert_text, point, new_point));
+            .push(Edit::insert(byte_position, insert_text, point, new_point));
         document.mark_modified();
         ctx.compositor
             .mark_dirty(&ctx.component_ids.buffer_view_id)?;
@@ -226,7 +226,7 @@ impl Executable for InsertNewLineAbove {
         document.mark_modified();
         document
             .history
-            .push(Change::insert(byte_position, insert_text, point, new_point));
+            .push(Edit::insert(byte_position, insert_text, point, new_point));
         ctx.compositor
             .mark_dirty(&ctx.component_ids.buffer_view_id)?;
         ctx.compositor
