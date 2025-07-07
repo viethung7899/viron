@@ -12,6 +12,8 @@ use crossterm::{cursor, terminal};
 use editor::Editor;
 use std::{env, io::stdout, panic};
 
+const HOME_DIR: &str = ".viron";
+
 #[tokio::main]
 async fn main() -> Result<()> {
     // Enable better panic messages
@@ -27,7 +29,11 @@ async fn main() -> Result<()> {
     let mut editor = Editor::new(file_name).await?;
 
     // Load the config
-    editor.load_config(&Config::load_from_file("config.toml")?)?;
+    let home_dir = env::home_dir()
+        .ok_or_else(|| anyhow::anyhow!("Could not determine home directory"))?
+        .join(HOME_DIR);
+    let config_path = home_dir.join("config.toml");
+    editor.load_config(&Config::load_from_file(config_path)?)?;
 
     // Set up error handling for the editor's run method
     let result = editor.run().await;
