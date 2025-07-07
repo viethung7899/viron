@@ -1,11 +1,14 @@
+use super::capabilities::*;
+use bon::Builder;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Builder)]
 #[serde(rename_all = "camelCase")]
 pub struct InitializeParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     process_id: Option<usize>,
-    // client_info: Option<ClientInfo>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    client_info: Option<ClientInfo>,
     #[serde(skip_serializing_if = "Option::is_none")]
     locale: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -16,10 +19,25 @@ pub struct InitializeParams {
     initialization_options: Option<serde_json::Value>,
     capabilities: ClientCapabilities,
     // trace: Option<TraceValue>,
-    // workspace_folders: Option<Vec<WorkspaceFolder>>,
+    workspace_folders: Option<Vec<WorkspaceFolder>>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ClientInfo {
+    pub name: String,
+    pub version: Option<String>,
+}
+
+impl ClientInfo {
+    pub fn new(name: impl ToString, version: Option<impl ToString>) -> Self {
+        let name = name.to_string();
+        let version = version.map(|v| v.to_string());
+        Self { name, version }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Builder)]
 #[serde(rename_all = "camelCase")]
 pub struct ClientCapabilities {
     // workspace: Option<WorkspaceClientCapabilities>,
@@ -29,8 +47,9 @@ pub struct ClientCapabilities {
     // experimental: Option<serde_json::Value>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct TextDocumentClientCapabilities {
-    completion: Option<super::completion::CompletionClientCapabilities>,
+pub struct WorkspaceFolder {
+    pub uri: String,
+    pub name: String,
 }

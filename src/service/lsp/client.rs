@@ -1,10 +1,12 @@
 use super::types::{LogMessageParams, ShowMessageParams, TextDocumentPublishDiagnostics};
 use crate::core::language::Language;
+use crate::service::lsp::params::get_initialize_params;
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::HashMap;
-use std::process;
+use std::env;
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::{
     process::Stdio,
@@ -207,27 +209,9 @@ impl LspClient {
     }
 
     pub async fn initialize(&mut self) -> Result<()> {
-        let params = json!({
-            "processId": process::id(),
-            "clientInfo": {
-                "name": "viron",
-                "version": "0.1.0"
-            },
-            "capabilities": {
-                "textDocument": {
-                    "completion": {
-                        "completionItem": {
-                            "snippetSupport": true
-                        }
-                    },
-                    "definition": {
-                        "dynamicRegistration": true,
-                        "linkSupport": false,
-                    }
-                }
-            }
-        });
-        self.send_request("initialize", params).await?;
+        let initialize_params = get_initialize_params(get_workspace_uri());
+        let initialize_params = serde_json::to_value(initialize_params)?;
+        self.send_request("initialize", initialize_params).await?;
         self.send_notification("initialized", json!({})).await?;
         Ok(())
     }
@@ -497,4 +481,17 @@ pub fn process_response(response: &Value) -> Result<InboundMessage> {
             })),
         }
     }
+}
+
+fn get_workspace_path() -> PathBuf {
+    env::current_dir()
+        .and_then(|path| path.canonicalize())
+        .unwrap_or_default()
+}
+
+fn get_workspace_uri() -> String {
+    format!(
+        "file://{}",
+        get_workspace_path().to_string_lossy().to_string()
+    )
 }

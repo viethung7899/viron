@@ -1,4 +1,5 @@
 mod client;
+mod params;
 pub mod types;
 
 use std::collections::HashMap;
