@@ -1,6 +1,6 @@
 use std::{collections::HashMap, ops::Range};
 
-use anyhow::{Ok, Result};
+use anyhow::{anyhow, Ok, Result};
 use tree_sitter::{Parser, Point, Query, QueryCursor, StreamingIterator};
 
 use crate::core::language::Language;
@@ -60,16 +60,20 @@ impl SyntaxHighlighter {
         let mut colors = Vec::new();
 
         let Some(language) = self.language else {
-            return Ok(colors);
+            return Err(anyhow!("No langauge specified for syntax highlighting"));
         };
 
         let Some(query) = self.queries.get(&language) else {
-            return Ok(colors);
+            return Err(anyhow!(
+                "No query found for language: {}",
+                language.to_str()
+            ));
         };
 
         let Some(tree) = self.parser.parse(code, None) else {
             return Ok(colors);
         };
+
         let mut cursor = QueryCursor::new();
         let mut matches = cursor.matches(&query, tree.root_node(), code);
 
