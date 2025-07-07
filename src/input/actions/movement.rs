@@ -167,7 +167,11 @@ impl Executable for MoveToTop {
     }
 }
 
-impl_action!(MoveToTop, "Move to top of buffer", ActionDefinition::MoveToTop);
+impl_action!(
+    MoveToTop,
+    "Move to top of buffer",
+    ActionDefinition::MoveToTop
+);
 
 #[derive(Debug, Clone)]
 pub struct MoveToBottom;
@@ -176,11 +180,17 @@ pub struct MoveToBottom;
 impl Executable for MoveToBottom {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         let line_count = ctx.buffer_manager.current_buffer().line_count();
-        GoToLine::new(line_count.saturating_sub(1)).execute(ctx).await
+        GoToLine::new(line_count.saturating_sub(1))
+            .execute(ctx)
+            .await
     }
 }
 
-impl_action!(MoveToBottom, "Move to bottom of buffer", ActionDefinition::MoveToBottom);
+impl_action!(
+    MoveToBottom,
+    "Move to bottom of buffer",
+    ActionDefinition::MoveToBottom
+);
 
 #[derive(Debug, Clone)]
 pub struct MoveToViewportCenter;
@@ -199,7 +209,11 @@ impl Executable for MoveToViewportCenter {
     }
 }
 
-impl_action!(MoveToViewportCenter, "Move viewport to center of buffer", ActionDefinition::MoveToViewportCenter);
+impl_action!(
+    MoveToViewportCenter,
+    "Move viewport to center of buffer",
+    ActionDefinition::MoveToViewportCenter
+);
 
 #[derive(Debug, Clone)]
 pub struct MoveToNextWord;
@@ -207,15 +221,20 @@ pub struct MoveToNextWord;
 #[async_trait(?Send)]
 impl Executable for MoveToNextWord {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
-        ctx.cursor
-            .find_next_word(ctx.buffer_manager.current_buffer());
+        let buffer = ctx.buffer_manager.current_buffer();
+        let cursor = ctx.cursor.find_next_word(buffer);
+        ctx.cursor.set_point(cursor.get_point(), buffer);
         ctx.compositor
             .mark_dirty(&ctx.component_ids.status_line_id)?;
         Ok(())
     }
 }
 
-impl_action!(MoveToNextWord, "Move to next word", ActionDefinition::MoveToNextWord);
+impl_action!(
+    MoveToNextWord,
+    "Move to next word",
+    ActionDefinition::MoveToNextWord
+);
 
 #[derive(Debug, Clone)]
 pub struct MoveToPreviousWord;
@@ -223,15 +242,20 @@ pub struct MoveToPreviousWord;
 #[async_trait(?Send)]
 impl Executable for MoveToPreviousWord {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
-        ctx.cursor
-            .find_previous_word(ctx.buffer_manager.current_buffer());
+        let buffer = ctx.buffer_manager.current_buffer();
+        let cursor = ctx.cursor.find_previous_word(buffer);
+        ctx.cursor.set_point(cursor.get_point(), buffer);
         ctx.compositor
             .mark_dirty(&ctx.component_ids.status_line_id)?;
         Ok(())
     }
 }
 
-impl_action!(MoveToPreviousWord, "Move to previous word", ActionDefinition::MoveToPreviousWord);
+impl_action!(
+    MoveToPreviousWord,
+    "Move to previous word",
+    ActionDefinition::MoveToPreviousWord
+);
 
 #[derive(Debug, Clone)]
 pub struct GoToLine {

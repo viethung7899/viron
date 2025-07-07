@@ -35,7 +35,7 @@ theme = "themes/catppuchin/mocha.json"
 "N" = { type = "FindPrevious" }
 
 "u" = { type = "UndoBuffer" }
-"<Ctrl>r" = { type = "RedoBuffer" }
+"<CONTROL-r>" = { type = "RedoBuffer" }
 
 "gd" = { type = "GoToDefinition" }
 

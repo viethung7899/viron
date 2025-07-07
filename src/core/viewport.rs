@@ -25,7 +25,7 @@ impl Default for Viewport {
 }
 
 impl Viewport {
-    pub fn new(height: usize, width: usize) -> Self {
+    pub fn new(width: usize, height: usize) -> Self {
         Self {
             width,
             height,
@@ -41,9 +41,9 @@ impl Viewport {
         self.width
     }
 
-    pub fn resize(&mut self, height: usize, width: usize) {
-        self.height = height;
+    pub fn resize(&mut self, width: usize, height: usize) {
         self.width = width;
+        self.height = height;
     }
 
     /// Returns the index of the first visible line
