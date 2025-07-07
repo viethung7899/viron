@@ -35,14 +35,6 @@ where
         }
     }
 
-    pub fn prefix_len(&self) -> usize {
-        self.gap_start
-    }
-
-    pub fn suffix_len(&self) -> usize {
-        self.buffer.len() - self.gap_end
-    }
-
     pub fn get_range(&self, range: Range<usize>) -> impl Iterator<Item = &T> {
         range.map(move |pos| {
             if pos < self.gap_start {
@@ -117,7 +109,6 @@ where
         }
         value.copied()
     }
-
     pub fn backspace_single(&mut self) -> Option<T> {
         let value = self.buffer.get(self.gap_start - 1);
         if value.is_none() {
@@ -126,7 +117,16 @@ where
         value.copied()
     }
 
-    pub fn delete(&mut self, count: usize) -> Option<Vec<T>> {
+    pub fn backspace_multiple(&mut self, count: usize) -> Option<Vec<T>> {
+        let start = self.gap_start.checked_sub(count)?;
+        let values = self.buffer.get(start..self.gap_start);
+        if values.is_some() {
+            self.gap_start = start;
+        }
+        values.map(|v| v.to_vec())
+    }
+
+    pub fn delete_multiple(&mut self, count: usize) -> Option<Vec<T>> {
         let values = self.buffer.get(self.gap_end..self.gap_end + count);
         if values.is_some() {
             self.gap_end += count;
