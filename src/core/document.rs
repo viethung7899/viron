@@ -1,15 +1,16 @@
 use crate::core::history::edit::Edit;
 use crate::core::language::Language;
+use crate::core::syntax::SyntaxEngine;
 use crate::core::{buffer::Buffer, history::History};
 use anyhow::{Context, Result};
 use std::path::{Path, PathBuf};
 
-#[derive(Debug)]
 pub struct Document {
     pub buffer: Buffer,
     pub path: Option<PathBuf>,
     pub modified: bool,
     pub language: Language,
+    pub syntax_engine: Option<SyntaxEngine>,
     pub history: History,
 }
 
@@ -20,6 +21,7 @@ impl Document {
             path: None,
             modified: false,
             language: Language::PlainText,
+            syntax_engine: None,
             history: History::new(1000),
         }
     }
@@ -28,12 +30,14 @@ impl Document {
         let content = std::fs::read_to_string(path).unwrap_or_default();
 
         let language = Language::from_path(path);
+        let syntax_engine = SyntaxEngine::new(&language).ok();
 
         Self {
             buffer: Buffer::from_string(&content),
             path: Some(path.to_path_buf()),
             modified: false,
             language,
+            syntax_engine,
             history: History::new(1000),
         }
     }

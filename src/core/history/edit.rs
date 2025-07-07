@@ -16,10 +16,7 @@ impl Transition {
 pub enum Edit {
     Insert(Insert),
     Delete(Delete),
-    Multiple {
-        changes: Vec<Edit>,
-        point: Transition,
-    },
+    Multiple { edits: Vec<Edit>, point: Transition },
 }
 
 impl Edit {
@@ -55,7 +52,7 @@ impl Edit {
 
     pub fn multiple(changes: Vec<Edit>, start: Point, end: Point) -> Self {
         Edit::Multiple {
-            changes,
+            edits: changes,
             point: Transition::new(start, end),
         }
     }
@@ -94,7 +91,10 @@ impl Edit {
                 point.after,
                 point.before,
             ),
-            Edit::Multiple { changes, point } => {
+            Edit::Multiple {
+                edits: changes,
+                point,
+            } => {
                 let changes = changes.iter().map(Self::undo).rev().collect();
                 Edit::multiple(changes, point.after, point.before)
             }
