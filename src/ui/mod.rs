@@ -1,7 +1,7 @@
 use crate::core::command::{CommandBuffer, SearchBuffer};
 use crate::core::cursor::Cursor;
 use crate::core::message::MessageManager;
-use crate::core::syntax::SyntaxHighlighter;
+use crate::core::syntax::SyntaxEngine;
 use crate::core::viewport::Viewport;
 use crate::editor::Mode;
 use crate::ui::render_buffer::RenderBuffer;
@@ -19,8 +19,7 @@ pub use components::Component;
 
 pub struct RenderContext<'a> {
     pub viewport: &'a Viewport,
-    pub document: &'a Document,
-    pub syntax_highlighter: &'a mut SyntaxHighlighter,
+    pub document: &'a mut Document,
     pub diagnostics: &'a [Diagnostic],
     pub cursor: &'a Cursor,
     pub mode: &'a Mode,

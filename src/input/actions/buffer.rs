@@ -14,7 +14,6 @@ async fn after_buffer_change(ctx: &mut ActionContext<'_>) -> ActionResult {
     let language = document.language;
 
     // Update syntax highlighter with the current document's language
-    ctx.syntax_highlighter.set_language(language.clone())?;
 
     if let Some(client) = ctx.lsp_service.start_server(language).await? {
         let Some(uri) = document.uri() else {

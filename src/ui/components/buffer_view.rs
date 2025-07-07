@@ -65,13 +65,17 @@ impl BufferView {
             ..
         } = self.bounds(render_buffer, context);
 
+        let Some(ref mut syntax_engine) = context.document.syntax_engine else {
+            return Err(anyhow::anyhow!("Syntax highlighter is not available"));
+        };
+
         let viewport = context.viewport;
         let buffer = &context.document.buffer;
         let theme = context.theme;
         let editor_style = theme.editor_style();
 
         let code = buffer.to_bytes();
-        let tokens = context.syntax_highlighter.highlight(&code)?;
+        let tokens = syntax_engine.highlight(&code)?;
 
         let top_line = viewport.top_line();
         let left_column = viewport.left_column();

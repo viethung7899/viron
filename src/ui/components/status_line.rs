@@ -12,7 +12,7 @@ impl Drawable for StatusLine {
         let Bounds {
             start_row, width, ..
         } = self.bounds(buffer, context);
-        let document = context.document;
+        let document = &context.document;
 
         let left = format!(" {} ", context.mode.to_name().to_uppercase());
 

@@ -38,7 +38,6 @@ pub struct ActionContext<'a> {
     pub command_buffer: &'a mut CommandBuffer,
     pub search_buffer: &'a mut SearchBuffer,
     pub message: &'a mut MessageManager,
-    pub syntax_highlighter: &'a mut SyntaxHighlighter,
 
     pub cursor: &'a mut Cursor,
     pub viewport: &'a mut Viewport,
@@ -176,7 +175,6 @@ macro_rules! impl_action {
     };
 }
 
-use crate::core::syntax::SyntaxHighlighter;
 pub(super) use impl_action;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -1,5 +1,4 @@
 use crate::core::cursor::Cursor;
-use crate::core::syntax::SyntaxHighlighter;
 use crate::core::viewport::Viewport;
 use crate::core::{buffer_manager::BufferManager, message::MessageManager};
 use crate::input::actions::Executable;
@@ -77,7 +76,6 @@ pub struct Editor {
     command_buffer: CommandBuffer,
     message_manager: MessageManager,
     search_buffer: SearchBuffer,
-    syntax_highlighter: SyntaxHighlighter,
 
     cursor: Cursor,
     viewport: Viewport,
@@ -123,7 +121,6 @@ impl Editor {
         let command_buffer = CommandBuffer::new();
         let message_manager = MessageManager::new();
         let search_buffer = SearchBuffer::new();
-        let syntax_highlighter = SyntaxHighlighter::new();
         let cursor = Cursor::new();
         let viewport = Viewport::new(width as usize - MIN_GUTTER_SIZE, height as usize - 2);
 
@@ -179,7 +176,6 @@ impl Editor {
             command_buffer,
             search_buffer,
             message_manager,
-            syntax_highlighter,
 
             cursor,
             viewport,
@@ -251,7 +247,6 @@ impl Editor {
             command_buffer: &mut self.command_buffer,
             search_buffer: &mut self.search_buffer,
             message: &mut self.message_manager,
-            syntax_highlighter: &mut self.syntax_highlighter,
             cursor: &mut self.cursor,
             running: &mut self.running,
             compositor: &mut self.compositor,
@@ -267,14 +262,13 @@ impl Editor {
 
         self.scroll_viewport()?;
 
-        let document = self.buffer_manager.current();
+        let document = self.buffer_manager.current_mut();
         let uri = document.uri().unwrap_or_default();
 
         let mut context = RenderContext {
             theme: &self.theme,
             cursor: &self.cursor,
             document,
-            syntax_highlighter: &mut self.syntax_highlighter,
             diagnostics: self.lsp_service.get_diagnostics(&uri),
             mode: &self.mode,
             viewport: &self.viewport,

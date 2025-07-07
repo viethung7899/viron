@@ -224,7 +224,7 @@ impl Buffer {
                     self.delete_char(*position);
                 }
             }
-            Edit::Multiple { changes, .. } => {
+            Edit::Multiple { edits: changes, .. } => {
                 for change in changes {
                     self.apply_edit(change);
                 }

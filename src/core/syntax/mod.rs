@@ -1,15 +1,9 @@
-use anyhow::{anyhow, Ok, Result};
-use std::{collections::HashMap, ops::Range};
+use anyhow::{anyhow, Result};
+use std::ops::Range;
 use tree_sitter::{Parser, Point, Query, QueryCursor, StreamingIterator, Tree};
 
+use crate::core::history::edit::Edit;
 use crate::core::language::Language;
-
-pub struct SyntaxHighlighter {
-    parser: Parser,
-    language: Option<Language>,
-    queries: HashMap<Language, Query>,
-    tree: Option<Tree>,
-}
 
 #[derive(Debug, Clone)]
 pub struct TokenInfo {
@@ -19,71 +13,74 @@ pub struct TokenInfo {
     pub scope: String,
 }
 
-impl SyntaxHighlighter {
-    pub fn new() -> Self {
-        Self {
-            parser: Parser::new(),
-            language: None,
-            tree: None,
-            queries: HashMap::new(),
-        }
-    }
+pub struct SyntaxEngine {
+    parser: Parser,
+    query: Query,
+    tree: Option<Tree>,
+}
 
-    pub fn set_language(&mut self, language: Language) -> Result<()> {
-        // If the language is already set, no need to change it
-        if self.language == Some(language) {
-            return Ok(());
-        }
-
+impl SyntaxEngine {
+    pub fn new(language: &Language) -> Result<Self> {
         let Some(ts_language) = language.get_tree_sitter_language() else {
-            self.parser.reset();
-            return Ok(());
-        };
-
-        self.parser.set_language(&ts_language)?;
-
-        if !self.queries.contains_key(&language) {
-            if let Some(source) = language.get_highlight_query() {
-                let query = Query::new(&ts_language, source)?;
-                self.queries.insert(language, query);
-            };
-        }
-
-        self.language = Some(language);
-
-        Ok(())
-    }
-
-    pub fn clear_cache(&mut self) {
-        self.parser.reset();
-    }
-
-    pub fn highlight(&mut self, code: &[u8]) -> Result<Vec<TokenInfo>> {
-        let Some(language) = self.language else {
-            return Err(anyhow!("No langauge specified for syntax highlighting"));
-        };
-
-        let Some(query) = self.queries.get(&language) else {
             return Err(anyhow!(
-                "No query found for language: {}",
+                "{} does not have a Tree-sitter language defined",
+                language.to_str()
+            ));
+        };
+        let Some(query_src) = language.get_highlight_query() else {
+            return Err(anyhow!(
+                "{} does not have a Tree-sitter query defined",
                 language.to_str()
             ));
         };
 
-        let mut colors = Vec::new();
-        let Some(tree) = self.parser.parse(code, None) else {
-            return Ok(colors);
+        let mut parser = Parser::new();
+        parser.set_language(&ts_language)?;
+        let query = Query::new(&ts_language, query_src)?;
+
+        Ok(Self {
+            parser,
+            query,
+            tree: None,
+        })
+    }
+
+    pub fn apply_edit(&mut self, edit: &Edit) -> Result<()> {
+        let Some(tree) = &mut self.tree else {
+            return Ok(());
+        };
+        match edit {
+            Edit::Insert(insert) => {
+                tree.edit(&insert.edit_summary());
+            }
+            Edit::Delete(delete) => {
+                tree.edit(&delete.edit_summary());
+            }
+            Edit::Multiple { edits, .. } => {
+                for edit in edits {
+                    self.apply_edit(edit)?;
+                }
+            }
+        };
+        Ok(())
+    }
+
+    pub fn highlight(&mut self, code: &[u8]) -> Result<Vec<TokenInfo>> {
+        let mut tokens = Vec::new();
+        self.tree = self.parser.parse(code, self.tree.as_ref());
+        let Some(tree) = &self.tree else {
+            return Ok(tokens);
         };
 
         let mut cursor = QueryCursor::new();
-        let mut matches = cursor.matches(&query, tree.root_node(), code);
+        let mut matches = cursor.matches(&self.query, tree.root_node(), code);
 
         while let Some(matching) = matches.next() {
             for capture in matching.captures {
                 let node = capture.node;
-                let scope = query.capture_names()[capture.index as usize];
+                let scope = self.query.capture_names()[capture.index as usize];
 
-                colors.push(TokenInfo {
+                tokens.push(TokenInfo {
                     byte_range: node.byte_range(),
                     start_position: node.start_position(),
                     end_position: node.end_position(),
@@ -91,6 +88,6 @@ impl SyntaxHighlighter {
                 });
             }
         }
-        Ok(colors)
+        Ok(tokens)
     }
 }
