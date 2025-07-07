@@ -1,4 +1,5 @@
-use super::types::{LogMessageParams, ShowMessageParams, TextDocumentPublishDiagnostics};
+use super::types::{DidCloseTextDocumentParams, DidOpenTextDocumentParams, DidSaveTextDocumentParams, LogMessageParams, ShowMessageParams, TextDocumentIdentifier, TextDocumentItem, TextDocumentPublishDiagnostics};
+use crate::core::history::edit::Edit;
 use crate::core::language::Language;
 use crate::service::lsp::params::get_initialize_params;
 use anyhow::{Context, Result};
@@ -217,42 +218,44 @@ impl LspClient {
     }
 
     pub async fn did_open(&mut self, uri: &str, contents: &str) -> Result<()> {
-        let params = json!({
-            "textDocument": {
-                "uri": uri,
-                "languageId": self.language.to_str(),
-                "version": 1,
-                "text": contents,
-            }
-        });
+        let params = DidOpenTextDocumentParams::builder()
+            .text_document(
+                TextDocumentItem::builder()
+                    .uri(uri.to_string())
+                    .language_id(self.language.to_str().to_string())
+                    .version(0)
+                    .text(contents.to_string())
+                    .build(),
+            )
+            .build();
 
-        self.send_notification("textDocument/didOpen", params)
+        self.send_notification("textDocument/didOpen", serde_json::to_value(params)?)
             .await?;
 
         Ok(())
     }
 
     pub async fn did_save(&mut self, uri: &str, contents: &str) -> Result<()> {
-        let params = json!({
-            "textDocument": {
-                "uri": uri,
-            },
-            "text": contents,
-        });
+        let params = DidSaveTextDocumentParams::builder()
+            .text_document(TextDocumentIdentifier::builder().uri(uri.to_string()).build())
+            .text(contents.to_string())
+            .build();
 
-        self.send_notification("textDocument/didSave", params)
+        self.send_notification("textDocument/didSave", serde_json::to_value(params)?)
             .await?;
         Ok(())
     }
 
     pub async fn did_close(&mut self, uri: &str) -> Result<()> {
-        let params = json!({
-            "textDocument": {
-                "uri": uri,
-            }
-        });
+        let params = DidCloseTextDocumentParams::builder()
+            .text_document(
+                TextDocumentIdentifier::builder()
+                    .uri(uri.to_string())
+                    .build(),
+            )
+            .build();
 
-        self.send_notification("textDocument/didClose", params)
+        self.send_notification("textDocument/didClose", serde_json::to_value(params)?)
             .await?;
 
         Ok(())
