@@ -360,7 +360,8 @@ impl Editor {
         self.width = width;
         self.height = height;
         self.compositor.resize(width, height);
-        self.viewport.resize(width - self.gutter_width(), height);
+        self.viewport
+            .resize(width - self.gutter_width(), height - 2);
         Ok(())
     }
 

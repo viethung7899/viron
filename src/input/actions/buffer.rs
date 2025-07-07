@@ -174,60 +174,6 @@ impl_action!(CloseBuffer, "Quit the editor", self {
 });
 
 #[derive(Debug, Clone)]
-pub struct UndoBuffer;
-
-#[async_trait(?Send)]
-impl Executable for UndoBuffer {
-    async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
-        match ctx.buffer_manager.current_mut().undo() {
-            Ok(change) => {
-                ctx.compositor
-                    .mark_dirty(&ctx.component_ids.buffer_view_id)?;
-                ctx.cursor
-                    .set_point(change.point_after(), ctx.buffer_manager.current_buffer());
-                let (row, column) = ctx.cursor.get_display_cursor();
-
-                movement::GoToPosition::new(row, column).execute(ctx).await
-            }
-            Err(e) => {
-                system::ShowMessage(Message::error(e.to_string()))
-                    .execute(ctx)
-                    .await
-            }
-        }
-    }
-}
-
-impl_action!(UndoBuffer, "Undo", ActionDefinition::UndoBuffer);
-
-#[derive(Debug, Clone)]
-pub struct RedoBuffer;
-
-#[async_trait(?Send)]
-impl Executable for RedoBuffer {
-    async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
-        match ctx.buffer_manager.current_mut().redo() {
-            Ok(change) => {
-                ctx.compositor
-                    .mark_dirty(&ctx.component_ids.buffer_view_id)?;
-                ctx.cursor
-                    .set_point(change.point_after(), ctx.buffer_manager.current_buffer());
-                let (row, column) = ctx.cursor.get_display_cursor();
-
-                movement::GoToPosition::new(row, column).execute(ctx).await
-            }
-            Err(e) => {
-                system::ShowMessage(Message::error(e.to_string()))
-                    .execute(ctx)
-                    .await
-            }
-        }
-    }
-}
-
-impl_action!(RedoBuffer, "Redo", ActionDefinition::RedoBuffer);
-
-#[derive(Debug, Clone)]
 pub struct RefreshBuffer;
 
 #[async_trait(?Send)]
