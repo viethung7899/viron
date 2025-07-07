@@ -118,16 +118,23 @@ impl Buffer {
         // Update line starts for all lines after the current one
         let row = self.row_at_position(position);
         for line in self.line_starts[row + 1..].iter_mut() {
-            *line += 1;
+            *line += bytes.len();
         }
 
         // If inserting a newline, add a new line start
+        let mut newlines = Vec::new();
         for (i, &byte) in bytes.iter().enumerate() {
             if byte == b'\n' {
                 let new_line_start = position + i + 1;
-                let new_row = self.row_at_position(position + i) + 1;
-                self.line_starts.insert(new_row, new_line_start);
+                newlines.push(new_line_start);
             }
+        }
+
+        if !newlines.is_empty() {
+            let insert_row = self.row_at_position(position) + 1;
+
+            // Insert all newlines at once using splice for better performance
+            self.line_starts.splice(insert_row..insert_row, newlines);
         }
 
         // Return the byte_position after insertion
@@ -135,6 +142,11 @@ impl Buffer {
     }
 
     pub fn insert_string(&mut self, position: usize, string: &str) -> usize {
+        // let mut position = position;
+        // for ch in string.chars() {
+        //     position = self.insert_char(position, ch);
+        // }
+        // position
         self.insert_bytes(position, string.as_bytes())
     }
 
@@ -223,10 +235,9 @@ impl Buffer {
     /// Helper method to determine which row a byte_position is in
     fn row_at_position(&self, position: usize) -> usize {
         // Find the row by binary search (more efficient for large files)
-        match self.line_starts.binary_search(&position) {
-            Ok(row) => row,
-            Err(row) => row - 1,
-        }
+        self.line_starts
+            .binary_search(&position)
+            .unwrap_or_else(|row| row - 1)
     }
 
     /// Convert byte_position to a Point
