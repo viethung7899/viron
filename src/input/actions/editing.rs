@@ -1,7 +1,7 @@
 use crate::core::history::change::Change;
 use crate::editor::Mode;
 use crate::input::actions::{
-    impl_action, Action, ActionContext, ActionDefinition, ActionResult, Executable,
+    Action, ActionContext, ActionDefinition, ActionResult, Executable, impl_action,
 };
 use async_trait::async_trait;
 use std::fmt::Debug;
@@ -26,7 +26,7 @@ impl Executable for InsertChar {
         let new_position = buffer.insert_char(position, self.0);
         let new_point = buffer.point_at_position(new_position);
 
-        ctx.cursor.set_point(new_point.clone());
+        ctx.cursor.set_point(new_point.clone(), buffer);
 
         let document = ctx.buffer_manager.current_mut();
         document.mark_modified();
@@ -127,7 +127,7 @@ impl Executable for InsertNewLine {
             point,
             new_point.clone(),
         ));
-        ctx.cursor.set_point(new_point);
+        ctx.cursor.set_point(new_point, &document.buffer);
         ctx.compositor
             .mark_dirty(&ctx.component_ids.buffer_view_id)?;
         ctx.compositor
@@ -168,7 +168,7 @@ impl Executable for InsertNewLineBelow {
         let new_position = document.buffer.insert_string(position, &insert_text);
         let new_point = document.buffer.point_at_position(new_position);
 
-        ctx.cursor.set_point(new_point);
+        ctx.cursor.set_point(new_point, &document.buffer);
         document
             .history
             .push(Change::insert(position, insert_text, point, new_point));
@@ -216,7 +216,7 @@ impl Executable for InsertNewLineAbove {
         let cursor_position = position + indentation.len();
         let new_point = document.buffer.point_at_position(cursor_position);
 
-        ctx.cursor.set_point(new_point);
+        ctx.cursor.set_point(new_point, &document.buffer);
 
         document.mark_modified();
         document
