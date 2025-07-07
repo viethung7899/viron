@@ -13,54 +13,54 @@ impl Transition {
 }
 
 #[derive(Debug, Clone)]
-pub enum Change {
+pub enum Edit {
     Insert(Insert),
     Delete(Delete),
     Multiple {
-        changes: Vec<Change>,
+        changes: Vec<Edit>,
         point: Transition,
     },
 }
 
-impl Change {
+impl Edit {
     pub fn insert(position: usize, text: String, start: Point, end: Point) -> Self {
-        Change::Insert(Insert::new(position, text, Transition::new(start, end)))
+        Edit::Insert(Insert::new(position, text, Transition::new(start, end)))
     }
 
     pub fn delete(position: usize, text: String, start: Point, end: Point) -> Self {
-        Change::Delete(Delete::new(position, text, Transition::new(start, end)))
+        Edit::Delete(Delete::new(position, text, Transition::new(start, end)))
     }
 
-    pub fn multiple(changes: Vec<Change>, start: Point, end: Point) -> Self {
-        Change::Multiple {
+    pub fn multiple(changes: Vec<Edit>, start: Point, end: Point) -> Self {
+        Edit::Multiple {
             changes,
             point: Transition::new(start, end),
         }
     }
 
-    pub fn merge(&self, other: &Change) -> Option<Change> {
+    pub fn merge(&self, other: &Edit) -> Option<Edit> {
         match (self, other) {
-            (Change::Insert(i1), Change::Insert(i2)) => i1.merge(i2).map(Change::Insert),
-            (Change::Delete(d1), Change::Delete(d2)) => d1.merge(d2).map(Change::Delete),
+            (Edit::Insert(i1), Edit::Insert(i2)) => i1.merge(i2).map(Edit::Insert),
+            (Edit::Delete(d1), Edit::Delete(d2)) => d1.merge(d2).map(Edit::Delete),
             _ => None, // Only allow merging of same types
         }
     }
 
-    pub fn undo(&self) -> Change {
+    pub fn undo(&self) -> Edit {
         match self {
-            Change::Insert(Insert {
+            Edit::Insert(Insert {
                 byte_position: position,
                 text,
                 point,
-            }) => Change::delete(*position, text.clone(), point.after, point.before),
-            Change::Delete(Delete {
+            }) => Edit::delete(*position, text.clone(), point.after, point.before),
+            Edit::Delete(Delete {
                 byte_position: position,
                 text,
                 point,
-            }) => Change::insert(*position, text.clone(), point.after, point.before),
-            Change::Multiple { changes, point } => {
+            }) => Edit::insert(*position, text.clone(), point.after, point.before),
+            Edit::Multiple { changes, point } => {
                 let changes = changes.iter().map(Self::undo).rev().collect();
-                Change::multiple(changes, point.after, point.before)
+                Edit::multiple(changes, point.after, point.before)
             }
         }
     }
@@ -172,20 +172,20 @@ impl Delete {
     }
 }
 
-impl Change {
+impl Edit {
     pub fn point_before(&self) -> Point {
         match self {
-            Change::Insert(insert) => insert.point.before,
-            Change::Delete(delete) => delete.point.before,
-            Change::Multiple { point, .. } => point.before,
+            Edit::Insert(insert) => insert.point.before,
+            Edit::Delete(delete) => delete.point.before,
+            Edit::Multiple { point, .. } => point.before,
         }
     }
 
     pub fn point_after(&self) -> Point {
         match self {
-            Change::Insert(insert) => insert.point.after,
-            Change::Delete(delete) => delete.point.after,
-            Change::Multiple { point, .. } => point.after,
+            Edit::Insert(insert) => insert.point.after,
+            Edit::Delete(delete) => delete.point.after,
+            Edit::Multiple { point, .. } => point.after,
         }
     }
 }

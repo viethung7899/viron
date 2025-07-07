@@ -1,4 +1,4 @@
-use crate::core::history::change::Change;
+use crate::core::history::edit::Edit;
 use crate::core::language::Language;
 use crate::core::{buffer::Buffer, history::History};
 use anyhow::{Context, Result};
@@ -25,8 +25,7 @@ impl Document {
     }
 
     pub fn from_file(path: &Path) -> Self {
-        let content = std::fs::read_to_string(path)
-            .unwrap_or_default();
+        let content = std::fs::read_to_string(path).unwrap_or_default();
 
         let language = Language::from_path(path);
 
@@ -70,32 +69,29 @@ impl Document {
 
     pub fn full_file_path(&self) -> Option<PathBuf> {
         let current = std::env::current_dir().ok()?;
-        self.path
-            .as_ref()
-            .map(|p| current.join(p))
+        self.path.as_ref().map(|p| current.join(p))
     }
-    
+
     pub fn uri(&self) -> Option<String> {
         self.full_file_path()
             .and_then(|p| p.to_str().map(|s| s.to_string()))
             .map(|s| format!("file://{}", s))
     }
 
-    
-    pub fn undo(&mut self) -> Result<Change> {
+    pub fn undo(&mut self) -> Result<Edit> {
         if let Some(change) = self.history.undo() {
             self.mark_modified();
-            self.buffer.apply_change(&change);
+            self.buffer.apply_edit(&change);
             Ok(change)
         } else {
             Err(anyhow::anyhow!("No changes to undo"))
         }
     }
 
-    pub fn redo(&mut self) -> Result<Change> {
+    pub fn redo(&mut self) -> Result<Edit> {
         if let Some(change) = self.history.redo() {
             self.mark_modified();
-            self.buffer.apply_change(&change);
+            self.buffer.apply_edit(&change);
             Ok(change)
         } else {
             Err(anyhow::anyhow!("No changes to redo"))

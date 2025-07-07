@@ -1,7 +1,6 @@
-use std::{collections::HashMap, ops::Range};
-
 use anyhow::{anyhow, Ok, Result};
-use tree_sitter::{Parser, Point, Query, QueryCursor, StreamingIterator};
+use std::{collections::HashMap, ops::Range};
+use tree_sitter::{Parser, Point, Query, QueryCursor, StreamingIterator, Tree};
 
 use crate::core::language::Language;
 
@@ -9,6 +8,7 @@ pub struct SyntaxHighlighter {
     parser: Parser,
     language: Option<Language>,
     queries: HashMap<Language, Query>,
+    tree: Option<Tree>,
 }
 
 #[derive(Debug, Clone)]
@@ -24,11 +24,13 @@ impl SyntaxHighlighter {
         Self {
             parser: Parser::new(),
             language: None,
+            tree: None,
             queries: HashMap::new(),
         }
     }
 
     pub fn set_language(&mut self, language: Language) -> Result<()> {
+        // If the language is already set, no need to change it
         if self.language == Some(language) {
             return Ok(());
         }
@@ -57,8 +59,6 @@ impl SyntaxHighlighter {
     }
 
     pub fn highlight(&mut self, code: &[u8]) -> Result<Vec<TokenInfo>> {
-        let mut colors = Vec::new();
-
         let Some(language) = self.language else {
             return Err(anyhow!("No langauge specified for syntax highlighting"));
         };
@@ -70,6 +70,7 @@ impl SyntaxHighlighter {
             ));
         };
 
+        let mut colors = Vec::new();
         let Some(tree) = self.parser.parse(code, None) else {
             return Ok(colors);
         };
