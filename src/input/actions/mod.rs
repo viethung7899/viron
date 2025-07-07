@@ -184,17 +184,13 @@ pub(super) use impl_action;
 pub enum ActionDefinition {
     // Movement actions
     MoveLeft {
-        count: usize,
+        previous_line: bool,
     },
     MoveRight {
-        count: usize,
+        next_line: bool,
     },
-    MoveUp {
-        count: usize,
-    },
-    MoveDown {
-        count: usize,
-    },
+    MoveUp,
+    MoveDown,
     MoveToLineStart,
     MoveToLineEnd,
     MoveToTop,
@@ -256,10 +252,10 @@ pub enum ActionDefinition {
 pub fn create_action_from_definition(definition: &ActionDefinition) -> Box<dyn Action> {
     match definition {
         // Movement actions
-        ActionDefinition::MoveLeft { count } => Box::new(MoveLeft::new(*count)),
-        ActionDefinition::MoveRight { count } => Box::new(MoveRight::new(*count)),
-        ActionDefinition::MoveUp { count } => Box::new(MoveUp::new(*count)),
-        ActionDefinition::MoveDown { count } => Box::new(MoveDown::new(*count)),
+        ActionDefinition::MoveLeft { previous_line } => Box::new(MoveLeft::new(*previous_line)),
+        ActionDefinition::MoveRight { next_line } => Box::new(MoveRight::new(*next_line)),
+        ActionDefinition::MoveUp => Box::new(MoveUp),
+        ActionDefinition::MoveDown => Box::new(MoveDown),
         ActionDefinition::MoveToLineStart => Box::new(MoveToLineStart),
         ActionDefinition::MoveToLineEnd => Box::new(MoveToLineEnd),
         ActionDefinition::MoveToTop => Box::new(MoveToTop),

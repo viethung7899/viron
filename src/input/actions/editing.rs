@@ -86,7 +86,7 @@ impl Executable for Backspace {
         let document = ctx.buffer_manager.current_mut();
         let point = ctx.cursor.get_point();
         let position = document.buffer.cursor_position(&point);
-        ctx.cursor.move_left(&document.buffer, ctx.mode);
+        ctx.cursor.move_left(&document.buffer, ctx.mode, true);
         if position > 0 {
             if let Some((c, new_position)) = document.buffer.delete_char(position - 1) {
                 document.mark_modified();

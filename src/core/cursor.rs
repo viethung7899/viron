@@ -59,10 +59,10 @@ impl Cursor {
     }
 
     /// Move cursor one character to the left
-    pub fn move_left(&mut self, buffer: &Buffer, mode: &Mode) {
+    pub fn move_left(&mut self, buffer: &Buffer, mode: &Mode, previous_line: bool) {
         if self.char_column > 0 {
             self.char_column -= 1;
-        } else if self.row > 0 {
+        } else if self.row > 0 && previous_line {
             self.row -= 1;
             self.char_column = buffer.get_line_length(self.row).saturating_sub(1);
             if *mode != Mode::Insert {
@@ -75,7 +75,7 @@ impl Cursor {
     }
 
     /// Move cursor one character to the right
-    pub fn move_right(&mut self, buffer: &Buffer, mode: &Mode) {
+    pub fn move_right(&mut self, buffer: &Buffer, mode: &Mode, next_line: bool) {
         let line_length = buffer.get_line_length(self.row).saturating_sub(1);
 
         let at_end_of_line = if *mode == Mode::Insert {
@@ -86,7 +86,7 @@ impl Cursor {
 
         if !at_end_of_line {
             self.char_column += 1;
-        } else if self.row + 1 < buffer.line_count() {
+        } else if self.row + 1 < buffer.line_count() && next_line {
             self.row += 1;
             self.char_column = 0;
         }
@@ -133,7 +133,7 @@ impl Cursor {
     }
 
     /// Jump to the next word
-    pub fn find_next_word(&mut self, buffer: &Buffer) -> Cursor {
+    pub fn find_next_word(&self, buffer: &Buffer) -> Cursor {
         // Get the position within the buffer
         let current_point = self.get_point();
         let position = buffer.cursor_position(&current_point);
@@ -204,12 +204,7 @@ impl Cursor {
         }
 
         if index == 0 {
-            return Cursor {
-                row: 0,
-                char_column: 0,
-                byte_column: 0,
-                preferred_column: 0,
-            };
+            return Cursor::new();
         }
 
         // Find the start of the current word
@@ -228,8 +223,7 @@ impl Cursor {
         let mut new_cursor = Cursor {
             row: new_point.row,
             byte_column: new_point.column,
-            char_column: 0,      // Will be calculated
-            preferred_column: 0, // Will be set
+            ..Default::default()
         };
         new_cursor.char_column = new_cursor.byte_to_char_column(buffer);
         new_cursor.preferred_column = new_cursor.char_column;
