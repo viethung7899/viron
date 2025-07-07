@@ -56,9 +56,9 @@ impl Buffer {
         }
     }
 
-    pub fn get_content_line(&self, line: usize) -> String {
+    pub fn get_content_line_as_bytes(&self, line: usize) -> Vec<u8> {
         if line >= self.line_count() {
-            return "".to_string();
+            return Vec::new();
         }
         let line_start = self.line_starts[line];
         let line_end = if line + 1 < self.line_starts.len() {
@@ -66,15 +66,27 @@ impl Buffer {
         } else {
             self.buffer.len_without_gap()
         };
-        let bytes: Vec<u8> = self
-            .buffer
+        self.buffer
             .get_range(line_start..line_end)
             .copied()
-            .collect();
+            .collect()
+    }
+
+    pub fn get_content_line(&self, line: usize) -> String {
+        let bytes = self.get_content_line_as_bytes(line);
         String::from_utf8_lossy(&bytes).to_string()
     }
 
     pub fn get_line_length(&self, line: usize) -> usize {
+        if line >= self.line_count() {
+            return 0;
+        }
+
+        let line_content = self.get_content_line(line);
+        line_content.chars().count()
+    }
+
+    pub fn get_line_length_bytes(&self, line: usize) -> usize {
         if line > self.line_count() {
             return 0;
         }
@@ -216,4 +228,3 @@ impl Buffer {
         Point { row, column }
     }
 }
-

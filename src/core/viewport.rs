@@ -62,27 +62,27 @@ impl Viewport {
     /// Scrolls the viewport to ensure the cursor is visible
     /// Returns true if the viewport was scrolled
     pub fn scroll_to_cursor(&mut self, cursor: &Cursor) -> bool {
-        let position = cursor.get_point();
+        let (row, column) = cursor.get_display_cursor();
 
         // Scroll vertically if needed
-        if position.row < self.offset.row {
+        if row < self.offset.row {
             // Cursor is above viewport
-            self.offset.row = position.row;
+            self.offset.row = row;
             return true;
-        } else if position.row >= self.offset.row + self.height {
+        } else if row >= self.offset.row + self.height {
             // Cursor is below viewport
-            self.offset.row = position.row - self.height + 1;
+            self.offset.row = row - self.height + 1;
             return true;
         }
 
         // Scroll horizontally if needed
-        if position.column < self.offset.column {
+        if column < self.offset.column {
             // Cursor is to the left of viewport
-            self.offset.column = position.column;
+            self.offset.column = column;
             return true;
-        } else if position.column >= self.offset.column + self.width {
+        } else if column >= self.offset.column + self.width {
             // Cursor is to the right of viewport
-            self.offset.column = position.column - self.width + 1;
+            self.offset.column = column - self.width + 1;
             return true;
         }
 

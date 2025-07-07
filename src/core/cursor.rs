@@ -1,11 +1,15 @@
-use crate::{core::buffer::Buffer, editor::Mode};
+use crate::{
+    core::{buffer::Buffer, utf8::Utf8CharIterator},
+    editor::Mode,
+};
 use tree_sitter::Point;
 
-#[derive(Debug, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct Cursor {
-    position: Point,
-    // Store the preferred column for vertical movement
+    row: usize,
+    char_column: usize,
     preferred_column: usize,
+    byte_column: usize,
 }
 
 impl Cursor {
@@ -13,116 +17,132 @@ impl Cursor {
         Self::default()
     }
 
-    pub fn get_point(&self) -> Point {
-        self.position.clone()
+    pub fn get_display_cursor(&self) -> (usize, usize) {
+        (self.row, self.char_column)
     }
 
-    pub fn set_point(&mut self, position: Point) {
-        self.position = position;
+    pub fn get_point(&self) -> Point {
+        Point {
+            row: self.row,
+            column: self.byte_column,
+        }
+    }
+
+    pub fn set_point(&mut self, position: Point, buffer: &Buffer) {
+        self.row = position.row;
+        self.byte_column = position.column;
+        self.char_column = self.byte_to_char_column(buffer);
         self.preferred_column = position.column;
+    }
+
+    fn byte_to_char_column(&self, buffer: &Buffer) -> usize {
+        let line_bytes = buffer.get_content_line_as_bytes(self.row);
+
+        if self.byte_column >= line_bytes.len() {
+            return Utf8CharIterator::new(&line_bytes).count();
+        }
+
+        let prefix = &line_bytes[..self.byte_column];
+        return Utf8CharIterator::new(&prefix).count();
+    }
+
+    fn char_to_byte_column(&self, buffer: &Buffer) -> usize {
+        let line_bytes = buffer.get_content_line_as_bytes(self.row);
+        let mut iter = Utf8CharIterator::new(&line_bytes)
+            .skip(self.char_column)
+            .peekable();
+        iter.peek().map(|item| item.byte_index).unwrap_or_default()
+    }
+
+    fn sync_byte_column(&mut self, buffer: &Buffer) {
+        self.byte_column = self.char_to_byte_column(buffer);
     }
 
     /// Move cursor one character to the left
     pub fn move_left(&mut self, buffer: &Buffer, mode: &Mode) {
-        if self.position.column > 0 {
-            self.position.column -= 1;
-        } else if self.position.row > 0 {
-            self.position.row -= 1;
-            self.position.column = buffer.get_line_length(self.position.row);
+        if self.char_column > 0 {
+            self.char_column -= 1;
+        } else if self.row > 0 {
+            self.row -= 1;
+            self.char_column = buffer.get_line_length(self.row).saturating_sub(1);
             if *mode != Mode::Insert {
                 // In non-insert mode, don't allow cursor to go beyond the last character
-                self.position.column = self.position.column.saturating_sub(1);
+                self.char_column = self.char_column.saturating_sub(1);
             }
         }
+        self.sync_byte_column(buffer);
+        self.preferred_column = self.char_column;
     }
 
     /// Move cursor one character to the right
     pub fn move_right(&mut self, buffer: &Buffer, mode: &Mode) {
-        let line_length = buffer.get_line_length(self.position.row);
+        let line_length = buffer.get_line_length(self.row).saturating_sub(1);
 
         let at_end_of_line = if *mode == Mode::Insert {
-            self.position.column >= line_length
+            self.char_column >= line_length
         } else {
-            self.position.column >= line_length.saturating_sub(1)
+            self.char_column >= line_length.saturating_sub(1)
         };
 
         if !at_end_of_line {
-            self.position.column += 1;
-        } else if self.position.row + 1 < buffer.line_count() {
-            self.position.row += 1;
-            self.position.column = 0;
+            self.char_column += 1;
+        } else if self.row + 1 < buffer.line_count() {
+            self.row += 1;
+            self.char_column = 0;
         }
-
-        self.preferred_column = self.position.column;
+        self.sync_byte_column(buffer);
+        self.preferred_column = self.char_column;
     }
 
     /// Move cursor up one line
     pub fn move_up(&mut self, buffer: &Buffer, mode: &Mode) {
-        if self.position.row == 0 {
+        if self.row == 0 {
             return;
         }
 
-        self.position.row -= 1;
+        self.row -= 1;
         self.clamp_column(buffer, mode);
     }
 
     /// Move cursor down one line
     pub fn move_down(&mut self, buffer: &Buffer, mode: &Mode) {
-        if self.position.row + 1 >= buffer.line_count() {
+        if self.row + 1 >= buffer.line_count() {
             return;
         }
 
-        self.position.row += 1;
+        self.row += 1;
         self.clamp_column(buffer, mode);
     }
 
     /// Move to the start of the current line
     pub fn move_to_line_start(&mut self) {
-        self.position.column = 0;
+        self.char_column = 0;
         self.preferred_column = 0;
     }
 
     /// Move to the end of the current line
     pub fn move_to_line_end(&mut self, buffer: &Buffer, mode: &Mode) {
-        let line_length = buffer.get_line_length(self.position.row);
+        let line_length = buffer.get_line_length(self.row);
         if *mode == Mode::Insert {
-            self.position.column = line_length;
+            self.char_column = line_length;
         } else {
-            self.position.column = line_length.saturating_sub(1);
+            self.char_column = line_length.saturating_sub(1);
         }
-        self.preferred_column = self.position.column;
-    }
-
-    /// Move to the start of the document
-    pub fn move_to_top(&mut self) {
-        self.position = Point { row: 0, column: 0 };
-        self.preferred_column = 0;
-    }
-
-    /// Move to the end of the document
-    pub fn move_to_bottom(&mut self, buffer: &Buffer, mode: &Mode) {
-        let last_row = buffer.line_count().saturating_sub(1);
-        let last_column = buffer.get_line_length(last_row).saturating_sub(1);
-        self.position.row = last_row;
-        self.position.column = if *mode == Mode::Insert {
-            last_column
-        } else {
-            last_column.saturating_sub(1)
-        };
-        self.preferred_column = self.position.column;
+        self.preferred_column = self.char_column;
     }
 
     /// Jump to the next word
-    pub fn find_next_word(&mut self, buffer: &Buffer) {
+    pub fn find_next_word(&mut self, buffer: &Buffer) -> Cursor {
         // Get the position within the buffer
-        let position = buffer.cursor_position(&self.position);
+        let current_point = self.get_point();
+        let position = buffer.cursor_position(&current_point);
 
         // Get buffer content
         let content = buffer.to_string();
         let chars: Vec<char> = content.chars().collect();
 
         if position >= chars.len() {
-            return;
+            return self.clone();
         }
 
         let mut index = position;
@@ -146,18 +166,29 @@ impl Cursor {
 
         // Update the cursor position
         if index < chars.len() {
-            self.position = buffer.point_at_position(index);
-            self.preferred_column = self.position.column;
+            let new_point = buffer.point_at_position(index);
+            let mut new_cursor = Cursor {
+                row: new_point.row,
+                byte_column: new_point.column,
+                char_column: 0,      // Will be calculated
+                preferred_column: 0, // Will be set
+            };
+            new_cursor.char_column = new_cursor.byte_to_char_column(buffer);
+            new_cursor.preferred_column = new_cursor.char_column;
+            new_cursor
+        } else {
+            self.clone()
         }
     }
 
     /// Jump to the previous word
-    pub fn find_previous_word(&mut self, buffer: &Buffer) {
+    pub fn find_previous_word(&self, buffer: &Buffer) -> Cursor {
         // Get the position within the buffer
-        let position = buffer.cursor_position(&self.position);
+        let current_point = self.get_point();
+        let position = buffer.cursor_position(&current_point);
 
         if position == 0 {
-            return;
+            return self.clone();
         }
 
         // Get buffer content
@@ -172,9 +203,12 @@ impl Cursor {
         }
 
         if index == 0 {
-            self.position = Point { row: 0, column: 0 };
-            self.preferred_column = 0;
-            return;
+            return Cursor {
+                row: 0,
+                char_column: 0,
+                byte_column: 0,
+                preferred_column: 0,
+            };
         }
 
         // Find the start of the current word
@@ -188,13 +222,22 @@ impl Cursor {
             word_start -= 1;
         }
 
-        self.position = buffer.point_at_position(word_start);
-        self.preferred_column = self.position.column;
+        // Create new cursor at the target position
+        let new_point = buffer.point_at_position(word_start);
+        let mut new_cursor = Cursor {
+            row: new_point.row,
+            byte_column: new_point.column,
+            char_column: 0,      // Will be calculated
+            preferred_column: 0, // Will be set
+        };
+        new_cursor.char_column = new_cursor.byte_to_char_column(buffer);
+        new_cursor.preferred_column = new_cursor.char_column;
+        new_cursor
     }
 
     /// Ensure the cursor is at a valid position in the current line
     pub fn clamp_column(&mut self, buffer: &Buffer, mode: &Mode) {
-        let line_length = buffer.get_line_length(self.position.row);
+        let line_length = buffer.get_line_length(self.row);
 
         // In insert mode, cursor can be at the end of line
         // In normal mode, cursor can only be on the last character
@@ -205,27 +248,29 @@ impl Cursor {
         };
 
         // Try to maintain the preferred column if possible
-        self.position.column = self.preferred_column.min(max_column);
+        self.char_column = self.preferred_column.min(max_column);
+        self.sync_byte_column(buffer);
     }
 
     pub fn go_to_line(&mut self, line_number: usize, buffer: &Buffer, mode: &Mode) {
         let max_lines = buffer.line_count().saturating_sub(1);
         if line_number > max_lines {
-            self.position.row = max_lines;
+            self.row = max_lines;
         } else {
-            self.position.row = line_number;
+            self.row = line_number;
         }
         self.clamp_column(buffer, mode);
     }
 
     pub fn go_to_column(&mut self, column: usize, buffer: &Buffer, mode: &Mode) {
-        let line_length = buffer.get_line_length(self.position.row);
+        let line_length = buffer.get_line_length(self.row);
         if *mode == Mode::Insert {
-            self.position.column = column.min(line_length);
+            self.char_column = column.min(line_length);
         } else {
-            self.position.column = column.min(line_length.saturating_sub(1));
+            self.char_column = column.min(line_length.saturating_sub(1));
         }
-        self.preferred_column = self.position.column;
+        self.sync_byte_column(buffer);
+        self.preferred_column = self.char_column;
     }
 }
 

@@ -328,12 +328,12 @@ impl Editor {
     }
 
     fn show_cursor_in_buffer(&mut self) -> Result<()> {
-        let cursor = self.cursor.get_point();
+        let (row, column) = self.cursor.get_display_cursor();
         let viewport = &self.viewport;
         let gutter_size = self.gutter_width();
 
-        let screen_row = cursor.row - viewport.top_line();
-        let screen_col = cursor.column - viewport.left_column();
+        let screen_row = row - viewport.top_line();
+        let screen_col = column - viewport.left_column();
 
         if screen_row < viewport.height() && screen_col < viewport.width() {
             self.stdout
