@@ -21,9 +21,9 @@ impl Executable for InsertChar {
         let current_point = ctx.cursor.get_point();
 
         let buffer = ctx.buffer_manager.current_buffer_mut();
-        let position = buffer.cursor_position(&current_point);
+        let byte_start = buffer.cursor_position(&current_point);
 
-        let new_position = buffer.insert_char(position, self.0);
+        let new_position = buffer.insert_char(byte_start, self.0);
         let new_point = buffer.point_at_position(new_position);
 
         ctx.cursor.set_point(new_point.clone(), buffer);
@@ -32,7 +32,8 @@ impl Executable for InsertChar {
         document.mark_modified();
 
         document.history.push(Edit::insert(
-            position,
+            byte_start,
+            current_point,
             self.0.to_string(),
             current_point,
             new_point,
@@ -58,13 +59,13 @@ impl Executable for DeleteChar {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         let document = ctx.buffer_manager.current_mut();
         let point = ctx.cursor.get_point();
-        let position = document.buffer.cursor_position(&point);
-        if let Some((c, _)) = document.buffer.delete_char(position) {
+        let byte_start = document.buffer.cursor_position(&point);
+        if let Some((c, _)) = document.buffer.delete_char(byte_start) {
             // Cursor stays in place after deletion
             document.mark_modified();
             document
                 .history
-                .push(Edit::delete(position, c.to_string(), point, point));
+                .push(Edit::delete(byte_start, point, c.to_string(), point, point));
             ctx.compositor
                 .mark_dirty(&ctx.component_ids.buffer_view_id)?;
             ctx.compositor
@@ -90,11 +91,13 @@ impl Executable for Backspace {
         if position > 0 {
             if let Some((c, new_position)) = document.buffer.delete_char(position - 1) {
                 document.mark_modified();
+                let new_point = document.buffer.point_at_position(new_position);
                 document.history.push(Edit::delete(
                     position - 1,
+                    new_point,
                     c.to_string(),
                     point,
-                    document.buffer.point_at_position(new_position),
+                    new_point,
                 ));
                 ctx.compositor
                     .mark_dirty(&ctx.component_ids.buffer_view_id)?;
@@ -117,12 +120,13 @@ impl Executable for InsertNewLine {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         let document = ctx.buffer_manager.current_mut();
         let point = ctx.cursor.get_point();
-        let position = document.buffer.cursor_position(&point);
-        let new_position = document.buffer.insert_char(position, '\n');
+        let byte_start = document.buffer.cursor_position(&point);
+        let new_position = document.buffer.insert_char(byte_start, '\n');
         let new_point = document.buffer.point_at_position(new_position);
         document.mark_modified();
         document.history.push(Edit::insert(
-            position,
+            byte_start,
+            point,
             "\n".to_string(),
             point,
             new_point.clone(),
@@ -161,11 +165,12 @@ impl Executable for InsertNewLineBelow {
 
         // Move cursor to end of the current line
         ctx.cursor.move_to_line_end(&document.buffer, &Mode::Insert);
-        let byte_position = document.buffer.cursor_position(&ctx.cursor.get_point());
+        let byte_start = document.buffer.cursor_position(&ctx.cursor.get_point());
+        let start_point = document.buffer.point_at_position(byte_start);
 
         // Insert newline at end of current line followed by indentation
         let insert_text = format!("\n{}", indentation);
-        document.buffer.insert_string(byte_position, &insert_text);
+        document.buffer.insert_string(byte_start, &insert_text);
 
         // Position cursor at the start of the new line after indentation
         let mut new_point = point.clone();
@@ -173,9 +178,13 @@ impl Executable for InsertNewLineBelow {
         new_point.column = indentation.len();
 
         ctx.cursor.set_point(new_point, &document.buffer);
-        document
-            .history
-            .push(Edit::insert(byte_position, insert_text, point, new_point));
+        document.history.push(Edit::insert(
+            byte_start,
+            start_point,
+            insert_text,
+            point,
+            new_point,
+        ));
         document.mark_modified();
         ctx.compositor
             .mark_dirty(&ctx.component_ids.buffer_view_id)?;
@@ -211,12 +220,12 @@ impl Executable for InsertNewLineAbove {
         // Move cursor to beginning of current line
         let mut new_point = point.clone();
         new_point.column = 0;
-        let byte_position = document.buffer.cursor_position(&new_point);
-        log::info!("Point: {:?}, Byte Position: {}", new_point, byte_position);
+        let start_byte = document.buffer.cursor_position(&new_point);
+        let start_point = document.buffer.point_at_position(start_byte);
 
         // Insert indentation followed by newline
         let insert_text = format!("{}\n", indentation);
-        document.buffer.insert_string(byte_position, &insert_text);
+        document.buffer.insert_string(start_byte, &insert_text);
 
         // Position cursor at end of the new line (after indentation)
         new_point.column = indentation.len();
@@ -224,9 +233,13 @@ impl Executable for InsertNewLineAbove {
         ctx.cursor.set_point(new_point, &document.buffer);
 
         document.mark_modified();
-        document
-            .history
-            .push(Edit::insert(byte_position, insert_text, point, new_point));
+        document.history.push(Edit::insert(
+            start_byte,
+            start_point,
+            insert_text,
+            point,
+            new_point,
+        ));
         ctx.compositor
             .mark_dirty(&ctx.component_ids.buffer_view_id)?;
         ctx.compositor

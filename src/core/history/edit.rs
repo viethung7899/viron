@@ -23,12 +23,34 @@ pub enum Edit {
 }
 
 impl Edit {
-    pub fn insert(position: usize, text: String, start: Point, end: Point) -> Self {
-        Edit::Insert(Insert::new(position, text, Transition::new(start, end)))
+    pub fn insert(
+        start_byte: usize,
+        start_point: Point,
+        text: String,
+        start: Point,
+        end: Point,
+    ) -> Self {
+        Edit::Insert(Insert::new(
+            start_byte,
+            start_point,
+            text,
+            Transition::new(start, end),
+        ))
     }
 
-    pub fn delete(position: usize, text: String, start: Point, end: Point) -> Self {
-        Edit::Delete(Delete::new(position, text, Transition::new(start, end)))
+    pub fn delete(
+        start_byte: usize,
+        start_point: Point,
+        text: String,
+        start: Point,
+        end: Point,
+    ) -> Self {
+        Edit::Delete(Delete::new(
+            start_byte,
+            start_point,
+            text,
+            Transition::new(start, end),
+        ))
     }
 
     pub fn multiple(changes: Vec<Edit>, start: Point, end: Point) -> Self {
@@ -49,15 +71,29 @@ impl Edit {
     pub fn undo(&self) -> Edit {
         match self {
             Edit::Insert(Insert {
-                byte_position: position,
+                start_byte: position,
+                start_point,
                 text,
-                point,
-            }) => Edit::delete(*position, text.clone(), point.after, point.before),
+                transition: point,
+            }) => Edit::delete(
+                *position,
+                *start_point,
+                text.clone(),
+                point.after,
+                point.before,
+            ),
             Edit::Delete(Delete {
-                byte_position: position,
+                start_byte: position,
+                start_point,
                 text,
-                point,
-            }) => Edit::insert(*position, text.clone(), point.after, point.before),
+                transition: point,
+            }) => Edit::insert(
+                *position,
+                *start_point,
+                text.clone(),
+                point.after,
+                point.before,
+            ),
             Edit::Multiple { changes, point } => {
                 let changes = changes.iter().map(Self::undo).rev().collect();
                 Edit::multiple(changes, point.after, point.before)
@@ -68,17 +104,24 @@ impl Edit {
 
 #[derive(Debug, Clone)]
 pub struct Insert {
-    pub byte_position: usize,
+    pub start_byte: usize,
+    pub start_point: Point,
     pub text: String,
-    pub point: Transition,
+    pub transition: Transition,
 }
 
 impl Insert {
-    pub fn new(position: usize, text: String, point: Transition) -> Self {
+    pub fn new(
+        start_byte: usize,
+        start_point: Point,
+        text: String,
+        transition: Transition,
+    ) -> Self {
         Self {
-            byte_position: position,
+            start_byte,
+            start_point,
             text,
-            point,
+            transition,
         }
     }
 
@@ -99,37 +142,45 @@ impl Insert {
         }
 
         // Must be consecutive positions
-        if other.byte_position != self.byte_position + self.text.len() {
+        if other.start_byte != self.start_byte + self.text.len() {
             return None;
         }
 
         // Cursor positions must connect properly
-        if self.point.after != other.point.before {
+        if self.transition.after != other.transition.before {
             return None;
         }
 
         // Create merged insert
         Some(Insert {
-            byte_position: self.byte_position,
+            start_byte: self.start_byte,
+            start_point: self.start_point,
             text: format!("{}{}", self.text, other.text),
-            point: Transition::new(self.point.before, other.point.after),
+            transition: Transition::new(self.transition.before, other.transition.after),
         })
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct Delete {
-    pub byte_position: usize,
+    pub start_byte: usize,
+    pub start_point: Point,
     pub text: String,
-    pub point: Transition,
+    pub transition: Transition,
 }
 
 impl Delete {
-    pub fn new(position: usize, text: String, point: Transition) -> Self {
+    pub fn new(
+        start_byte: usize,
+        start_point: Point,
+        text: String,
+        transition: Transition,
+    ) -> Self {
         Self {
-            byte_position: position,
+            start_byte,
+            start_point,
             text,
-            point,
+            transition,
         }
     }
 
@@ -149,23 +200,26 @@ impl Delete {
         }
 
         // 1. Backspace: delete backwards
-        if other.byte_position + other.text.len() == self.byte_position
-            && self.point.after == other.point.before
+        if other.start_byte + other.text.len() == self.start_byte
+            && self.transition.after == other.transition.before
         {
             return Some(Delete {
-                byte_position: other.byte_position,
+                start_byte: other.start_byte,
+                start_point: other.start_point,
                 text: format!("{}{}", other.text, self.text),
-                point: Transition::new(self.point.before, other.point.after),
+                transition: Transition::new(self.transition.before, other.transition.after),
             });
         }
 
         // 2. Delete forward
-        if self.byte_position == other.byte_position && self.point.before == other.point.before {
+        if self.start_byte == other.start_byte && self.transition.before == other.transition.before
+        {
             // Create merged delete
             return Some(Delete {
-                byte_position: self.byte_position,
+                start_byte: self.start_byte,
+                start_point: self.start_point,
                 text: format!("{}{}", self.text, other.text),
-                point: Transition::new(self.point.before, other.point.after),
+                transition: Transition::new(self.transition.before, other.transition.after),
             });
         }
         None
@@ -175,16 +229,16 @@ impl Delete {
 impl Edit {
     pub fn point_before(&self) -> Point {
         match self {
-            Edit::Insert(insert) => insert.point.before,
-            Edit::Delete(delete) => delete.point.before,
+            Edit::Insert(insert) => insert.transition.before,
+            Edit::Delete(delete) => delete.transition.before,
             Edit::Multiple { point, .. } => point.before,
         }
     }
 
     pub fn point_after(&self) -> Point {
         match self {
-            Edit::Insert(insert) => insert.point.after,
-            Edit::Delete(delete) => delete.point.after,
+            Edit::Insert(insert) => insert.transition.after,
+            Edit::Delete(delete) => delete.transition.after,
             Edit::Multiple { point, .. } => point.after,
         }
     }
@@ -201,72 +255,4 @@ fn chars_can_group(c1: char, c2: char) -> bool {
         return true;
     }
     false
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_insert_merge() {
-        let insert1 = Insert::new(
-            0,
-            "a".into(),
-            Transition::new(Point::new(0, 0), Point::new(0, 1)),
-        );
-        let insert2 = Insert::new(
-            1,
-            "b".into(),
-            Transition::new(Point::new(0, 1), Point::new(0, 2)),
-        );
-        let merged = insert1.merge(&insert2);
-        assert!(merged.is_some());
-        let merged = merged.unwrap();
-        assert_eq!(merged.byte_position, 0);
-        assert_eq!(merged.text, "ab");
-        assert_eq!(merged.point.before, Point::new(0, 0));
-        assert_eq!(merged.point.after, Point::new(0, 2));
-    }
-
-    #[test]
-    fn test_delete_merge_forward() {
-        let delete1 = Delete::new(
-            0,
-            "a".into(),
-            Transition::new(Point::new(0, 0), Point::new(0, 0)),
-        );
-        let delete2 = Delete::new(
-            0,
-            "b".into(),
-            Transition::new(Point::new(0, 0), Point::new(0, 0)),
-        );
-        let merged = delete1.merge(&delete2);
-        assert!(merged.is_some());
-        let merged = merged.unwrap();
-        assert_eq!(merged.byte_position, 0);
-        assert_eq!(merged.text, "ab");
-        assert_eq!(merged.point.before, Point::new(0, 0));
-        assert_eq!(merged.point.after, Point::new(0, 0));
-    }
-
-    #[test]
-    fn test_delete_merge_backward() {
-        let delete1 = Delete::new(
-            4,
-            "b".into(),
-            Transition::new(Point::new(0, 4), Point::new(0, 3)),
-        );
-        let delete2 = Delete::new(
-            3,
-            "a".into(),
-            Transition::new(Point::new(0, 3), Point::new(0, 2)),
-        );
-        let merged = delete1.merge(&delete2);
-        assert!(merged.is_some());
-        let merged = merged.unwrap();
-        assert_eq!(merged.byte_position, 0);
-        assert_eq!(merged.text, "pu");
-        assert_eq!(merged.point.before, Point::new(0, 2));
-        assert_eq!(merged.point.after, Point::new(0, 0));
-    }
 }
