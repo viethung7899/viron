@@ -49,12 +49,12 @@ impl Change {
     pub fn undo(&self) -> Change {
         match self {
             Change::Insert(Insert {
-                position,
+                byte_position: position,
                 text,
                 point,
             }) => Change::delete(*position, text.clone(), point.after, point.before),
             Change::Delete(Delete {
-                position,
+                byte_position: position,
                 text,
                 point,
             }) => Change::insert(*position, text.clone(), point.after, point.before),
@@ -68,7 +68,7 @@ impl Change {
 
 #[derive(Debug, Clone)]
 pub struct Insert {
-    pub position: usize,
+    pub byte_position: usize,
     pub text: String,
     pub point: Transition,
 }
@@ -76,7 +76,7 @@ pub struct Insert {
 impl Insert {
     pub fn new(position: usize, text: String, point: Transition) -> Self {
         Self {
-            position,
+            byte_position: position,
             text,
             point,
         }
@@ -99,7 +99,7 @@ impl Insert {
         }
 
         // Must be consecutive positions
-        if other.position != self.position + self_count {
+        if other.byte_position != self.byte_position + self.text.len() {
             return None;
         }
 
@@ -110,7 +110,7 @@ impl Insert {
 
         // Create merged insert
         Some(Insert {
-            position: self.position,
+            byte_position: self.byte_position,
             text: format!("{}{}", self.text, other.text),
             point: Transition::new(self.point.before, other.point.after),
         })
@@ -119,7 +119,7 @@ impl Insert {
 
 #[derive(Debug, Clone)]
 pub struct Delete {
-    pub position: usize,
+    pub byte_position: usize,
     pub text: String,
     pub point: Transition,
 }
@@ -127,7 +127,7 @@ pub struct Delete {
 impl Delete {
     pub fn new(position: usize, text: String, point: Transition) -> Self {
         Self {
-            position,
+            byte_position: position,
             text,
             point,
         }
@@ -149,19 +149,21 @@ impl Delete {
         }
 
         // 1. Backspace: delete backwards
-        if other.position + other_count == self.position && self.point.after == other.point.before {
+        if other.byte_position + other.text.len() == self.byte_position
+            && self.point.after == other.point.before
+        {
             return Some(Delete {
-                position: other.position,
+                byte_position: other.byte_position,
                 text: format!("{}{}", other.text, self.text),
                 point: Transition::new(self.point.before, other.point.after),
             });
         }
 
         // 2. Delete forward
-        if self.position == other.position && self.point.before == other.point.before {
+        if self.byte_position == other.byte_position && self.point.before == other.point.before {
             // Create merged delete
             return Some(Delete {
-                position: self.position,
+                byte_position: self.byte_position,
                 text: format!("{}{}", self.text, other.text),
                 point: Transition::new(self.point.before, other.point.after),
             });
@@ -220,7 +222,7 @@ mod tests {
         let merged = insert1.merge(&insert2);
         assert!(merged.is_some());
         let merged = merged.unwrap();
-        assert_eq!(merged.position, 0);
+        assert_eq!(merged.byte_position, 0);
         assert_eq!(merged.text, "ab");
         assert_eq!(merged.point.before, Point::new(0, 0));
         assert_eq!(merged.point.after, Point::new(0, 2));
@@ -241,7 +243,7 @@ mod tests {
         let merged = delete1.merge(&delete2);
         assert!(merged.is_some());
         let merged = merged.unwrap();
-        assert_eq!(merged.position, 0);
+        assert_eq!(merged.byte_position, 0);
         assert_eq!(merged.text, "ab");
         assert_eq!(merged.point.before, Point::new(0, 0));
         assert_eq!(merged.point.after, Point::new(0, 0));
@@ -262,7 +264,7 @@ mod tests {
         let merged = delete1.merge(&delete2);
         assert!(merged.is_some());
         let merged = merged.unwrap();
-        assert_eq!(merged.position, 0);
+        assert_eq!(merged.byte_position, 0);
         assert_eq!(merged.text, "pu");
         assert_eq!(merged.point.before, Point::new(0, 2));
         assert_eq!(merged.point.after, Point::new(0, 0));

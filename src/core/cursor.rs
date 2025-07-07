@@ -32,7 +32,7 @@ impl Cursor {
         self.row = position.row;
         self.byte_column = position.column;
         self.char_column = self.byte_to_char_column(buffer);
-        self.preferred_column = position.column;
+        self.preferred_column = self.char_column;
     }
 
     fn byte_to_char_column(&self, buffer: &Buffer) -> usize {
@@ -122,7 +122,7 @@ impl Cursor {
 
     /// Move to the end of the current line
     pub fn move_to_line_end(&mut self, buffer: &Buffer, mode: &Mode) {
-        let line_length = buffer.get_line_length(self.row);
+        let line_length = buffer.get_line_length(self.row).saturating_sub(1);
         if *mode == Mode::Insert {
             self.char_column = line_length;
         } else {
@@ -237,7 +237,7 @@ impl Cursor {
 
     /// Ensure the cursor is at a valid position in the current line
     pub fn clamp_column(&mut self, buffer: &Buffer, mode: &Mode) {
-        let line_length = buffer.get_line_length(self.row);
+        let line_length = buffer.get_line_length(self.row).saturating_sub(1);
 
         // In insert mode, cursor can be at the end of line
         // In normal mode, cursor can only be on the last character

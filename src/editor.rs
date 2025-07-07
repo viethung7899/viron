@@ -14,18 +14,18 @@ use crate::ui::components::{
     BufferView, CommandLine, ComponentIds, Gutter, MessageArea, PendingKeys, SearchBox, StatusLine,
 };
 use crate::ui::compositor::Compositor;
-use crate::ui::{Component, RenderContext, theme::Theme};
+use crate::ui::{theme::Theme, Component, RenderContext};
 use crate::{
     config::Config,
     core::command::{CommandBuffer, SearchBuffer},
 };
 use anyhow::Result;
-use crossterm::{ExecutableCommand, QueueableCommand, style};
 use crossterm::{
     cursor,
     event::{KeyCode, KeyEvent, KeyModifiers},
     terminal::{self, ClearType},
 };
+use crossterm::{style, ExecutableCommand, QueueableCommand};
 use serde::{Deserialize, Serialize};
 use std::io::{self, Stdout, Write};
 use std::path::{Path, PathBuf};
@@ -125,7 +125,7 @@ impl Editor {
         let search_buffer = SearchBuffer::new();
         let syntax_highlighter = SyntaxHighlighter::new();
         let cursor = Cursor::new();
-        let viewport = Viewport::new(height as usize - 2, width as usize - MIN_GUTTER_SIZE);
+        let viewport = Viewport::new(width as usize - MIN_GUTTER_SIZE, height as usize - 2);
 
         // Create UI components
         let theme = Theme::default();
@@ -366,8 +366,7 @@ impl Editor {
         self.width = width;
         self.height = height;
         self.compositor.resize(width, height);
-        self.viewport
-            .resize(height - 2, width - self.gutter_width());
+        self.viewport.resize(width - self.gutter_width(), height);
         Ok(())
     }
 
@@ -489,13 +488,12 @@ impl Editor {
     }
 
     fn update_viewport_for_gutter_width(&mut self, gutter_size: usize) -> Result<()> {
-        let terminal_size = terminal::size()?;
-        let required_viewport_width = terminal_size.0 as usize - gutter_size;
+        let (width, height) = terminal::size()?;
+        let required_viewport_width = width as usize - gutter_size;
 
         // Only update if the width actually changed
         if self.viewport.width() != required_viewport_width {
-            self.viewport
-                .resize(terminal_size.1 as usize - 2, required_viewport_width);
+            self.viewport.resize(required_viewport_width, self.height);
             self.compositor.mark_all_dirty();
         }
         Ok(())

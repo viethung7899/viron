@@ -43,6 +43,8 @@ impl Executable for EnterMode {
             (_, Mode::Normal) => {
                 ctx.command_buffer.clear();
                 ctx.search_buffer.buffer.clear();
+                ctx.cursor
+                    .clamp_column(ctx.buffer_manager.current_buffer(), &Mode::Normal);
                 ctx.compositor
                     .mark_visible(&ctx.component_ids.command_line_id, false)?;
                 ctx.compositor

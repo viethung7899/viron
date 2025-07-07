@@ -109,7 +109,7 @@ impl Buffer {
     }
 
     pub fn insert_bytes(&mut self, position: usize, bytes: &[u8]) -> usize {
-        // Move gap to insertion position
+        // Move gap to insertion byte_position
         self.buffer.move_gap(position);
 
         // Insert the character
@@ -130,7 +130,7 @@ impl Buffer {
             }
         }
 
-        // Return the position after insertion
+        // Return the byte_position after insertion
         position + bytes.len()
     }
 
@@ -196,10 +196,18 @@ impl Buffer {
 
     pub fn apply_change(&mut self, change: &Change) {
         match change {
-            Change::Insert(Insert { position, text, .. }) => {
+            Change::Insert(Insert {
+                byte_position: position,
+                text,
+                ..
+            }) => {
                 self.insert_string(*position, &text);
             }
-            Change::Delete(Delete { position, text, .. }) => {
+            Change::Delete(Delete {
+                byte_position: position,
+                text,
+                ..
+            }) => {
                 for _ in text.chars() {
                     self.delete_char(*position);
                 }
@@ -212,7 +220,7 @@ impl Buffer {
         }
     }
 
-    /// Helper method to determine which row a position is in
+    /// Helper method to determine which row a byte_position is in
     fn row_at_position(&self, position: usize) -> usize {
         // Find the row by binary search (more efficient for large files)
         match self.line_starts.binary_search(&position) {
@@ -221,7 +229,7 @@ impl Buffer {
         }
     }
 
-    /// Convert position to a Point
+    /// Convert byte_position to a Point
     pub fn point_at_position(&self, position: usize) -> Point {
         let row = self.row_at_position(position);
         let column = position - self.line_starts[row];
