@@ -1,10 +1,12 @@
 use crate::constants::{MIN_GUTTER_WIDTH, RESERVED_ROW_COUNT};
 use crate::service::lsp::types::DiagnosticSeverity;
 use crate::ui::components::gutter::Gutter;
+use crate::service::lsp::types::{Diagnostic, DiagnosticSeverity};
 use crate::ui::render_buffer::RenderBuffer;
 use crate::ui::theme::Style;
 use crate::ui::{Bounds, Drawable, Focusable, RenderContext};
 use anyhow::Result;
+use std::collections::HashMap;
 use std::ops::Add;
 use std::str::from_utf8;
 use tree_sitter::Point;
@@ -275,21 +277,38 @@ impl EditorView {
         let starting_line = viewport.top_line();
         let ending_line = starting_line + bounds.height;
 
-        let visible_diagnostics = context
-            .diagnostics
-            .iter()
-            .filter(|d| {
-                let start = &d.range.start;
-                start.line >= starting_line && start.line < ending_line
-            })
-            .filter(|d| d.severity <= DiagnosticSeverity::Warning);
+        log::info!(
+            "Found {} diagnostics {:#?}",
+            context.diagnostics.len(),
+            context.diagnostics
+        );
 
-        for diagnostic in visible_diagnostics {
+        let mut line_diagnostics: HashMap<usize, &Diagnostic> = HashMap::new();
+
+        for diagnostic in context.diagnostics.iter().filter(|d| {
+            let start = &d.range.start;
+            start.line >= starting_line
+                && start.line < ending_line
+                && d.severity <= DiagnosticSeverity::Warning
+        }) {
+            let line = diagnostic.range.start.line;
+            match line_diagnostics.get(&line) {
+                Some(existing) => {
+                    if diagnostic.severity < existing.severity {
+                        line_diagnostics.insert(line, diagnostic);
+                    }
+                }
+                None => {
+                    line_diagnostics.insert(line, diagnostic);
+                }
+            }
+        }
+
+        for (line, diagnostic) in line_diagnostics {
             let Some(message) = diagnostic.message.lines().next() else {
                 continue;
             };
             let formatted = format!("■  {message}");
-            let line = diagnostic.range.start.line;
             let line_length = buffer.get_line_length(line);
             let column = line_length + DIAGNOSTIC_MARGIN;
 
