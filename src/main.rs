@@ -5,14 +5,12 @@ mod input;
 mod service;
 mod ui;
 
-use crate::config::Config;
+use crate::config::{get_config_dir, Config};
 use anyhow::Result;
 use crossterm::terminal::ClearType;
 use crossterm::{cursor, terminal};
 use editor::Editor;
 use std::{env, io::stdout, panic};
-
-const HOME_DIR: &str = ".viron";
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -29,11 +27,8 @@ async fn main() -> Result<()> {
     let mut editor = Editor::new(file_name).await?;
 
     // Load the config
-    let home_dir = env::home_dir()
-        .ok_or_else(|| anyhow::anyhow!("Could not determine home directory"))?
-        .join(HOME_DIR);
-    let config_path = home_dir.join("config.toml");
-    editor.load_config(&Config::load_from_file("config.toml")?)?;
+    let config_path = get_config_dir().join("config.toml");
+    editor.load_config(&Config::load_from_file(config_path)?)?;
 
     // Set up error handling for the editor's run method
     let result = editor.run().await;

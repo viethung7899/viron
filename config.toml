@@ -1,4 +1,4 @@
-theme = "themes/catppuchin/mocha.json"
+theme = "catppuchin/mocha"
 
 # Keybindings for normal mode
 [keymap.normal]
