@@ -16,7 +16,6 @@ impl Transition {
 pub enum Edit {
     Insert(Insert),
     Delete(Delete),
-    Multiple { edits: Vec<Edit>, point: Transition },
 }
 
 impl Edit {
@@ -48,13 +47,6 @@ impl Edit {
             text,
             Transition::new(start, end),
         ))
-    }
-
-    pub fn multiple(changes: Vec<Edit>, start: Point, end: Point) -> Self {
-        Edit::Multiple {
-            edits: changes,
-            point: Transition::new(start, end),
-        }
     }
 
     pub fn merge(&self, other: &Edit) -> Option<Edit> {
@@ -90,14 +82,7 @@ impl Edit {
                 text.clone(),
                 point.after,
                 point.before,
-            ),
-            Edit::Multiple {
-                edits: changes,
-                point,
-            } => {
-                let changes = changes.iter().map(Self::undo).rev().collect();
-                Edit::multiple(changes, point.after, point.before)
-            }
+            )
         }
     }
 }
@@ -253,7 +238,6 @@ impl Edit {
         match self {
             Edit::Insert(insert) => insert.transition.before,
             Edit::Delete(delete) => delete.transition.before,
-            Edit::Multiple { point, .. } => point.before,
         }
     }
 
@@ -261,7 +245,6 @@ impl Edit {
         match self {
             Edit::Insert(insert) => insert.transition.after,
             Edit::Delete(delete) => delete.transition.after,
-            Edit::Multiple { point, .. } => point.after,
         }
     }
 }

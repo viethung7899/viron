@@ -297,9 +297,6 @@ impl LspClient {
                         .build(),
                 ]
             }
-            _ => {
-                return Ok(());
-            }
         };
         let params = DidChangeTextDocumentParams::builder()
             .text_document(

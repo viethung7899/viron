@@ -56,11 +56,6 @@ impl SyntaxEngine {
             Edit::Delete(delete) => {
                 tree.edit(&delete.edit_summary());
             }
-            Edit::Multiple { edits, .. } => {
-                for edit in edits {
-                    self.apply_edit(edit)?;
-                }
-            }
         };
         Ok(())
     }
