@@ -277,12 +277,6 @@ impl EditorView {
         let starting_line = viewport.top_line();
         let ending_line = starting_line + bounds.height;
 
-        log::info!(
-            "Found {} diagnostics {:#?}",
-            context.diagnostics.len(),
-            context.diagnostics
-        );
-
         let mut line_diagnostics: HashMap<usize, &Diagnostic> = HashMap::new();
 
         for diagnostic in context.diagnostics.iter().filter(|d| {

@@ -1,8 +1,21 @@
 use crate::service::lsp::types::capabilities::*;
 use crate::service::lsp::types::initialize::*;
 
-pub fn get_initialize_params(workspace_uri: impl ToString) -> InitializeParams {
-    let workspace_uri = workspace_uri.to_string();
+fn get_workspace() -> WorkspaceFolder {
+    let workspace = std::env::current_dir().unwrap_or_default();
+    let workspace_uri = format!("file://{}", workspace.to_string_lossy());
+    let workspace_name = workspace
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("Workspace")
+        .to_string();
+    WorkspaceFolder {
+        uri: workspace_uri,
+        name: workspace_name,
+    }
+}
+
+pub fn get_initialize_params() -> InitializeParams {
     let client_capabilities = ClientCapabilities::builder()
         .text_document(
             TextDocumentClientCapabilities::builder()
@@ -27,11 +40,7 @@ pub fn get_initialize_params(workspace_uri: impl ToString) -> InitializeParams {
             env!("CARGO_PKG_NAME").to_string(),
             Some(env!("CARGO_PKG_VERSION").to_string()),
         ))
-        .root_uri(workspace_uri.clone())
         .capabilities(client_capabilities)
-        .workspace_folders(vec![WorkspaceFolder {
-            uri: workspace_uri,
-            name: "Workspace".to_string(),
-        }])
+        .workspace_folders(vec![get_workspace()])
         .build()
 }

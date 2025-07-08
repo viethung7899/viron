@@ -161,8 +161,10 @@ impl LspService {
                 None
             }
             NotificationKind::PublishDiagnostics(diagnostics) => {
+                let uri = diagnostics.uri.unwrap_or_default();
+                log::info!("Get diagnostic for {} in {:#?}", uri, diagnostics.diagnostics);
                 self.diagnostics
-                    .insert(diagnostics.uri.unwrap_or_default(), diagnostics.diagnostics);
+                    .insert(uri, diagnostics.diagnostics);
                 Some(Box::new(actions::RefreshBuffer))
             }
         }

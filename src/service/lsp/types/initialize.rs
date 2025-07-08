@@ -9,16 +9,13 @@ pub struct InitializeParams {
     process_id: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
     client_info: Option<ClientInfo>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    locale: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    root_path: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    root_uri: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    initialization_options: Option<serde_json::Value>,
+    // #[serde(skip_serializing_if = "Option::is_none")]
+    // locale: Option<String>,
+    // #[serde(skip_serializing_if = "Option::is_none")]
+    // initialization_options: Option<serde_json::Value>,
     capabilities: ClientCapabilities,
     // trace: Option<TraceValue>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     workspace_folders: Option<Vec<WorkspaceFolder>>,
 }
 
