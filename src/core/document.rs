@@ -11,6 +11,7 @@ pub struct Document {
     pub modified: bool,
     pub language: Language,
     pub syntax_engine: Option<SyntaxEngine>,
+    pub version: usize,
     pub history: History,
 }
 
@@ -22,6 +23,7 @@ impl Document {
             modified: false,
             language: Language::PlainText,
             syntax_engine: None,
+            version: 0,
             history: History::new(1000),
         }
     }
@@ -38,6 +40,7 @@ impl Document {
             modified: false,
             language,
             syntax_engine,
+            version: 0,
             history: History::new(1000),
         }
     }
@@ -60,6 +63,7 @@ impl Document {
     }
 
     pub fn mark_modified(&mut self) {
+        self.version += 1;
         self.modified = true;
     }
 
@@ -82,20 +86,16 @@ impl Document {
             .map(|s| format!("file://{}", s))
     }
 
-    pub fn undo(&mut self) -> Result<Edit> {
+    pub fn get_undo(&mut self) -> Result<Edit> {
         if let Some(change) = self.history.undo() {
-            self.mark_modified();
-            self.buffer.apply_edit(&change);
             Ok(change)
         } else {
             Err(anyhow::anyhow!("No changes to undo"))
         }
     }
 
-    pub fn redo(&mut self) -> Result<Edit> {
+    pub fn get_redo(&mut self) -> Result<Edit> {
         if let Some(change) = self.history.redo() {
-            self.mark_modified();
-            self.buffer.apply_edit(&change);
             Ok(change)
         } else {
             Err(anyhow::anyhow!("No changes to redo"))

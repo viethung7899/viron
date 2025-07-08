@@ -13,7 +13,7 @@ pub struct DidOpenTextDocumentParams {
 pub struct TextDocumentItem {
     uri: String,
     language_id: String,
-    version: i128,
+    version: usize,
     text: String,
 }
 
@@ -48,15 +48,12 @@ pub struct DidChangeTextDocumentParams {
 #[serde(rename_all = "camelCase")]
 pub struct VersionedTextDocumentIdentifier {
     uri: String,
-    version: i128,
+    version: usize,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Builder)]
 #[serde(rename_all = "camelCase")]
 pub struct TextDocumentContentChangeEvent {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    range: Option<Range>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    range_length: Option<usize>,
+    range: Range,
     text: String,
 }

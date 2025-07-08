@@ -1,8 +1,16 @@
-use super::types::{DidCloseTextDocumentParams, DidOpenTextDocumentParams, DidSaveTextDocumentParams, LogMessageParams, ShowMessageParams, TextDocumentIdentifier, TextDocumentItem, TextDocumentPublishDiagnostics};
+use super::types::{
+    DidCloseTextDocumentParams, DidOpenTextDocumentParams, DidSaveTextDocumentParams,
+    LogMessageParams, ShowMessageParams, TextDocumentContentChangeEvent, TextDocumentIdentifier,
+    TextDocumentItem, TextDocumentPublishDiagnostics, VersionedTextDocumentIdentifier,
+};
+use crate::core::document::Document;
 use crate::core::history::edit::Edit;
 use crate::core::language::Language;
 use crate::service::lsp::params::get_initialize_params;
+use crate::service::lsp::types::common::{Position, Range};
+use crate::service::lsp::types::DidChangeTextDocumentParams;
 use anyhow::{Context, Result};
+use async_recursion::async_recursion;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::HashMap;
@@ -22,6 +30,7 @@ use tokio::{
     process::Command,
     sync::mpsc,
 };
+use tree_sitter::InputEdit;
 
 static ID: AtomicUsize = AtomicUsize::new(1);
 const CHANNEL_SIZE: usize = 32;
@@ -217,14 +226,17 @@ impl LspClient {
         Ok(())
     }
 
-    pub async fn did_open(&mut self, uri: &str, contents: &str) -> Result<()> {
+    pub async fn did_open(&mut self, document: &Document) -> Result<()> {
+        let Some(uri) = document.uri() else {
+            return Ok(());
+        };
         let params = DidOpenTextDocumentParams::builder()
             .text_document(
                 TextDocumentItem::builder()
-                    .uri(uri.to_string())
-                    .language_id(self.language.to_str().to_string())
-                    .version(0)
-                    .text(contents.to_string())
+                    .uri(uri)
+                    .language_id(document.language.to_str().to_string())
+                    .version(document.version)
+                    .text(document.buffer.to_string())
                     .build(),
             )
             .build();
@@ -235,10 +247,13 @@ impl LspClient {
         Ok(())
     }
 
-    pub async fn did_save(&mut self, uri: &str, contents: &str) -> Result<()> {
+    pub async fn did_save(&mut self, document: &Document) -> Result<()> {
+        let Some(uri) = document.uri() else {
+            return Ok(());
+        };
         let params = DidSaveTextDocumentParams::builder()
-            .text_document(TextDocumentIdentifier::builder().uri(uri.to_string()).build())
-            .text(contents.to_string())
+            .text_document(TextDocumentIdentifier::builder().uri(uri).build())
+            .text(document.buffer.to_string())
             .build();
 
         self.send_notification("textDocument/didSave", serde_json::to_value(params)?)
@@ -246,18 +261,57 @@ impl LspClient {
         Ok(())
     }
 
-    pub async fn did_close(&mut self, uri: &str) -> Result<()> {
+    pub async fn did_close(&mut self, document: &Document) -> Result<()> {
+        let Some(uri) = document.uri() else {
+            return Ok(());
+        };
         let params = DidCloseTextDocumentParams::builder()
-            .text_document(
-                TextDocumentIdentifier::builder()
-                    .uri(uri.to_string())
-                    .build(),
-            )
+            .text_document(TextDocumentIdentifier::builder().uri(uri).build())
             .build();
 
         self.send_notification("textDocument/didClose", serde_json::to_value(params)?)
             .await?;
 
+        Ok(())
+    }
+
+    pub async fn did_change(&mut self, document: &Document, edit: &Edit) -> Result<()> {
+        let Some(uri) = document.uri() else {
+            return Ok(());
+        };
+
+        let changes = match edit {
+            Edit::Insert(insert) => {
+                vec![
+                    TextDocumentContentChangeEvent::builder()
+                        .range(get_range_from_summary(&insert.edit_summary()))
+                        .text(insert.text.clone())
+                        .build(),
+                ]
+            }
+            Edit::Delete(delete) => {
+                vec![
+                    TextDocumentContentChangeEvent::builder()
+                        .range(get_range_from_summary(&delete.edit_summary()))
+                        .text(delete.text.clone())
+                        .build(),
+                ]
+            }
+            _ => {
+                return Ok(());
+            }
+        };
+        let params = DidChangeTextDocumentParams::builder()
+            .text_document(
+                VersionedTextDocumentIdentifier::builder()
+                    .uri(uri)
+                    .version(document.version)
+                    .build(),
+            )
+            .content_changes(changes)
+            .build();
+        self.send_notification("textDocument/didChange", serde_json::to_value(params)?)
+            .await?;
         Ok(())
     }
 
@@ -505,4 +559,17 @@ fn get_workspace_uri() -> String {
         "file://{}",
         get_workspace_path().to_string_lossy().to_string()
     )
+}
+
+fn get_range_from_summary(summary: &InputEdit) -> Range {
+    Range {
+        start: Position {
+            line: summary.start_position.row,
+            character: summary.start_position.column,
+        },
+        end: Position {
+            line: summary.old_end_position.row,
+            character: summary.old_end_position.column,
+        },
+    }
 }

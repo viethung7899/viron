@@ -17,11 +17,7 @@ async fn after_buffer_change(ctx: &mut ActionContext<'_>) -> ActionResult {
     // Update syntax highlighter with the current document's language
 
     if let Some(client) = ctx.lsp_service.start_server(language).await? {
-        let Some(uri) = document.uri() else {
-            return Ok(());
-        };
-        let content = document.buffer.to_string();
-        client.did_open(&uri, &content).await?;
+        client.did_open(&document).await?;
     };
 
     ctx.compositor.mark_all_dirty();
@@ -97,8 +93,8 @@ impl WriteBuffer {
 #[async_trait(?Send)]
 impl Executable for WriteBuffer {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
-        let current_document = ctx.buffer_manager.current();
-        let path = self.path.clone().or(current_document.path.clone());
+        let document = ctx.buffer_manager.current();
+        let path = self.path.clone().or(document.path.clone());
         let Some(path) = path else {
             return system::ShowMessage(Message::error(
                 "No path specified for writing the buffer. Please provide a valid path."
@@ -108,13 +104,11 @@ impl Executable for WriteBuffer {
             .await;
         };
 
-        let content = current_document.buffer.to_string();
-        let line_count = current_document.buffer.line_count();
+        let content = document.buffer.to_string();
+        let line_count = document.buffer.line_count();
 
-        if let Some(uri) = current_document.uri() {
-            if let Some(client) = ctx.lsp_service.get_client_mut() {
-                client.did_save(&uri, &content).await?;
-            }
+        if let Some(client) = ctx.lsp_service.get_client_mut() {
+            client.did_save(document).await?;
         }
 
         match std::fs::write(&path, &content) {
@@ -169,9 +163,7 @@ impl Executable for CloseBuffer {
 
         let document = ctx.buffer_manager.close_current();
         if let Some(client) = ctx.lsp_service.get_client_mut() {
-            if let Some(uri) = document.uri() {
-                client.did_close(&uri).await?;
-            }
+            client.did_close(&document).await?;
         }
 
         if ctx.buffer_manager.is_empty() {

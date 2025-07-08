@@ -161,22 +161,13 @@ impl Insert {
     }
 
     pub fn edit_summary(&self) -> InputEdit {
-        let mut new_end_position = self.start_point;
-        for b in self.text.as_bytes() {
-            if *b == b'\n' {
-                new_end_position.row += 1;
-                new_end_position.column = 0;
-            } else {
-                new_end_position.column += 1;
-            }
-        }
         InputEdit {
             start_byte: self.start_byte,
             old_end_byte: self.start_byte,
             new_end_byte: self.start_byte + self.text.len(),
             start_position: self.start_point,
             old_end_position: self.start_point,
-            new_end_position,
+            new_end_position: get_end_position(&self.text, &self.start_point),
         }
     }
 }
@@ -246,21 +237,12 @@ impl Delete {
     }
 
     pub fn edit_summary(&self) -> InputEdit {
-        let mut old_end_position = self.start_point;
-        for b in self.text.as_bytes() {
-            if *b == b'\n' {
-                old_end_position.row += 1;
-                old_end_position.column = 0;
-            } else {
-                old_end_position.column += 1;
-            }
-        }
         InputEdit {
             start_byte: self.start_byte,
             old_end_byte: self.start_byte + self.text.len(),
             new_end_byte: self.start_byte,
             start_position: self.start_point,
-            old_end_position,
+            old_end_position: get_end_position(&self.text, &self.start_point),
             new_end_position: self.start_point,
         }
     }
@@ -295,4 +277,17 @@ fn chars_can_group(c1: char, c2: char) -> bool {
         return true;
     }
     false
+}
+
+fn get_end_position(text: &str, start: &Point) -> Point {
+    let mut end_position = start.clone();
+    for b in text.as_bytes() {
+        if *b == b'\n' {
+            end_position.row += 1;
+            end_position.column = 0;
+        } else {
+            end_position.column += 1;
+        }
+    }
+    end_position
 }
