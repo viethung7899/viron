@@ -1,8 +1,9 @@
+use crate::input::keymaps::KeyMapConfig;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
-use crate::input::keymaps::KeyMapConfig;
+const CONFIG_DIRECTORY: &str = ".viron";
 
 #[derive(Serialize, Deserialize)]
 pub struct Config {
@@ -16,4 +17,9 @@ impl Config {
         let config = toml::from_str(&string)?;
         Ok(config)
     }
+}
+
+pub fn get_config_dir() -> PathBuf {
+    let home_dir = dirs::home_dir().unwrap_or_default();
+    home_dir.join(CONFIG_DIRECTORY)
 }

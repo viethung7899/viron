@@ -1,3 +1,4 @@
+use crate::config::get_config_dir;
 use crate::core::cursor::Cursor;
 use crate::core::viewport::Viewport;
 use crate::core::{buffer_manager::BufferManager, message::MessageManager};
@@ -210,7 +211,8 @@ impl Editor {
 
     pub fn load_config(&mut self, config: &Config) -> Result<()> {
         self.keymap = KeyMap::load_from_config(&config.keymap)?;
-        self.theme = Theme::load_from_file(&config.theme)?;
+        let theme_path = get_config_dir().join(format!("themes/{}.json", config.theme));
+        self.theme = Theme::load_from_file(theme_path)?;
         Ok(())
     }
 
