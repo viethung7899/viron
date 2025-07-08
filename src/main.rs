@@ -12,7 +12,7 @@ use crossterm::{cursor, terminal};
 use editor::Editor;
 use std::{env, io::stdout, panic};
 
-const HOME_DIR: &str = ".viron";
+const CONFIG_DIRECTORY: &str = ".viron";
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -31,9 +31,9 @@ async fn main() -> Result<()> {
     // Load the config
     let home_dir = env::home_dir()
         .ok_or_else(|| anyhow::anyhow!("Could not determine home directory"))?
-        .join(HOME_DIR);
+        .join(CONFIG_DIRECTORY);
     let config_path = home_dir.join("config.toml");
-    editor.load_config(&Config::load_from_file("config.toml")?)?;
+    editor.load_config(&Config::load_from_file(config_path)?)?;
 
     // Set up error handling for the editor's run method
     let result = editor.run().await;
