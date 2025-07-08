@@ -38,11 +38,12 @@ pub struct GeneralCapabilities {
     position_encoding: Option<Vec<PositionEncodingKind>>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub enum PositionEncodingKind {
     #[serde(rename = "utf-8")]
     Utf8,
     #[serde(rename = "utf-16")]
+    #[default]
     Utf16,
     #[serde(rename = "utf-32")]
     Utf32,

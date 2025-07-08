@@ -321,10 +321,12 @@ impl Editor {
     }
 
     async fn handle_tick(&mut self) -> Result<()> {
-        let actions = self.lsp_service.handle_message().await;
-        if let Some(action) = actions {
+        let Some(client) = self.lsp_service.get_client_mut() else {
+            return Ok(());
+        };
+        if let Some(action) = client.handle_message().await {
             self.execute_action(action.as_ref()).await?;
-        }
+        };
         Ok(())
     }
 

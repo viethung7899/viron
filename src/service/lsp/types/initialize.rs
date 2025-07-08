@@ -1,6 +1,7 @@
 use super::capabilities::*;
 use bon::Builder;
 use serde::{Deserialize, Serialize};
+use serde_repr::{Deserialize_repr, Serialize_repr};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Builder)]
 #[serde(rename_all = "camelCase")]
@@ -49,4 +50,45 @@ pub struct ClientCapabilities {
 pub struct WorkspaceFolder {
     pub uri: String,
     pub name: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InitializeResult {
+    pub capabilities: ServerCapabilities,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub server_info: Option<ServerInfo>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ServerInfo {
+    pub name: String,
+    pub version: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ServerCapabilities {
+    #[serde(default)]
+    pub position_encoding: PositionEncodingKind,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub text_document_sync: Option<TextDocumentSyncOptions>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TextDocumentSyncOptions {
+    open_close: Option<bool>,
+    #[serde(default)]
+    change: TextDocumentSyncKind,
+}
+
+#[derive(Debug, Clone, Default, Serialize_repr, Deserialize_repr)]
+#[repr(usize)]
+pub enum TextDocumentSyncKind {
+    #[default]
+    None = 0,
+    Full = 1,
+    Incremental = 2,
 }

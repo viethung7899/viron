@@ -3,7 +3,7 @@ use async_trait::async_trait;
 use crate::core::message::Message;
 use crate::input::actions::{impl_action, system, Action, ActionContext, ActionResult, Executable};
 use crate::input::actions::{
-    Action, ActionContext, ActionDefinition, ActionResult, Executable, impl_action, system,
+    impl_action, system, Action, ActionContext, ActionDefinition, ActionResult, Executable,
 };
 
 use crate::input::actions::definition::ActionDefinition;
@@ -15,7 +15,6 @@ async fn after_buffer_change(ctx: &mut ActionContext<'_>) -> ActionResult {
     let language = document.language;
 
     // Update syntax highlighter with the current document's language
-
     if let Some(client) = ctx.lsp_service.start_server(language).await? {
         client.did_open(&document).await?;
     };

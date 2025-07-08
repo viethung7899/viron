@@ -1,18 +1,23 @@
 use super::types::{
-    DidCloseTextDocumentParams, DidOpenTextDocumentParams, DidSaveTextDocumentParams,
-    LogMessageParams, ShowMessageParams, TextDocumentContentChangeEvent, TextDocumentIdentifier,
-    TextDocumentItem, TextDocumentPublishDiagnostics, VersionedTextDocumentIdentifier,
+    DefinitionResult, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
+    DidSaveTextDocumentParams, LogMessageParams, ShowMessageParams, TextDocumentContentChangeEvent,
+    TextDocumentIdentifier, TextDocumentItem, TextDocumentPublishDiagnostics,
+    VersionedTextDocumentIdentifier,
 };
 use crate::core::document::Document;
 use crate::core::history::edit::Edit;
 use crate::core::language::Language;
+use crate::input::actions;
 use crate::service::lsp::params::get_initialize_params;
 use crate::service::lsp::types::common::{Position, Range};
+use crate::service::lsp::types::initialize::{InitializeResult, ServerCapabilities};
 use crate::service::lsp::types::DidChangeTextDocumentParams;
+use crate::service::lsp::{types, LspAction};
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::{
     process::Stdio,
@@ -107,11 +112,13 @@ pub struct LspClient {
     request_sender: mpsc::Sender<OutboundMessage>,
     response_receiver: mpsc::Receiver<InboundMessage>,
     pending_responses: HashMap<i64, String>,
+    server_capabilities: Option<ServerCapabilities>,
     process: Arc<Mutex<Option<Child>>>,
+    pub initialized: bool,
 }
 
 impl LspClient {
-    pub async fn start(language: Language, args: &[&str]) -> Result<Self> {
+    pub async fn new(language: Language, args: &[&str]) -> Result<Self> {
         let command = language
             .get_language_server()
             .context("Language is not supported")?;
@@ -210,16 +217,29 @@ impl LspClient {
             language,
             request_sender,
             response_receiver,
-            pending_responses: Default::default(),
+            server_capabilities: None,
+            pending_responses: HashMap::new(),
             process: Arc::new(Mutex::new(Some(child))),
+            initialized: false,
         })
     }
 
     pub async fn initialize(&mut self) -> Result<()> {
         let initialize_params = get_initialize_params();
-        self.send_request("initialize", serde_json::to_value(initialize_params)?)
+        self.send_request("initialize", serde_json::to_value(initialize_params)?, true)
             .await?;
-        self.send_notification("initialized", json!({})).await?;
+        Ok(())
+    }
+
+    pub(super) async fn handle_initialize_result(
+        &mut self,
+        result: InitializeResult,
+    ) -> Result<()> {
+        self.server_capabilities = Some(result.capabilities);
+        log::info!("Server capabilities: {:#?}", self.server_capabilities);
+        self.initialized = true;
+        self.send_notification("initialized", json!({}), true)
+            .await?;
         Ok(())
     }
 
@@ -238,7 +258,7 @@ impl LspClient {
             )
             .build();
 
-        self.send_notification("textDocument/didOpen", serde_json::to_value(params)?)
+        self.send_notification("textDocument/didOpen", serde_json::to_value(params)?, false)
             .await?;
 
         Ok(())
@@ -253,7 +273,7 @@ impl LspClient {
             .text(document.buffer.to_string())
             .build();
 
-        self.send_notification("textDocument/didSave", serde_json::to_value(params)?)
+        self.send_notification("textDocument/didSave", serde_json::to_value(params)?, false)
             .await?;
         Ok(())
     }
@@ -266,8 +286,12 @@ impl LspClient {
             .text_document(TextDocumentIdentifier::builder().uri(uri).build())
             .build();
 
-        self.send_notification("textDocument/didClose", serde_json::to_value(params)?)
-            .await?;
+        self.send_notification(
+            "textDocument/didClose",
+            serde_json::to_value(params)?,
+            false,
+        )
+        .await?;
 
         Ok(())
     }
@@ -304,8 +328,12 @@ impl LspClient {
             )
             .content_changes(changes)
             .build();
-        self.send_notification("textDocument/didChange", serde_json::to_value(params)?)
-            .await?;
+        self.send_notification(
+            "textDocument/didChange",
+            serde_json::to_value(params)?,
+            false,
+        )
+        .await?;
         Ok(())
     }
 
@@ -324,12 +352,16 @@ impl LspClient {
                 "character": character,
             }
         });
-        self.send_request("textDocument/definition", params).await?;
+        self.send_request("textDocument/definition", params, false)
+            .await?;
 
         Ok(())
     }
 
-    async fn send_request(&mut self, method: &str, params: Value) -> Result<i64> {
+    async fn send_request(&mut self, method: &str, params: Value, force: bool) -> Result<i64> {
+        if !self.initialized && !force {
+            return Err(anyhow::anyhow!("LSP client is not initialized"));
+        }
         let req = Request::new(method, params);
         let id = req.id.clone();
 
@@ -340,7 +372,15 @@ impl LspClient {
         Ok(id)
     }
 
-    pub async fn send_notification(&mut self, method: &str, params: Value) -> Result<()> {
+    pub async fn send_notification(
+        &mut self,
+        method: &str,
+        params: Value,
+        force: bool,
+    ) -> Result<()> {
+        if !self.initialized && !force {
+            return Err(anyhow::anyhow!("LSP client is not initialized"));
+        }
         self.request_sender
             .send(OutboundMessage::Notification(NotificationRequest {
                 method: method.to_string(),
@@ -391,7 +431,7 @@ impl LspClient {
 
     pub async fn shutdown(&mut self) -> Result<()> {
         // Send shutdown request and wait for response
-        let shutdown_id = self.send_request("shutdown", json!({})).await?;
+        let shutdown_id = self.send_request("shutdown", json!({}), true).await?;
 
         // Wait for shutdown response (with timeout)
         let timeout_duration = std::time::Duration::from_secs(5);
@@ -409,7 +449,7 @@ impl LspClient {
         }
 
         // Send exit notification
-        self.send_notification("exit", json!({})).await?;
+        self.send_notification("exit", json!({}), true).await?;
 
         // Give the process a moment to exit gracefully
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
@@ -420,6 +460,107 @@ impl LspClient {
         }
 
         Ok(())
+    }
+
+    pub async fn handle_message(&mut self) -> Option<LspAction> {
+        let Ok(Some((messages, method))) = self.receive_response().await else {
+            return None;
+        };
+        log::info!("Messages: {:#?}", messages);
+        self.process_messages(messages, method).await
+    }
+
+    async fn handle_notification(&mut self, notification: NotificationKind) -> Option<LspAction> {
+        match notification {
+            NotificationKind::ShowMessage(msg) => {
+                match msg.type_ {
+                    types::MessageType::Info => log::info!("{}", msg.message),
+                    types::MessageType::Warning => log::warn!("{}", msg.message),
+                    types::MessageType::Error => log::error!("{}", msg.message),
+                    types::MessageType::Log => log::debug!("{}", msg.message),
+                };
+                None
+            }
+            NotificationKind::LogMessage(msg) => {
+                match msg.type_ {
+                    types::MessageType::Error => log::error!("{}", msg.message),
+                    types::MessageType::Info | types::MessageType::Log => {
+                        log::info!("{}", msg.message)
+                    }
+                    types::MessageType::Warning => log::warn!("{}", msg.message),
+                };
+                None
+            }
+            NotificationKind::PublishDiagnostics(diagnostics) => {
+                let uri = diagnostics.uri.unwrap_or_default();
+                Some(Box::new(actions::UpdateDiagnostics::new(
+                    uri,
+                    diagnostics.diagnostics,
+                )))
+            }
+        }
+    }
+
+    pub async fn process_messages(
+        &mut self,
+        message: InboundMessage,
+        method: Option<String>,
+    ) -> Option<LspAction> {
+        match message {
+            InboundMessage::Notification(notification) => {
+                return self.handle_notification(notification).await;
+            }
+            InboundMessage::Error(err) => {
+                log::error!("LSP Error: {}", err.message);
+                return None;
+            }
+            InboundMessage::ProcessingError(err) => {
+                log::error!("LSP processing error {}", err);
+            }
+            InboundMessage::Response(response) => {
+                let Some(method) = &method else {
+                    return None;
+                };
+                match self.handle_response(method, response.result).await {
+                    Ok(action) => {
+                        return action;
+                    }
+                    Err(_err) => {
+                        log::warn!("Unhandled LSP response for method: {}", method);
+                    }
+                }
+            }
+            _ => {}
+        }
+        None
+    }
+
+    pub async fn handle_response(
+        &mut self,
+        method: &str,
+        result: Value,
+    ) -> Result<Option<LspAction>> {
+        match method {
+            "textDocument/definition" => {
+                let result = serde_json::from_value::<Option<DefinitionResult>>(result)?;
+                let Some(result) = result else {
+                    return Ok(None);
+                };
+                if let Some(location) = result.get_locations().first() {
+                    let mut action = actions::CompositeExecutable::new();
+                    let file_path = location.uri.strip_prefix("file://").unwrap();
+                    action.add(actions::OpenBuffer::new(PathBuf::from(file_path)));
+                    let position = &location.range.start;
+                    action.add(actions::GoToPosition::new(
+                        position.line,
+                        position.character,
+                    ));
+                    return Ok(Some(Box::new(action)));
+                }
+            }
+            _ => {}
+        }
+        Ok(None)
     }
 }
 
