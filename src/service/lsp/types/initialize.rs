@@ -79,9 +79,9 @@ pub struct ServerCapabilities {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TextDocumentSyncOptions {
-    open_close: Option<bool>,
+    pub open_close: Option<bool>,
     #[serde(default)]
-    change: TextDocumentSyncKind,
+    pub change: TextDocumentSyncKind,
 }
 
 #[derive(Debug, Clone, Default, Serialize_repr, Deserialize_repr)]

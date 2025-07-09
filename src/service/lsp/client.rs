@@ -1,8 +1,8 @@
 use super::types::{
-    DefinitionResult, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
-    DidSaveTextDocumentParams, LogMessageParams, ShowMessageParams, TextDocumentContentChangeEvent,
-    TextDocumentIdentifier, TextDocumentItem, TextDocumentPublishDiagnostics,
-    VersionedTextDocumentIdentifier,
+    DefinitionResult, DidChangeTextDocumentParams, DidCloseTextDocumentParams,
+    DidOpenTextDocumentParams, DidSaveTextDocumentParams, LogMessageParams, ShowMessageParams,
+    TextDocumentContentChangeEvent, TextDocumentIdentifier, TextDocumentItem,
+    TextDocumentPublishDiagnostics, VersionedTextDocumentIdentifier,
 };
 use crate::core::document::Document;
 use crate::core::history::edit::Edit;
@@ -10,8 +10,9 @@ use crate::core::language::Language;
 use crate::input::actions;
 use crate::service::lsp::params::get_initialize_params;
 use crate::service::lsp::types::common::{Position, Range};
-use crate::service::lsp::types::initialize::{InitializeResult, ServerCapabilities};
-use crate::service::lsp::types::DidChangeTextDocumentParams;
+use crate::service::lsp::types::initialize::{
+    InitializeResult, ServerCapabilities, TextDocumentSyncKind,
+};
 use crate::service::lsp::{types, LspAction};
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
@@ -250,7 +251,7 @@ impl LspClient {
         let params = DidOpenTextDocumentParams::builder()
             .text_document(
                 TextDocumentItem::builder()
-                    .uri(uri)
+                    .uri(uri.clone())
                     .language_id(document.language.to_str().to_string())
                     .version(document.version)
                     .text(document.buffer.to_string())
@@ -296,44 +297,65 @@ impl LspClient {
         Ok(())
     }
 
-    pub async fn did_change(&mut self, document: &Document, edit: &Edit) -> Result<()> {
+    pub async fn did_change(&mut self, document: &mut Document, edit: &Edit) -> Result<()> {
         let Some(uri) = document.uri() else {
             return Ok(());
         };
 
-        let changes = match edit {
-            Edit::Insert(insert) => {
-                vec![
-                    TextDocumentContentChangeEvent::builder()
-                        .range(get_range_from_summary(&insert.edit_summary()))
-                        .text(insert.text.clone())
-                        .build(),
-                ]
+        let sync_kind = self
+            .server_capabilities
+            .as_ref()
+            .and_then(|cap| cap.text_document_sync.as_ref())
+            .map_or(TextDocumentSyncKind::Full, |sync_option| {
+                sync_option.change.clone()
+            });
+
+        let content_changes = match sync_kind {
+            TextDocumentSyncKind::Full => TextDocumentContentChangeEvent::builder()
+                .text(document.buffer.to_string())
+                .build(),
+            TextDocumentSyncKind::Incremental => {
+                let (range, text) = match edit {
+                    Edit::Insert(insert) => (
+                        get_range_from_summary(&insert.edit_summary()),
+                        insert.text.clone(),
+                    ),
+                    Edit::Delete(delete) => (
+                        get_range_from_summary(&delete.edit_summary()),
+                        String::new(),
+                    ),
+                };
+                TextDocumentContentChangeEvent::builder()
+                    .range(range)
+                    .text(text)
+                    .build()
             }
-            Edit::Delete(delete) => {
-                vec![
-                    TextDocumentContentChangeEvent::builder()
-                        .range(get_range_from_summary(&delete.edit_summary()))
-                        .text("".to_string())
-                        .build(),
-                ]
+            _ => {
+                return Ok(());
             }
         };
+
+        document.version += 1;
+
         let params = DidChangeTextDocumentParams::builder()
             .text_document(
                 VersionedTextDocumentIdentifier::builder()
-                    .uri(uri)
+                    .uri(uri.clone())
                     .version(document.version)
                     .build(),
             )
-            .content_changes(changes)
+            .content_changes(vec![content_changes])
             .build();
+
         self.send_notification(
             "textDocument/didChange",
             serde_json::to_value(params)?,
             false,
         )
         .await?;
+
+        self.request_diagnostics(document).await?;
+
         Ok(())
     }
 
@@ -370,6 +392,20 @@ impl LspClient {
             .send(OutboundMessage::Request(req))
             .await?;
         Ok(id)
+    }
+
+    pub async fn request_diagnostics(&mut self, document: &Document) -> Result<()> {
+        let Some(uri) = document.uri() else {
+            return Ok(());
+        };
+        let params = json!({
+            "textDocument": {
+                "uri": uri,
+            }
+        });
+        self.send_request("textDocument/diagnostic", params, false)
+            .await?;
+        Ok(())
     }
 
     pub async fn send_notification(

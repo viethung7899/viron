@@ -23,7 +23,7 @@ impl Document {
             modified: false,
             language: Language::PlainText,
             syntax_engine: None,
-            version: 0,
+            version: 1,
             history: History::new(1000),
         }
     }
@@ -40,7 +40,7 @@ impl Document {
             modified: false,
             language,
             syntax_engine,
-            version: 0,
+            version: 1,
             history: History::new(1000),
         }
     }
@@ -63,7 +63,6 @@ impl Document {
     }
 
     pub fn mark_modified(&mut self) {
-        self.version += 1;
         self.modified = true;
     }
 

@@ -54,6 +54,7 @@ pub struct VersionedTextDocumentIdentifier {
 #[derive(Debug, Clone, Serialize, Deserialize, Builder)]
 #[serde(rename_all = "camelCase")]
 pub struct TextDocumentContentChangeEvent {
-    range: Range,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    range: Option<Range>,
     text: String,
 }
