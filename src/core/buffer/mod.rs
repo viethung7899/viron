@@ -1,5 +1,6 @@
 use tree_sitter::Point;
 
+use crate::core::utf8::Utf8CharIterator;
 use crate::core::{
     buffer::gap_buffer::GapBuffer,
     history::edit::{Delete, Edit, Insert},
@@ -204,6 +205,34 @@ impl Buffer {
         }
 
         Some((deleted_char, position))
+    }
+
+    pub fn delete_string(&mut self, position: usize, byte_count: usize) -> Option<(String, usize)> {
+        if position >= self.buffer.len_without_gap()
+            || position + byte_count > self.buffer.len_without_gap()
+            || byte_count == 0
+        {
+            return None;
+        }
+
+        let bytes = self
+            .buffer
+            .get_range(position..position + byte_count)
+            .cloned()
+            .collect::<Vec<_>>();
+
+        let char_count = Utf8CharIterator::new(bytes.as_slice()).count();
+        let mut deleted_string = String::new();
+
+        for _ in 0..char_count {
+            if let Some((ch, _)) = self.delete_char(position) {
+                deleted_string.push(ch);
+            } else {
+                break;
+            }
+        }
+
+        Some((deleted_string, position))
     }
 
     pub fn apply_edit(&mut self, change: &Edit) {

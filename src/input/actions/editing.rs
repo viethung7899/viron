@@ -68,10 +68,10 @@ pub struct DeleteChar;
 #[async_trait(?Send)]
 impl Executable for DeleteChar {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
-        let document = ctx.buffer_manager.current_mut();
+        let buffer = ctx.buffer_manager.current_buffer_mut();
         let point = ctx.cursor.get_point();
-        let byte_start = document.buffer.cursor_position(&point);
-        if let Some((c, _)) = document.buffer.delete_char(byte_start) {
+        let byte_start = buffer.cursor_position(&point);
+        if let Some((c, _)) = buffer.delete_char(byte_start) {
             // Cursor stays in place after deletion
             let edit = Edit::delete(byte_start, point, c.to_string(), point, point);
             after_edit(ctx, &edit)?;
@@ -113,12 +113,12 @@ pub struct InsertNewLine;
 #[async_trait(?Send)]
 impl Executable for InsertNewLine {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
-        let document = ctx.buffer_manager.current_mut();
+        let buffer = ctx.buffer_manager.current_buffer_mut();
         let point = ctx.cursor.get_point();
-        let byte_start = document.buffer.cursor_position(&point);
-        let new_position = document.buffer.insert_char(byte_start, '\n');
-        let new_point = document.buffer.point_at_position(new_position);
-        ctx.cursor.set_point(new_point, &document.buffer);
+        let byte_start = buffer.cursor_position(&point);
+        let new_position = buffer.insert_char(byte_start, '\n');
+        let new_point = buffer.point_at_position(new_position);
+        ctx.cursor.set_point(new_point, &buffer);
         let edit = Edit::insert(byte_start, point, "\n".to_string(), point, new_point);
         after_edit(ctx, &edit)?;
         ctx.buffer_manager.current_mut().history.push(edit);
@@ -138,31 +138,31 @@ pub struct InsertNewLineBelow;
 #[async_trait(?Send)]
 impl Executable for InsertNewLineBelow {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
-        let document = ctx.buffer_manager.current_mut();
+        let buffer = ctx.buffer_manager.current_buffer_mut();
         let point = ctx.cursor.get_point();
 
         // Get the indentation of the current line
-        let current_line = document.buffer.get_content_line(point.row);
+        let current_line = buffer.get_content_line(point.row);
         let indentation = current_line
             .chars()
             .take_while(|&c| c == ' ' || c == '\t')
             .collect::<String>();
 
         // Move cursor to end of the current line
-        ctx.cursor.move_to_line_end(&document.buffer, &Mode::Insert);
-        let byte_start = document.buffer.cursor_position(&ctx.cursor.get_point());
-        let start_point = document.buffer.point_at_position(byte_start);
+        ctx.cursor.move_to_line_end(&buffer, &Mode::Insert);
+        let byte_start = buffer.cursor_position(&ctx.cursor.get_point());
+        let start_point = buffer.point_at_position(byte_start);
 
         // Insert newline at end of current line followed by indentation
         let insert_text = format!("\n{}", indentation);
-        document.buffer.insert_string(byte_start, &insert_text);
+        buffer.insert_string(byte_start, &insert_text);
 
         // Position cursor at the start of the new line after indentation
         let mut new_point = point.clone();
         new_point.row += 1;
         new_point.column = indentation.len();
 
-        ctx.cursor.set_point(new_point, &document.buffer);
+        ctx.cursor.set_point(new_point, &buffer);
         let edit = Edit::insert(byte_start, start_point, insert_text, point, new_point);
         after_edit(ctx, &edit)?;
         ctx.buffer_manager.current_mut().history.push(edit);
@@ -182,11 +182,11 @@ pub struct InsertNewLineAbove;
 #[async_trait(?Send)]
 impl Executable for InsertNewLineAbove {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
-        let document = ctx.buffer_manager.current_mut();
+        let buffer = ctx.buffer_manager.current_buffer_mut();
         let point = ctx.cursor.get_point();
 
         // Get the indentation of the current line
-        let current_line = document.buffer.get_content_line(point.row);
+        let current_line = buffer.get_content_line(point.row);
         let indentation = current_line
             .chars()
             .take_while(|&c| c == ' ' || c == '\t')
@@ -195,17 +195,17 @@ impl Executable for InsertNewLineAbove {
         // Move cursor to beginning of current line
         let mut new_point = point.clone();
         new_point.column = 0;
-        let start_byte = document.buffer.cursor_position(&new_point);
-        let start_point = document.buffer.point_at_position(start_byte);
+        let start_byte = buffer.cursor_position(&new_point);
+        let start_point = buffer.point_at_position(start_byte);
 
         // Insert indentation followed by newline
         let insert_text = format!("{}\n", indentation);
-        document.buffer.insert_string(start_byte, &insert_text);
+        buffer.insert_string(start_byte, &insert_text);
 
         // Position cursor at end of the new line (after indentation)
         new_point.column = indentation.len();
 
-        ctx.cursor.set_point(new_point, &document.buffer);
+        ctx.cursor.set_point(new_point, &buffer);
         let edit = Edit::insert(start_byte, start_point, insert_text, point, new_point);
 
         after_edit(ctx, &edit)?;
@@ -219,6 +219,70 @@ impl_action!(
     "Insert new line above",
     ActionDefinition::InsertNewLineAbove
 );
+
+#[derive(Debug, Clone)]
+
+pub struct DeleteCurrentLine;
+
+#[async_trait(?Send)]
+impl Executable for DeleteCurrentLine {
+    async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+        let buffer = ctx.buffer_manager.current_buffer_mut();
+        let point = ctx.cursor.get_point();
+
+        // Move cursor to beginning of current line
+        let mut start_point = point.clone();
+        start_point.column = 0;
+        let start_byte = buffer.cursor_position(&start_point);
+        let content_line = buffer.get_content_line(point.row);
+        let byte_count = content_line.len();
+
+        buffer.delete_string(start_byte, byte_count);
+
+        ctx.cursor.clamp_row(buffer);
+        ctx.cursor.clamp_column(buffer, ctx.mode);
+        let new_point = ctx.cursor.get_point();
+        let edit = Edit::delete(start_byte, start_point, content_line, point, new_point);
+        after_edit(ctx, &edit)?;
+        ctx.buffer_manager.current_mut().history.push(edit);
+        Ok(())
+    }
+}
+
+impl_action!(
+    DeleteCurrentLine,
+    "Insert new line above",
+    ActionDefinition::DeleteCurrentLine
+);
+
+#[derive(Debug, Clone)]
+pub struct DeleteWord;
+
+#[async_trait(?Send)]
+impl Executable for DeleteWord {
+    async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+        let buffer = ctx.buffer_manager.current_buffer_mut();
+        let point = ctx.cursor.get_point();
+        let start_position = buffer.cursor_position(&point);
+
+        let cursor = ctx.cursor.find_next_word(buffer);
+        let end_position = buffer.cursor_position(&cursor.get_point());
+        if start_position >= end_position {
+            return Ok(());
+        }
+
+        let Some((deleted_text, _)) = buffer.delete_string(start_position, end_position - start_position) else {
+            return Ok(());
+        };
+
+        let edit = Edit::delete(start_position, point, deleted_text, point, point);
+        after_edit(ctx, &edit)?;
+        ctx.buffer_manager.current_mut().history.push(edit);
+        Ok(())
+    }
+}
+
+impl_action!(DeleteWord, "Delete word", ActionDefinition::DeleteWord);
 
 #[derive(Debug, Clone)]
 pub struct Undo;

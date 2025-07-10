@@ -28,6 +28,8 @@ theme = "catppuchin/mocha"
 "b" = { type = "MoveToPreviousWord" }
 
 "x" = { type = "DeleteChar" }
+"dd" = { type = "DeleteCurrentLine" }
+"dw" = { type = "DeleteWord" }
 
 "i" = { type = "EnterMode", params = { mode = "insert" } }
 ":" = { type = "EnterMode", params = { mode = "command" } }
