@@ -14,18 +14,18 @@ use crate::ui::components::{
     BufferView, CommandLine, ComponentIds, Gutter, MessageArea, PendingKeys, SearchBox, StatusLine,
 };
 use crate::ui::compositor::Compositor;
-use crate::ui::{theme::Theme, Component, RenderContext};
+use crate::ui::{Component, RenderContext, theme::Theme};
 use crate::{
     config::Config,
     core::command::{CommandBuffer, SearchBuffer},
 };
 use anyhow::Result;
+use crossterm::{ExecutableCommand, QueueableCommand, style};
 use crossterm::{
     cursor,
     event::{KeyCode, KeyEvent, KeyModifiers},
     terminal::{self, ClearType},
 };
-use crossterm::{style, ExecutableCommand, QueueableCommand};
 use serde::{Deserialize, Serialize};
 use std::io::{self, Stdout, Write};
 use std::path::{Path, PathBuf};
@@ -130,26 +130,16 @@ impl Editor {
         let mut compositor =
             Compositor::new(width as usize, height as usize, &theme.editor_style());
 
-        let status_line_id =
-            compositor.add_component(Component::new("status_line", Box::new(StatusLine)))?;
-        let gutter_id = compositor.add_component(Component::new("gutter", Box::new(Gutter)))?;
-        let buffer_view_id =
-            compositor.add_component(Component::new("buffer_view", Box::new(BufferView)))?;
-
-        let pending_keys_id = compositor.add_component(Component::new_invisible(
-            "pending_keys",
-            Box::new(PendingKeys),
-        ))?;
-        let command_line_id = compositor.add_component(Component::new_invisible(
-            "command_line",
-            Box::new(CommandLine),
-        ))?;
-        let search_box_id = compositor
-            .add_component(Component::new_invisible("search_box", Box::new(SearchBox)))?;
-        let message_area_id = compositor.add_component(Component::new_invisible(
-            "message_area",
-            Box::new(MessageArea),
-        ))?;
+        // Add components to the compositor
+        let status_line_id = compositor.add_component("status_line", StatusLine, true)?;
+        let gutter_id = compositor.add_component("gutter", Gutter, true)?;
+        let buffer_view_id = compositor.add_component("buffer_view", BufferView, true)?;
+        
+        // Add invisible components
+        let pending_keys_id = compositor.add_component("pending_keys", PendingKeys, false)?;
+        let command_line_id = compositor.add_component("command_line", CommandLine, false)?;
+        let search_box_id = compositor.add_component("search_box", SearchBox, false)?;
+        let message_area_id = compositor.add_component("message_area", MessageArea, false)?;
 
         let component_ids = ComponentIds {
             status_line_id,
@@ -202,11 +192,6 @@ impl Editor {
         };
 
         Ok(editor)
-    }
-
-    pub async fn load_file(&mut self, path: impl AsRef<Path>) -> Result<()> {
-        let action = actions::OpenBuffer::new(PathBuf::from(path.as_ref()));
-        self.execute_action(&action).await
     }
 
     pub fn load_config(&mut self, config: &Config) -> Result<()> {

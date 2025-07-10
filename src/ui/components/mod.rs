@@ -11,8 +11,8 @@ pub use command_line::CommandLine;
 pub use gutter::Gutter;
 pub use message_area::MessageArea;
 pub use pending_keys::PendingKeys;
-pub use status_line::StatusLine;
 pub use search_box::SearchBox;
+pub use status_line::StatusLine;
 
 use crate::ui::Drawable;
 
@@ -28,25 +28,22 @@ pub struct ComponentIds {
 }
 
 pub struct Component {
-    pub id: String,
     pub dirty: bool,
     pub visible: bool,
     pub(in crate::ui) drawable: Box<dyn Drawable>,
 }
 
 impl Component {
-    pub fn new(id: &str, drawable: Box<dyn Drawable>) -> Self {
+    pub fn new(drawable: Box<dyn Drawable>) -> Self {
         Self {
-            id: id.to_string(),
             dirty: true,
             visible: true,
             drawable,
         }
     }
 
-    pub fn new_invisible(id: &str, drawable: Box<dyn Drawable>) -> Self {
+    pub fn new_invisible(drawable: Box<dyn Drawable>) -> Self {
         Self {
-            id: id.to_string(),
             dirty: true,
             visible: false,
             drawable,
