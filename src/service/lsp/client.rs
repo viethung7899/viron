@@ -1,121 +1,69 @@
-use super::types::{
-    DefinitionResult, DidChangeTextDocumentParams, DidCloseTextDocumentParams,
-    DidOpenTextDocumentParams, DidSaveTextDocumentParams, LogMessageParams, ShowMessageParams,
-    TextDocumentContentChangeEvent, TextDocumentIdentifier, TextDocumentItem,
-    TextDocumentPublishDiagnostics, VersionedTextDocumentIdentifier,
-};
 use crate::core::document::Document;
 use crate::core::history::edit::Edit;
 use crate::core::language::Language;
-use crate::input::actions;
+use crate::service::lsp::LspAction;
+use crate::service::lsp::message_handler::{parse_notification, parse_response};
+use crate::service::lsp::messages::{InboundMessage, OutboundMessage, lsp_receive, lsp_send};
 use crate::service::lsp::params::get_initialize_params;
-use crate::service::lsp::types::common::{Position, Range};
-use crate::service::lsp::types::initialize::{
-    InitializeResult, ServerCapabilities, TextDocumentSyncKind,
-};
-use crate::service::lsp::{types, LspAction};
 use anyhow::{Context, Result};
-use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use lsp_types::notification::{
+    DidCloseTextDocument, DidOpenTextDocument, DidSaveTextDocument, Exit, Initialized, Notification,
+};
+use lsp_types::request::{GotoDefinition, Initialize, Request, Shutdown};
+use lsp_types::{
+    DidCloseTextDocumentParams, DidOpenTextDocumentParams, DidSaveTextDocumentParams,
+    GotoDefinitionParams, InitializeResult, InitializedParams, MessageType, Position, Range,
+    ServerCapabilities, TextDocumentIdentifier, TextDocumentItem, TextDocumentPositionParams, Uri,
+};
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::str::FromStr;
 use std::sync::Arc;
+use std::sync::atomic::AtomicI32;
 use std::{
     process::Stdio,
-    sync::atomic::{self, AtomicUsize},
+    sync::atomic::{self},
 };
-use tokio::io::{AsyncBufRead, AsyncReadExt, AsyncWrite};
+
 use tokio::process::Child;
-use tokio::sync::mpsc::error::TryRecvError;
 use tokio::sync::Mutex;
 use tokio::{
-    io::{AsyncBufReadExt, AsyncWriteExt, BufReader, BufWriter},
+    io::{BufReader, BufWriter},
     process::Command,
     sync::mpsc,
 };
 use tree_sitter::InputEdit;
 
-static ID: AtomicUsize = AtomicUsize::new(1);
+static ID: AtomicI32 = AtomicI32::new(1);
 const CHANNEL_SIZE: usize = 32;
 
-pub fn next_id() -> usize {
+pub fn next_id() -> i32 {
     ID.fetch_add(1, atomic::Ordering::SeqCst)
 }
 
-#[derive(Debug)]
-pub struct NotificationRequest {
-    method: String,
-    params: Value,
-}
-
-#[derive(Debug)]
-pub struct Request {
-    id: i64,
-    method: String,
-    params: Value,
-}
-
-impl Request {
-    pub fn new(method: &str, params: Value) -> Self {
-        Self {
-            id: next_id() as i64,
-            method: method.to_string(),
-            params,
-        }
-    }
-}
-
-#[derive(Debug)]
-pub enum OutboundMessage {
-    Request(Request),
-    Notification(NotificationRequest),
+#[derive(Debug, Clone, PartialEq)]
+pub enum LspClientState {
+    Uninitialized,
+    Initializing,
+    Initialized,
+    ShuttingDown,
+    Dead,
 }
 
 #[derive(Debug, Clone)]
-pub struct ResponseMessage {
-    pub id: i64,
-    pub result: Value,
-}
+pub enum LspCommand {}
 
-#[derive(Debug)]
-pub struct Notification {
-    method: String,
-    params: Value,
-}
-
-#[derive(Debug)]
-pub struct ResponseError {
-    pub code: i64,
-    pub message: String,
-    pub data: Option<Value>,
-}
-
-#[derive(Debug)]
-pub enum InboundMessage {
-    Response(ResponseMessage),
-    Notification(NotificationKind),
-    UnknownNotification(Notification),
-    Error(ResponseError),
-    ProcessingError(String),
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-#[serde(untagged)]
-pub enum NotificationKind {
-    PublishDiagnostics(TextDocumentPublishDiagnostics),
-    ShowMessage(ShowMessageParams),
-    LogMessage(LogMessageParams),
-}
+#[derive(Debug, Clone)]
+pub enum LspEvent {}
 
 #[derive(Debug)]
 pub struct LspClient {
     pub(super) language: Language,
+    pub(super) state: LspClientState,
+    pub(super) server_capabilities: Option<ServerCapabilities>,
     request_sender: mpsc::Sender<OutboundMessage>,
     response_receiver: mpsc::Receiver<InboundMessage>,
-    pending_responses: HashMap<i64, String>,
-    server_capabilities: Option<ServerCapabilities>,
+    pending_responses: HashMap<i32, String>,
     process: Arc<Mutex<Option<Child>>>,
-    pub initialized: bool,
 }
 
 impl LspClient {
@@ -132,135 +80,87 @@ impl LspClient {
 
         let stdin = child.stdin.take().context("Failed to get stdin")?;
         let stdout = child.stdout.take().context("Failed to get stdout")?;
-        let stderr = child.stderr.take().context("Failed to get stderr")?;
 
         let (request_sender, mut request_receiver) = mpsc::channel::<OutboundMessage>(CHANNEL_SIZE);
         let (response_sender, response_receiver) = mpsc::channel::<InboundMessage>(CHANNEL_SIZE);
 
         // Send requests from editor into LSP's stdin
-        let sender = response_sender.clone();
         tokio::spawn(async move {
             let mut writer = BufWriter::new(stdin);
             while let Some(message) = request_receiver.recv().await {
-                match message {
-                    OutboundMessage::Request(request) => {
-                        if let Err(error) = lsp_send_request(&mut writer, &request).await {
-                            sender
-                                .send(InboundMessage::ProcessingError(error.to_string()))
-                                .await?;
-                        }
-                    }
-                    OutboundMessage::Notification(notification) => {
-                        if let Err(error) = lsp_send_notification(&mut writer, &notification).await
-                        {
-                            sender
-                                .send(InboundMessage::ProcessingError(error.to_string()))
-                                .await?;
-                        }
-                    }
-                }
+                lsp_send(&mut writer, message).await?;
             }
             anyhow::Ok(())
         });
 
         // Sends responses from LSP's stdout to the editor
         let sender = response_sender.clone();
-        tokio::spawn(
-            #[allow(unreachable_code)]
-            async move {
-                let mut reader = BufReader::new(stdout);
-
-                loop {
-                    let response = lsp_read_response(&mut reader).await;
-                    match response {
-                        Err(err) => {
-                            sender
-                                .send(InboundMessage::ProcessingError(err.to_string()))
-                                .await?;
-                            continue;
-                        }
-                        Ok(Some(value)) => {
-                            let message = match process_response(&value) {
-                                Ok(msg) => msg,
-                                Err(err) => {
-                                    sender
-                                        .send(InboundMessage::ProcessingError(err.to_string()))
-                                        .await?;
-                                    continue;
-                                }
-                            };
-                            sender.send(message).await?;
-                        }
-                        _ => {}
-                    }
-                }
-
-                anyhow::Ok(())
-            },
-        );
-
-        // Sends responses from LSP's stderr to the editor
-        let sender = response_sender.clone();
         tokio::spawn(async move {
-            let mut reader = BufReader::new(stderr);
-            let mut line = String::new();
-            while let Ok(read) = reader.read_line(&mut line).await {
-                if read > 0 {
-                    sender
-                        .send(InboundMessage::ProcessingError(line.clone()))
-                        .await?;
-                }
+            let mut reader = BufReader::new(stdout);
+
+            while let Ok(message) = lsp_receive(&mut reader).await {
+                let Some(message) = message else {
+                    continue;
+                };
+                sender.send(message).await?;
             }
+
             anyhow::Ok(())
         });
 
         Ok(LspClient {
             language,
+            state: LspClientState::Uninitialized,
             request_sender,
             response_receiver,
             server_capabilities: None,
             pending_responses: HashMap::new(),
             process: Arc::new(Mutex::new(Some(child))),
-            initialized: false,
         })
     }
 
     pub async fn initialize(&mut self) -> Result<()> {
-        let initialize_params = get_initialize_params();
-        self.send_request("initialize", serde_json::to_value(initialize_params)?, true)
+        self.state = LspClientState::Initializing;
+        self.send_request::<Initialize>(get_initialize_params(), true)
             .await?;
         Ok(())
     }
 
-    pub(super) async fn handle_initialize_result(
-        &mut self,
-        result: InitializeResult,
-    ) -> Result<()> {
-        self.server_capabilities = Some(result.capabilities);
-        log::info!("Server capabilities: {:#?}", self.server_capabilities);
-        self.initialized = true;
-        self.send_notification("initialized", json!({}), true)
-            .await?;
-        Ok(())
+    pub async fn wait_for_initialized(&mut self, timeout_secs: u64) -> Result<bool> {
+        if self.state == LspClientState::Initialized {
+            return Ok(true);
+        }
+
+        let start = std::time::Instant::now();
+        let timeout = std::time::Duration::from_secs(timeout_secs);
+
+        while start.elapsed() < timeout {
+            if self.state == LspClientState::Initialized {
+                return Ok(true);
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        }
+
+        Ok(false) // Timed out
     }
 
     pub async fn did_open(&mut self, document: &Document) -> Result<()> {
         let Some(uri) = document.uri() else {
             return Ok(());
         };
-        let params = DidOpenTextDocumentParams::builder()
-            .text_document(
-                TextDocumentItem::builder()
-                    .uri(uri.clone())
-                    .language_id(document.language.to_str().to_string())
-                    .version(document.version)
-                    .text(document.buffer.to_string())
-                    .build(),
-            )
-            .build();
 
-        self.send_notification("textDocument/didOpen", serde_json::to_value(params)?, false)
-            .await?;
+        self.send_notification::<DidOpenTextDocument>(
+            DidOpenTextDocumentParams {
+                text_document: TextDocumentItem {
+                    uri: Uri::from_str(&uri)?,
+                    version: document.version as i32,
+                    text: document.buffer.to_string(),
+                    language_id: document.language.to_str().to_string(),
+                },
+            },
+            false,
+        )
+        .await?;
 
         Ok(())
     }
@@ -269,13 +169,17 @@ impl LspClient {
         let Some(uri) = document.uri() else {
             return Ok(());
         };
-        let params = DidSaveTextDocumentParams::builder()
-            .text_document(TextDocumentIdentifier::builder().uri(uri).build())
-            .text(document.buffer.to_string())
-            .build();
 
-        self.send_notification("textDocument/didSave", serde_json::to_value(params)?, false)
-            .await?;
+        self.send_notification::<DidSaveTextDocument>(
+            DidSaveTextDocumentParams {
+                text: Some(document.buffer.to_string()),
+                text_document: TextDocumentIdentifier {
+                    uri: Uri::from_str(&uri)?,
+                },
+            },
+            false,
+        )
+        .await?;
         Ok(())
     }
 
@@ -283,13 +187,13 @@ impl LspClient {
         let Some(uri) = document.uri() else {
             return Ok(());
         };
-        let params = DidCloseTextDocumentParams::builder()
-            .text_document(TextDocumentIdentifier::builder().uri(uri).build())
-            .build();
 
-        self.send_notification(
-            "textDocument/didClose",
-            serde_json::to_value(params)?,
+        self.send_notification::<DidCloseTextDocument>(
+            DidCloseTextDocumentParams {
+                text_document: TextDocumentIdentifier {
+                    uri: Uri::from_str(&uri)?,
+                },
+            },
             false,
         )
         .await?;
@@ -298,64 +202,6 @@ impl LspClient {
     }
 
     pub async fn did_change(&mut self, document: &mut Document, edit: &Edit) -> Result<()> {
-        let Some(uri) = document.uri() else {
-            return Ok(());
-        };
-
-        let sync_kind = self
-            .server_capabilities
-            .as_ref()
-            .and_then(|cap| cap.text_document_sync.as_ref())
-            .map_or(TextDocumentSyncKind::Full, |sync_option| {
-                sync_option.change.clone()
-            });
-
-        let content_changes = match sync_kind {
-            TextDocumentSyncKind::Full => TextDocumentContentChangeEvent::builder()
-                .text(document.buffer.to_string())
-                .build(),
-            TextDocumentSyncKind::Incremental => {
-                let (range, text) = match edit {
-                    Edit::Insert(insert) => (
-                        get_range_from_summary(&insert.edit_summary()),
-                        insert.text.clone(),
-                    ),
-                    Edit::Delete(delete) => (
-                        get_range_from_summary(&delete.edit_summary()),
-                        String::new(),
-                    ),
-                };
-                TextDocumentContentChangeEvent::builder()
-                    .range(range)
-                    .text(text)
-                    .build()
-            }
-            _ => {
-                return Ok(());
-            }
-        };
-
-        document.version += 1;
-
-        let params = DidChangeTextDocumentParams::builder()
-            .text_document(
-                VersionedTextDocumentIdentifier::builder()
-                    .uri(uri.clone())
-                    .version(document.version)
-                    .build(),
-            )
-            .content_changes(vec![content_changes])
-            .build();
-
-        self.send_notification(
-            "textDocument/didChange",
-            serde_json::to_value(params)?,
-            false,
-        )
-        .await?;
-
-        self.request_diagnostics(document).await?;
-
         Ok(())
     }
 
@@ -365,80 +211,86 @@ impl LspClient {
         line: usize,
         character: usize,
     ) -> Result<()> {
-        let params = json!({
-            "textDocument": {
-                "uri": uri,
+        self.send_request::<GotoDefinition>(
+            GotoDefinitionParams {
+                work_done_progress_params: Default::default(),
+                partial_result_params: Default::default(),
+                text_document_position_params: TextDocumentPositionParams {
+                    text_document: TextDocumentIdentifier {
+                        uri: Uri::from_str(&uri)?,
+                    },
+                    position: Position {
+                        line: line as u32,
+                        character: character as u32,
+                    },
+                },
             },
-            "position": {
-                "line": line,
-                "character": character,
-            }
-        });
-        self.send_request("textDocument/definition", params, false)
-            .await?;
+            false,
+        )
+        .await?;
 
         Ok(())
     }
 
-    async fn send_request(&mut self, method: &str, params: Value, force: bool) -> Result<i64> {
-        if !self.initialized && !force {
+    async fn send_request<R: Request>(&mut self, params: R::Params, force: bool) -> Result<i32> {
+        if self.state != LspClientState::Initialized && !force {
             return Err(anyhow::anyhow!("LSP client is not initialized"));
         }
-        let req = Request::new(method, params);
-        let id = req.id.clone();
+        let id = next_id();
+        let method = R::METHOD.to_string();
+        let params = serde_json::to_value(params)?;
 
         self.pending_responses.insert(id, method.to_string());
         self.request_sender
-            .send(OutboundMessage::Request(req))
+            .send(OutboundMessage {
+                id: Some(id as i32),
+                method,
+                params,
+            })
             .await?;
         Ok(id)
     }
 
-    pub async fn request_diagnostics(&mut self, document: &Document) -> Result<()> {
-        let Some(uri) = document.uri() else {
-            return Ok(());
-        };
-        let params = json!({
-            "textDocument": {
-                "uri": uri,
-            }
-        });
-        self.send_request("textDocument/diagnostic", params, false)
-            .await?;
-        Ok(())
-    }
-
-    pub async fn send_notification(
+    pub async fn send_notification<N: Notification>(
         &mut self,
-        method: &str,
-        params: Value,
+        params: N::Params,
         force: bool,
     ) -> Result<()> {
-        if !self.initialized && !force {
+        if self.state != LspClientState::Initialized && !force {
             return Err(anyhow::anyhow!("LSP client is not initialized"));
         }
+        let method = N::METHOD.to_string();
+        let params = serde_json::to_value(params)?;
         self.request_sender
-            .send(OutboundMessage::Notification(NotificationRequest {
-                method: method.to_string(),
+            .send(OutboundMessage {
+                id: None,
+                method,
                 params,
-            }))
+            })
             .await?;
         Ok(())
     }
 
-    pub async fn receive_response(&mut self) -> Result<Option<(InboundMessage, Option<String>)>> {
-        match self.response_receiver.try_recv() {
-            Ok(msg) => {
-                if let InboundMessage::Response(msg) = &msg {
-                    if let Some(method) = self.pending_responses.remove(&msg.id) {
-                        return Ok(Some((InboundMessage::Response(msg.clone()), Some(method))));
-                    }
-                }
-                Ok(Some((msg, None)))
+    pub async fn get_lsp_action(&mut self) -> Result<Option<LspAction>> {
+        let Ok(message) = self.response_receiver.try_recv() else {
+            return Ok(None);
+        };
+
+        let handler = match message {
+            InboundMessage::Response(response) => {
+                let Some(method) = self.pending_responses.get(&response.id) else {
+                    return Ok(None);
+                };
+                let Some(result) = response.result.to_owned() else {
+                    return Ok(None);
+                };
+                parse_response(method, result)?
             }
-            Err(TryRecvError::Empty) => Ok(None),
-            Err(err) => Err(err.into()),
-        }
+            InboundMessage::Notification(notification) => parse_notification(notification)?,
+        };
+
+        handler.handle_client(self).await?;
+        Ok(handler.get_lsp_action())
     }
 
     pub async fn is_running(&self) -> bool {
@@ -467,25 +319,23 @@ impl LspClient {
 
     pub async fn shutdown(&mut self) -> Result<()> {
         // Send shutdown request and wait for response
-        let shutdown_id = self.send_request("shutdown", json!({}), true).await?;
+        let shutdown_id = self.send_request::<Shutdown>((), true).await?;
 
         // Wait for shutdown response (with timeout)
         let timeout_duration = std::time::Duration::from_secs(5);
         let start_time = std::time::Instant::now();
 
         while start_time.elapsed() < timeout_duration {
-            if let Some((message, _)) = self.receive_response().await? {
-                if let InboundMessage::Response(response) = message {
-                    if response.id == shutdown_id {
-                        break;
-                    }
+            if let Some(InboundMessage::Response(response)) = self.response_receiver.recv().await {
+                if response.id == shutdown_id {
+                    break;
                 }
             }
             tokio::time::sleep(std::time::Duration::from_millis(100)).await;
         }
 
         // Send exit notification
-        self.send_notification("exit", json!({}), true).await?;
+        self.send_notification::<Exit>((), true).await?;
 
         // Give the process a moment to exit gracefully
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
@@ -497,237 +347,17 @@ impl LspClient {
 
         Ok(())
     }
-
-    pub async fn handle_message(&mut self) -> Option<LspAction> {
-        let Ok(Some((messages, method))) = self.receive_response().await else {
-            return None;
-        };
-        log::info!("Messages: {:#?}", messages);
-        self.process_messages(messages, method).await
-    }
-
-    async fn handle_notification(&mut self, notification: NotificationKind) -> Option<LspAction> {
-        match notification {
-            NotificationKind::ShowMessage(msg) => {
-                match msg.type_ {
-                    types::MessageType::Info => log::info!("{}", msg.message),
-                    types::MessageType::Warning => log::warn!("{}", msg.message),
-                    types::MessageType::Error => log::error!("{}", msg.message),
-                    types::MessageType::Log => log::debug!("{}", msg.message),
-                };
-                None
-            }
-            NotificationKind::LogMessage(msg) => {
-                match msg.type_ {
-                    types::MessageType::Error => log::error!("{}", msg.message),
-                    types::MessageType::Info | types::MessageType::Log => {
-                        log::info!("{}", msg.message)
-                    }
-                    types::MessageType::Warning => log::warn!("{}", msg.message),
-                };
-                None
-            }
-            NotificationKind::PublishDiagnostics(diagnostics) => {
-                let uri = diagnostics.uri.unwrap_or_default();
-                Some(Box::new(actions::UpdateDiagnostics::new(
-                    uri,
-                    diagnostics.diagnostics,
-                )))
-            }
-        }
-    }
-
-    pub async fn process_messages(
-        &mut self,
-        message: InboundMessage,
-        method: Option<String>,
-    ) -> Option<LspAction> {
-        match message {
-            InboundMessage::Notification(notification) => {
-                return self.handle_notification(notification).await;
-            }
-            InboundMessage::Error(err) => {
-                log::error!("LSP Error: {}", err.message);
-                return None;
-            }
-            InboundMessage::ProcessingError(err) => {
-                log::error!("LSP processing error {}", err);
-            }
-            InboundMessage::Response(response) => {
-                let Some(method) = &method else {
-                    return None;
-                };
-                match self.handle_response(method, response.result).await {
-                    Ok(action) => {
-                        return action;
-                    }
-                    Err(_err) => {
-                        log::warn!("Unhandled LSP response for method: {}", method);
-                    }
-                }
-            }
-            _ => {}
-        }
-        None
-    }
-
-    pub async fn handle_response(
-        &mut self,
-        method: &str,
-        result: Value,
-    ) -> Result<Option<LspAction>> {
-        match method {
-            "textDocument/definition" => {
-                let result = serde_json::from_value::<Option<DefinitionResult>>(result)?;
-                let Some(result) = result else {
-                    return Ok(None);
-                };
-                if let Some(location) = result.get_locations().first() {
-                    let mut action = actions::CompositeExecutable::new();
-                    let file_path = location.uri.strip_prefix("file://").unwrap();
-                    action.add(actions::OpenBuffer::new(PathBuf::from(file_path)));
-                    let position = &location.range.start;
-                    action.add(actions::GoToPosition::new(
-                        position.line,
-                        position.character,
-                    ));
-                    return Ok(Some(Box::new(action)));
-                }
-            }
-            _ => {}
-        }
-        Ok(None)
-    }
-}
-
-fn parse_notification(method: &str, params: &Value) -> Result<Option<NotificationKind>> {
-    match method {
-        "textDocument/publishDiagnostics" => Ok(Some(NotificationKind::PublishDiagnostics(
-            serde_json::from_value(params.clone())?,
-        ))),
-        "window/showMessage" => Ok(Some(NotificationKind::ShowMessage(serde_json::from_value(
-            params.clone(),
-        )?))),
-        "window/logMessage" => Ok(Some(NotificationKind::LogMessage(serde_json::from_value(
-            params.clone(),
-        )?))),
-        _ => Ok(None),
-    }
-}
-
-pub async fn lsp_send_request<W: Unpin + AsyncWrite>(writer: &mut W, req: &Request) -> Result<i64> {
-    let id = req.id;
-    let req = json!({
-        "id": req.id,
-        "jsonrpc": "2.0",
-        "method": req.method,
-        "params": req.params,
-    });
-    let body = serde_json::to_string(&req)?;
-    let req = format!("Content-Length: {}\r\n\r\n{}", body.len(), body);
-    log::info!("=> {}", body);
-    writer.write_all(req.as_bytes()).await?;
-    writer.flush().await?;
-
-    Ok(id)
-}
-
-pub async fn lsp_send_notification<W: Unpin + AsyncWrite>(
-    writer: &mut W,
-    req: &NotificationRequest,
-) -> Result<()> {
-    let req = json!({
-        "jsonrpc": "2.0",
-        "method": req.method,
-        "params": req.params,
-    });
-    let body = serde_json::to_string(&req)?;
-    let req = format!("Content-Length: {}\r\n\r\n{}", body.len(), body);
-    log::info!("=> {}", body);
-    writer.write_all(req.as_bytes()).await?;
-    writer.flush().await?;
-
-    Ok(())
-}
-
-pub async fn lsp_read_response<R: Unpin + AsyncBufRead>(reader: &mut R) -> Result<Option<Value>> {
-    let mut line = String::new();
-    let read_size = reader.read_line(&mut line).await?;
-    if read_size <= 0 {
-        return Ok(None);
-    }
-    let length = line
-        .strip_prefix("Content-Length: ")
-        .context("Expected Content-Length header")?
-        .trim()
-        .parse::<usize>()?;
-    reader.read_line(&mut line).await?;
-
-    let mut body = vec![0; length];
-    reader.read_exact(&mut body).await?;
-
-    log::info!("<= {}", String::from_utf8_lossy(&body));
-
-    let json: Value = serde_json::from_slice(&body)?;
-    Ok(Some(json))
-}
-
-pub fn get_error_message(error: &Value) -> Result<InboundMessage> {
-    let code = error
-        .get("code")
-        .and_then(|s| s.as_i64())
-        .context("Expected integer property - code")?;
-    let message = error
-        .get("message")
-        .and_then(|s| s.as_str())
-        .context("Expected string property - message")?
-        .to_string();
-    let data = error.get("data").cloned();
-    Ok(InboundMessage::Error(ResponseError {
-        code,
-        message,
-        data,
-    }))
-}
-
-pub fn process_response(response: &Value) -> Result<InboundMessage> {
-    if let Some(id) = response.get("id") {
-        let id = id.as_i64().context("Expected id as integer")?;
-        let result = response
-            .get("result")
-            .cloned()
-            .context("Expected property - result")?;
-        Ok(InboundMessage::Response(ResponseMessage { id, result }))
-    } else {
-        let method = response
-            .get("method")
-            .and_then(|s| s.as_str())
-            .context("Expected string property - method")?
-            .to_string();
-        let params = response
-            .get("params")
-            .cloned()
-            .context("Expected property - params")?;
-
-        match parse_notification(&method, &params)? {
-            Some(notification) => Ok(InboundMessage::Notification(notification)),
-            None => Ok(InboundMessage::UnknownNotification(Notification {
-                method,
-                params,
-            })),
-        }
-    }
 }
 
 fn get_range_from_summary(summary: &InputEdit) -> Range {
     Range {
         start: Position {
-            line: summary.start_position.row,
-            character: summary.start_position.column,
+            line: summary.start_position.row as u32,
+            character: summary.start_position.column as u32,
         },
         end: Position {
-            line: summary.old_end_position.row,
-            character: summary.old_end_position.column,
+            line: summary.old_end_position.row as u32,
+            character: summary.old_end_position.column as u32,
         },
     }
 }

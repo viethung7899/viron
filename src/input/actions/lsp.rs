@@ -1,10 +1,11 @@
 use crate::core::message::Message;
 use crate::input::actions::Action;
 use crate::input::actions::{
+    ActionContext, ActionDefinition, ActionResult, Executable, impl_action, system,
     impl_action, system, ActionContext, ActionResult, Executable,
 };
-use crate::service::lsp::types::Diagnostic;
 use async_trait::async_trait;
+use lsp_types::Diagnostic;
 use crate::input::actions::definition::ActionDefinition;
 
 #[derive(Debug, Clone)]
@@ -43,13 +44,13 @@ impl_action!(
 
 #[derive(Debug, Clone)]
 pub struct UpdateDiagnostics {
-    pub uri: String,
+    pub path: String,
     pub diagnostics: Vec<Diagnostic>,
 }
 
 impl UpdateDiagnostics {
-    pub fn new(uri: String, diagnostics: Vec<Diagnostic>) -> Self {
-        Self { uri, diagnostics }
+    pub fn new(path: String, diagnostics: Vec<Diagnostic>) -> Self {
+        Self { path, diagnostics }
     }
 }
 
@@ -57,9 +58,15 @@ impl UpdateDiagnostics {
 impl Executable for UpdateDiagnostics {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         ctx.lsp_service
-            .update_diagnostics(self.uri.clone(), self.diagnostics.clone());
-        if let Some(current_uri) = ctx.buffer_manager.current().uri() {
-            if current_uri == self.uri {
+            .update_diagnostics(self.path.clone(), self.diagnostics.clone());
+        if let Some(current_path) = ctx
+            .buffer_manager
+            .current()
+            .full_file_path()
+            .as_ref()
+            .and_then(|path| path.to_str())
+        {
+            if current_path == &self.path {
                 ctx.compositor
                     .mark_dirty(&ctx.component_ids.buffer_view_id)?;
             }

@@ -1,11 +1,12 @@
+use crate::ui::render_buffer::RenderBuffer;
 use crate::constants::{MIN_GUTTER_WIDTH, RESERVED_ROW_COUNT};
 use crate::service::lsp::types::DiagnosticSeverity;
 use crate::ui::components::gutter::Gutter;
 use crate::service::lsp::types::{Diagnostic, DiagnosticSeverity};
-use crate::ui::render_buffer::RenderBuffer;
 use crate::ui::theme::Style;
 use crate::ui::{Bounds, Drawable, Focusable, RenderContext};
 use anyhow::Result;
+use lsp_types::{Diagnostic, DiagnosticSeverity};
 use std::collections::HashMap;
 use std::ops::Add;
 use std::str::from_utf8;
@@ -274,16 +275,16 @@ impl EditorView {
         let bounds = self.get_buffer_bounds(render_buffer, context);
         let buffer = &context.document.buffer;
         let viewport = context.viewport;
-        let starting_line = viewport.top_line();
-        let ending_line = starting_line + bounds.height;
+        let starting_line = viewport.top_line() as u32;
+        let ending_line = starting_line + bounds.height as u32;
 
-        let mut line_diagnostics: HashMap<usize, &Diagnostic> = HashMap::new();
+        let mut line_diagnostics: HashMap<u32, &Diagnostic> = HashMap::new();
 
         for diagnostic in context.diagnostics.iter().filter(|d| {
             let start = &d.range.start;
             start.line >= starting_line
                 && start.line < ending_line
-                && d.severity <= DiagnosticSeverity::Warning
+                && d.severity <= Some(DiagnosticSeverity::WARNING)
         }) {
             let line = diagnostic.range.start.line;
             match line_diagnostics.get(&line) {
@@ -303,7 +304,7 @@ impl EditorView {
                 continue;
             };
             let formatted = format!("■  {message}");
-            let line_length = buffer.get_line_length(line);
+            let line_length = buffer.get_line_length(line as usize);
             let column = line_length + DIAGNOSTIC_MARGIN;
 
             let formatted: String = formatted
@@ -317,7 +318,7 @@ impl EditorView {
                 .get_diagnostic_style(&diagnostic.severity);
 
             render_buffer.set_text(
-                line - starting_line,
+                (line - starting_line) as usize,
                 column
                     .saturating_sub(viewport.left_column())
                     .add(bounds.start_col),

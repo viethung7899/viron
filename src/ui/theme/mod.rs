@@ -1,10 +1,10 @@
-use crate::service::lsp::types::DiagnosticSeverity;
 use crate::ui::theme::vscode::VsCodeTheme;
 use anyhow::Result;
 use crossterm::style::{Attribute, Attributes, Color, Colors, ContentStyle};
 use std::collections::HashMap;
 use std::fs;
 use std::io::BufReader;
+use lsp_types::DiagnosticSeverity;
 
 pub mod vscode;
 
@@ -241,10 +241,11 @@ impl Theme {
 
     pub fn get_diagnostic_style(&self, severity: &DiagnosticSeverity) -> Style {
         let colors = match severity {
-            DiagnosticSeverity::Error => &self.colors.diagnostic.error,
-            DiagnosticSeverity::Warning => &self.colors.diagnostic.warning,
-            DiagnosticSeverity::Information => &self.colors.diagnostic.info,
-            DiagnosticSeverity::Hint => &self.colors.diagnostic.hint,
+            &DiagnosticSeverity::ERROR => &self.colors.diagnostic.error,
+            &DiagnosticSeverity::WARNING => &self.colors.diagnostic.warning,
+            &DiagnosticSeverity::INFORMATION => &self.colors.diagnostic.info,
+            &DiagnosticSeverity::HINT => &self.colors.diagnostic.hint,
+            _ => unreachable!(),
         };
         Style {
             foreground: colors.foreground,

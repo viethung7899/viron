@@ -20,8 +20,14 @@ use crate::ui::components::{
 };
 use crate::ui::compositor::Compositor;
 use crate::ui::{theme::Theme, RenderContext};
+use crate::ui::{Component, RenderContext, theme::Theme};
+use crate::{
+    config::Config,
+    core::command::{CommandBuffer, SearchBuffer},
+};
 use anyhow::Result;
 use crossterm::cursor::SetCursorStyle;
+use crossterm::{ExecutableCommand, QueueableCommand, style};
 use crossterm::{
     cursor,
     event::KeyEvent,
@@ -324,7 +330,7 @@ impl Editor {
         let Some(client) = self.lsp_service.get_client_mut() else {
             return Ok(());
         };
-        if let Some(action) = client.handle_message().await {
+        if let Some(action) = client.get_lsp_action().await? {
             self.execute_action(action.as_ref()).await?;
         };
         Ok(())

@@ -1,16 +1,16 @@
 mod client;
+mod events;
+mod message_handler;
+mod messages;
 mod params;
-pub mod types;
 
 use std::collections::HashMap;
-use types::Diagnostic;
 
 use crate::core::language::Language;
-use crate::{
-    input::actions,
-    service::lsp::client::{InboundMessage, LspClient},
-};
+use crate::service::lsp::client::LspClientState;
+use crate::{input::actions, service::lsp::client::LspClient};
 use anyhow::Result;
+use lsp_types::Diagnostic;
 
 #[derive(Debug, Default)]
 pub struct LspService {
@@ -69,17 +69,8 @@ impl LspService {
         };
 
         client.initialize().await?;
-
-        while !client.initialized {
-            if let Some((InboundMessage::Response(response), Some(method))) =
-                client.receive_response().await?
-            {
-                if method.as_str() == "initialize" {
-                    client
-                        .handle_initialize_result(serde_json::from_value(response.result)?)
-                        .await?;
-                }
-            }
+        while client.state != LspClientState::Initialized {
+            let _ = client.get_lsp_action().await;
         }
 
         self.client = Some(client);
@@ -110,7 +101,7 @@ impl LspService {
             .unwrap_or_default()
     }
 
-    pub fn update_diagnostics(&mut self, uri: String, diagnostics: Vec<Diagnostic>) {
-        self.diagnostics.insert(uri, diagnostics);
+    pub fn update_diagnostics(&mut self, path: String, diagnostics: Vec<Diagnostic>) {
+        self.diagnostics.insert(path, diagnostics);
     }
 }

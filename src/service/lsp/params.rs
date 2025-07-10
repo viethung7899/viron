@@ -1,5 +1,8 @@
-use crate::service::lsp::types::capabilities::*;
-use crate::service::lsp::types::initialize::*;
+use lsp_types::{
+    ClientCapabilities, ClientInfo, GotoCapability, InitializeParams,
+    TextDocumentClientCapabilities, Uri, WorkspaceFolder,
+};
+use std::str::FromStr;
 
 fn get_workspace() -> WorkspaceFolder {
     let workspace = std::env::current_dir().unwrap_or_default();
@@ -10,37 +13,31 @@ fn get_workspace() -> WorkspaceFolder {
         .unwrap_or("Workspace")
         .to_string();
     WorkspaceFolder {
-        uri: workspace_uri,
+        uri: Uri::from_str(&workspace_uri).unwrap(),
         name: workspace_name,
     }
 }
 
 pub fn get_initialize_params() -> InitializeParams {
-    let client_capabilities = ClientCapabilities::builder()
-        .text_document(
-            TextDocumentClientCapabilities::builder()
-                .definition(
-                    DefinitionClientCapabilities::builder()
-                        .dynamic_registration(true)
-                        .link_support(false)
-                        .build(),
-                )
-                .general(
-                    GeneralCapabilities::builder()
-                        .position_encoding(vec![PositionEncodingKind::Utf8])
-                        .build(),
-                )
-                .build(),
-        )
-        .build();
+    let client_capabilities = ClientCapabilities {
+        text_document: Some(TextDocumentClientCapabilities {
+            definition: Some(GotoCapability {
+                link_support: Some(false),
+                dynamic_registration: Some(true),
+            }),
+            ..Default::default()
+        }),
+        ..Default::default()
+    };
 
-    InitializeParams::builder()
-        .process_id(std::process::id() as usize)
-        .client_info(ClientInfo::new(
-            env!("CARGO_PKG_NAME").to_string(),
-            Some(env!("CARGO_PKG_VERSION").to_string()),
-        ))
-        .capabilities(client_capabilities)
-        .workspace_folders(vec![get_workspace()])
-        .build()
+    InitializeParams {
+        process_id: Some(std::process::id()),
+        client_info: Some(ClientInfo {
+            name: env!("CARGO_PKG_NAME").to_string(),
+            version: Some(env!("CARGO_PKG_VERSION").to_string()),
+        }),
+        capabilities: client_capabilities,
+        workspace_folders: Some(vec![get_workspace()]),
+        ..Default::default()
+    }
 }
