@@ -229,6 +229,12 @@ impl Cursor {
         new_cursor.preferred_column = new_cursor.char_column;
         new_cursor
     }
+    
+    pub fn clamp_row(&mut self, buffer: &Buffer) {
+        if self.row >= buffer.line_count() {
+            self.row = buffer.line_count().saturating_sub(1);
+        }
+    }
 
     /// Ensure the cursor is at a valid position in the current line
     pub fn clamp_column(&mut self, buffer: &Buffer, mode: &Mode) {

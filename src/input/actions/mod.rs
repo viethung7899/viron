@@ -204,11 +204,16 @@ pub enum ActionDefinition {
     InsertChar {
         ch: char,
     },
-    DeleteChar,
-    Backspace,
     InsertNewLine,
     InsertNewLineBelow,
     InsertNewLineAbove,
+
+    Backspace,
+    DeleteChar,
+    DeleteCurrentLine,
+
+    Undo,
+    Redo,
 
     // Search actions
     FindNext,
@@ -228,8 +233,6 @@ pub enum ActionDefinition {
     WriteBuffer {
         path: Option<String>,
     },
-    Undo,
-    Redo,
     CloseBuffer {
         force: bool,
     },
@@ -270,6 +273,10 @@ pub fn create_action_from_definition(definition: &ActionDefinition) -> Box<dyn A
         ActionDefinition::InsertNewLine => Box::new(InsertNewLine),
         ActionDefinition::InsertNewLineBelow => Box::new(InsertNewLineBelow),
         ActionDefinition::InsertNewLineAbove => Box::new(InsertNewLineAbove),
+        ActionDefinition::DeleteCurrentLine => Box::new(DeleteCurrentLine),
+
+        ActionDefinition::Undo => Box::new(Undo),
+        ActionDefinition::Redo => Box::new(Redo),
 
         // Search actions
         ActionDefinition::FindNext => Box::new(FindNext),
@@ -297,8 +304,6 @@ pub fn create_action_from_definition(definition: &ActionDefinition) -> Box<dyn A
             let path_buf = path.as_ref().map(PathBuf::from);
             Box::new(WriteBuffer::new(path_buf))
         }
-        ActionDefinition::Undo => Box::new(Undo),
-        ActionDefinition::Redo => Box::new(Redo),
         ActionDefinition::CloseBuffer { force } => Box::new(CloseBuffer::force(*force)),
 
         // LSP actions

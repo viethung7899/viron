@@ -205,6 +205,26 @@ impl Buffer {
 
         Some((deleted_char, position))
     }
+    
+    pub fn delete_string(&mut self, position: usize, char_count: usize) -> Option<(String, usize)> {
+        if position >= self.buffer.len_without_gap() || char_count == 0 {
+            return None;
+        }
+
+        let mut deleted_string = String::new();
+        let mut current_position = position;
+
+        for _ in 0..char_count {
+            if let Some((ch, new_position)) = self.delete_char(current_position) {
+                deleted_string.push(ch);
+                current_position = new_position;
+            } else {
+                break;
+            }
+        }
+
+        Some((deleted_string, current_position))
+    }
 
     pub fn apply_edit(&mut self, change: &Edit) {
         match change {
