@@ -235,9 +235,9 @@ impl Executable for DeleteCurrentLine {
         start_point.column = 0;
         let start_byte = buffer.cursor_position(&start_point);
         let content_line = buffer.get_content_line(point.row);
-        let count = content_line.chars().count();
+        let byte_count = content_line.len();
 
-        buffer.delete_string(start_byte, count);
+        buffer.delete_string(start_byte, byte_count);
 
         ctx.cursor.clamp_row(buffer);
         ctx.cursor.clamp_column(buffer, ctx.mode);
@@ -254,6 +254,35 @@ impl_action!(
     "Insert new line above",
     ActionDefinition::DeleteCurrentLine
 );
+
+#[derive(Debug, Clone)]
+pub struct DeleteWord;
+
+#[async_trait(?Send)]
+impl Executable for DeleteWord {
+    async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+        let buffer = ctx.buffer_manager.current_buffer_mut();
+        let point = ctx.cursor.get_point();
+        let start_position = buffer.cursor_position(&point);
+
+        let cursor = ctx.cursor.find_next_word(buffer);
+        let end_position = buffer.cursor_position(&cursor.get_point());
+        if start_position >= end_position {
+            return Ok(());
+        }
+
+        let Some((deleted_text, _)) = buffer.delete_string(start_position, end_position - start_position) else {
+            return Ok(());
+        };
+
+        let edit = Edit::delete(start_position, point, deleted_text, point, point);
+        after_edit(ctx, &edit)?;
+        ctx.buffer_manager.current_mut().history.push(edit);
+        Ok(())
+    }
+}
+
+impl_action!(DeleteWord, "Delete word", ActionDefinition::DeleteWord);
 
 #[derive(Debug, Clone)]
 pub struct Undo;

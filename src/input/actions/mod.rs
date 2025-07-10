@@ -211,6 +211,7 @@ pub enum ActionDefinition {
     Backspace,
     DeleteChar,
     DeleteCurrentLine,
+    DeleteWord,
 
     Undo,
     Redo,
@@ -274,6 +275,7 @@ pub fn create_action_from_definition(definition: &ActionDefinition) -> Box<dyn A
         ActionDefinition::InsertNewLineBelow => Box::new(InsertNewLineBelow),
         ActionDefinition::InsertNewLineAbove => Box::new(InsertNewLineAbove),
         ActionDefinition::DeleteCurrentLine => Box::new(DeleteCurrentLine),
+        ActionDefinition::DeleteWord => Box::new(DeleteWord),
 
         ActionDefinition::Undo => Box::new(Undo),
         ActionDefinition::Redo => Box::new(Redo),
