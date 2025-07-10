@@ -1,7 +1,6 @@
 use crate::core::command::{CommandBuffer, SearchBuffer};
 use crate::core::cursor::Cursor;
 use crate::core::message::MessageManager;
-use crate::core::syntax::SyntaxEngine;
 use crate::core::viewport::Viewport;
 use crate::editor::Mode;
 use crate::ui::render_buffer::RenderBuffer;
@@ -15,7 +14,6 @@ pub mod theme;
 use crate::core::document::Document;
 use crate::input::keymaps::KeySequence;
 use crate::service::lsp::types::Diagnostic;
-pub use components::Component;
 
 pub struct RenderContext<'a> {
     pub viewport: &'a Viewport,

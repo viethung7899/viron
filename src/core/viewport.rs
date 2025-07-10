@@ -6,9 +6,7 @@ use crate::core::cursor::Cursor;
 pub struct Viewport {
     start_row: usize,
     start_column: usize,
-    /// Number of columns visible in the viewport
     width: usize,
-    /// Number of lines visible in the viewport
     height: usize,
 }
 
@@ -55,34 +53,36 @@ impl Viewport {
         self.start_column
     }
 
-    /// Scrolls the viewport to ensure the cursor is visible
-    /// Returns true if the viewport was scrolled
-    pub fn scroll_to_cursor(&mut self, cursor: &Cursor) -> bool {
+    pub fn content_width(&self, gutter_width: usize) -> usize {
+        self.width.saturating_sub(gutter_width)
+    }
+
+    /// Scrolls the viewport to ensure the cursor is visible, accounting for gutter
+    pub fn scroll_to_cursor_with_gutter(&mut self, cursor: &Cursor, gutter_width: usize) -> bool {
         let (row, column) = cursor.get_display_cursor();
+        let content_width = self.content_width(gutter_width);
 
-        // Scroll vertically if needed
+        let mut scrolled = false;
+
+        // Scroll vertically if needed (unchanged)
         if row < self.start_row {
-            // Cursor is above viewport
             self.start_row = row;
-            return true;
+            scrolled = true;
         } else if row >= self.start_row + self.height {
-            // Cursor is below viewport
             self.start_row = row - self.height + 1;
-            return true;
+            scrolled = true;
         }
 
-        // Scroll horizontally if needed
+        // Scroll horizontally if needed (accounting for reduced content width)
         if column < self.start_column {
-            // Cursor is to the left of viewport
             self.start_column = column;
-            return true;
-        } else if column >= self.start_column + self.width {
-            // Cursor is to the right of viewport
-            self.start_column = column - self.width + 1;
-            return true;
+            scrolled = true;
+        } else if column >= self.start_column + content_width {
+            self.start_column = column - content_width + 1;
+            scrolled = true;
         }
 
-        false
+        scrolled
     }
 
     /// Scrolls up by the specified number of lines

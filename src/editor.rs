@@ -11,10 +11,11 @@ use crate::input::{
 };
 use crate::service::LspService;
 use crate::ui::components::{
-    BufferView, CommandLine, ComponentIds, Gutter, MessageArea, PendingKeys, SearchBox, StatusLine,
+    CommandLine, ComponentIds, EditorView, MIN_GUTTER_SIZE, MessageArea, PendingKeys, SearchBox,
+    StatusLine,
 };
 use crate::ui::compositor::Compositor;
-use crate::ui::{Component, RenderContext, theme::Theme};
+use crate::ui::{RenderContext, theme::Theme};
 use crate::{
     config::Config,
     core::command::{CommandBuffer, SearchBuffer},
@@ -64,8 +65,6 @@ impl Mode {
         }
     }
 }
-
-const MIN_GUTTER_SIZE: usize = 4;
 
 pub struct Editor {
     // Size
@@ -123,7 +122,7 @@ impl Editor {
         let message_manager = MessageManager::new();
         let search_buffer = SearchBuffer::new();
         let cursor = Cursor::new();
-        let viewport = Viewport::new(width as usize - MIN_GUTTER_SIZE, height as usize - 2);
+        let viewport = Viewport::new(width as usize, height as usize - 2);
 
         // Create UI components
         let theme = Theme::default();
@@ -132,9 +131,8 @@ impl Editor {
 
         // Add components to the compositor
         let status_line_id = compositor.add_component("status_line", StatusLine, true)?;
-        let gutter_id = compositor.add_component("gutter", Gutter, true)?;
-        let buffer_view_id = compositor.add_component("buffer_view", BufferView, true)?;
-        
+        let editor_view_id = compositor.add_component("editor_view", EditorView, true)?;
+
         // Add invisible components
         let pending_keys_id = compositor.add_component("pending_keys", PendingKeys, false)?;
         let command_line_id = compositor.add_component("command_line", CommandLine, false)?;
@@ -143,8 +141,7 @@ impl Editor {
 
         let component_ids = ComponentIds {
             status_line_id,
-            gutter_id,
-            buffer_view_id,
+            editor_view_id,
             pending_keys_id,
             command_line_id,
             message_area_id,
@@ -244,9 +241,6 @@ impl Editor {
     }
 
     fn render(&mut self) -> Result<()> {
-        let gutter_width = self.gutter_width();
-        self.update_viewport_for_gutter_width(gutter_width)?;
-
         self.scroll_viewport()?;
 
         let document = self.buffer_manager.current_mut();
@@ -267,7 +261,7 @@ impl Editor {
 
         self.stdout.queue(cursor::Hide)?;
         self.compositor.render(&mut context, &mut self.stdout)?;
-        self.show_cursor()?;
+        // self.show_cursor()?;
         self.stdout.flush()?;
 
         Ok(())
@@ -282,73 +276,76 @@ impl Editor {
     }
 
     fn scroll_viewport(&mut self) -> Result<()> {
-        if self.viewport.scroll_to_cursor(&self.cursor) {
+        let line_count = self.buffer_manager.current_buffer().line_count();
+        let gutter_width = (line_count.to_string().len() + 1).max(MIN_GUTTER_SIZE);
+        if self
+            .viewport
+            .scroll_to_cursor_with_gutter(&self.cursor, gutter_width)
+        {
             self.compositor
-                .mark_dirty(&self.component_ids.buffer_view_id)?;
-            self.compositor.mark_dirty(&self.component_ids.gutter_id)?;
+                .mark_dirty(&self.component_ids.editor_view_id)?;
             self.compositor
                 .mark_dirty(&self.component_ids.status_line_id)?;
         }
         Ok(())
     }
 
-    fn show_cursor(&mut self) -> Result<()> {
-        self.stdout.queue(self.mode.set_cursor_style())?;
-        match self.mode {
-            Mode::Normal | Mode::Insert => {
-                self.show_cursor_in_buffer()?;
-            }
-            Mode::Command => {
-                self.show_cursor_in_command_line()?;
-            }
-            Mode::Search => {
-                self.show_cursor_in_search_box()?;
-            }
-        }
-        Ok(())
-    }
+    // fn show_cursor(&mut self) -> Result<()> {
+    //     self.stdout.queue(self.mode.set_cursor_style())?;
+    //     match self.mode {
+    //         Mode::Normal | Mode::Insert => {
+    //             self.show_cursor_in_buffer()?;
+    //         }
+    //         Mode::Command => {
+    //             self.show_cursor_in_command_line()?;
+    //         }
+    //         Mode::Search => {
+    //             self.show_cursor_in_search_box()?;
+    //         }
+    //     }
+    //     Ok(())
+    // }
 
-    fn show_cursor_in_buffer(&mut self) -> Result<()> {
-        let (row, column) = self.cursor.get_display_cursor();
-        let viewport = &self.viewport;
-        let gutter_size = self.gutter_width();
+    // fn show_cursor_in_buffer(&mut self) -> Result<()> {
+    //     let (row, column) = self.cursor.get_display_cursor();
+    //     let viewport = &self.viewport;
+    //     let gutter_size = self.gutter_width();
 
-        let screen_row = row - viewport.top_line();
-        let screen_col = column - viewport.left_column();
+    //     let screen_row = row - viewport.top_line();
+    //     let screen_col = column - viewport.left_column();
 
-        if screen_row < viewport.height() && screen_col < viewport.width() {
-            self.stdout
-                .queue(cursor::MoveTo(
-                    (screen_col + gutter_size) as u16,
-                    screen_row as u16,
-                ))?
-                .queue(cursor::Show)?;
-        }
-        Ok(())
-    }
+    //     if screen_row < viewport.height() && screen_col < viewport.width() {
+    //         self.stdout
+    //             .queue(cursor::MoveTo(
+    //                 (screen_col + gutter_size) as u16,
+    //                 screen_row as u16,
+    //             ))?
+    //             .queue(cursor::Show)?;
+    //     }
+    //     Ok(())
+    // }
 
-    fn show_cursor_in_command_line(&mut self) -> Result<()> {
-        let position = self.command_buffer.cursor_position();
-        self.stdout
-            .queue(cursor::MoveTo(position as u16 + 1, self.height as u16 - 1))?
-            .queue(cursor::Show)?;
-        Ok(())
-    }
+    // fn show_cursor_in_command_line(&mut self) -> Result<()> {
+    //     let position = self.command_buffer.cursor_position();
+    //     self.stdout
+    //         .queue(cursor::MoveTo(position as u16 + 1, self.height as u16 - 1))?
+    //         .queue(cursor::Show)?;
+    //     Ok(())
+    // }
 
-    fn show_cursor_in_search_box(&mut self) -> Result<()> {
-        let position = self.search_buffer.buffer.cursor_position();
-        self.stdout
-            .queue(cursor::MoveTo(position as u16 + 1, self.height as u16 - 1))?
-            .queue(cursor::Show)?;
-        Ok(())
-    }
+    // fn show_cursor_in_search_box(&mut self) -> Result<()> {
+    //     let position = self.search_buffer.buffer.cursor_position();
+    //     self.stdout
+    //         .queue(cursor::MoveTo(position as u16 + 1, self.height as u16 - 1))?
+    //         .queue(cursor::Show)?;
+    //     Ok(())
+    // }
 
     fn handle_resize(&mut self, width: usize, height: usize) -> Result<()> {
         self.width = width;
         self.height = height;
         self.compositor.resize(width, height);
-        self.viewport
-            .resize(width - self.gutter_width(), height - 2);
+        self.viewport.resize(width, height - 2);
         Ok(())
     }
 
@@ -460,13 +457,6 @@ impl Editor {
         tokio::spawn(async move { self.lsp_service.shutdown().await });
 
         Ok(())
-    }
-
-    fn gutter_width(&self) -> usize {
-        let line_count = self.buffer_manager.current_buffer().line_count();
-
-        let digits = line_count.to_string().len();
-        (digits + 1).max(MIN_GUTTER_SIZE)
     }
 
     fn update_viewport_for_gutter_width(&mut self, gutter_size: usize) -> Result<()> {

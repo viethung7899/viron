@@ -17,7 +17,7 @@ fn after_edit(ctx: &mut ActionContext, edit: &Edit) -> ActionResult {
     }
 
     ctx.compositor
-        .mark_dirty(&ctx.component_ids.buffer_view_id)?;
+        .mark_dirty(&ctx.component_ids.editor_view_id)?;
     ctx.compositor
         .mark_dirty(&ctx.component_ids.status_line_id)?;
     ctx.search_buffer.reset();
