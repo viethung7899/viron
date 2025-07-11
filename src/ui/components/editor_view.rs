@@ -1,7 +1,8 @@
+use crate::core::viewport;
 use crate::service::lsp::types::DiagnosticSeverity;
 use crate::ui::render_buffer::RenderBuffer;
 use crate::ui::theme::Style;
-use crate::ui::{Bounds, Drawable, RenderContext};
+use crate::ui::{Bounds, Drawable, Focusable, RenderContext};
 use anyhow::Result;
 use std::ops::Add;
 use std::str::from_utf8;
@@ -383,5 +384,16 @@ impl Drawable for EditorView {
             width,
             height,
         }
+    }
+}
+
+impl Focusable for EditorView {
+    fn get_display_cursor(&self, _: &RenderBuffer, context: &RenderContext) -> (usize, usize) {
+        let viewport = context.viewport;
+        let (row, column) = context.cursor.get_display_cursor();
+        let gutter_width = self.get_gutter_width(context);
+        let screen_row = row - viewport.top_line();
+        let screen_col = column - viewport.left_column();
+        (screen_row, screen_col + gutter_width)
     }
 }

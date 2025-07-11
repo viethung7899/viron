@@ -5,6 +5,8 @@ mod pending_keys;
 mod search_box;
 mod status_line;
 
+use std::rc::Rc;
+
 pub use command_line::CommandLine;
 pub use editor_view::EditorView;
 pub use message_area::MessageArea;
@@ -14,7 +16,7 @@ pub use status_line::StatusLine;
 
 pub use editor_view::MIN_GUTTER_SIZE;
 
-use crate::ui::Drawable;
+use crate::ui::{Drawable, Focusable};
 
 pub struct ComponentIds {
     pub status_line_id: String,
@@ -29,23 +31,6 @@ pub struct ComponentIds {
 pub struct Component {
     pub dirty: bool,
     pub visible: bool,
-    pub(in crate::ui) drawable: Box<dyn Drawable>,
-}
-
-impl Component {
-    pub fn new(drawable: Box<dyn Drawable>) -> Self {
-        Self {
-            dirty: true,
-            visible: true,
-            drawable,
-        }
-    }
-
-    pub fn new_invisible(drawable: Box<dyn Drawable>) -> Self {
-        Self {
-            dirty: true,
-            visible: false,
-            drawable,
-        }
-    }
+    pub(in crate::ui) drawable: Rc<dyn Drawable>,
+    pub(in crate::ui) focusable: Option<Rc<dyn Focusable>>,
 }

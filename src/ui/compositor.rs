@@ -1,8 +1,9 @@
 use crate::ui::components::Component;
 use crate::ui::render_buffer::RenderBuffer;
 use crate::ui::theme::Style;
-use crate::ui::{Drawable, RenderContext};
+use crate::ui::{Drawable, Focusable, RenderContext};
 use anyhow::{Result, anyhow};
+use std::rc::Rc;
 use std::{collections::HashMap, io::Write};
 
 pub struct Compositor {
@@ -10,6 +11,7 @@ pub struct Compositor {
     editor_style: Style,
     current_buffer: RenderBuffer,
     previous_buffer: Option<RenderBuffer>,
+    focused_component: Option<String>,
 }
 
 impl Compositor {
@@ -19,22 +21,50 @@ impl Compositor {
             editor_style: default_style.clone(),
             current_buffer: RenderBuffer::new(width, height, default_style),
             previous_buffer: None,
+            focused_component: None,
         }
     }
 
-    pub fn add_component(
+    pub fn add_component<C: Drawable + 'static>(
         &mut self,
         id: &str,
-        drawable: impl Drawable + 'static,
+        drawable: C,
         visible: bool,
     ) -> Result<String> {
         if self.components.contains_key(id) {
             return Err(anyhow!("Component already exists"));
         }
+
+        let drawable = Rc::new(drawable);
+
         let component = Component {
             dirty: true,
             visible,
-            drawable: Box::new(drawable),
+            drawable,
+            focusable: None,
+        };
+        self.components.insert(id.to_string(), component);
+        Ok(id.to_string())
+    }
+
+    pub fn add_focusable_component<C: Drawable + Focusable + 'static>(
+        &mut self,
+        id: &str,
+        drawable: C,
+        visible: bool,
+    ) -> Result<String> {
+        if self.components.contains_key(id) {
+            return Err(anyhow!("Component already exists"));
+        }
+
+        let drawable = Rc::new(drawable);
+        let focusable = drawable.clone();
+
+        let component = Component {
+            dirty: true,
+            visible,
+            drawable,
+            focusable: Some(focusable),
         };
         self.components.insert(id.to_string(), component);
         Ok(id.to_string())
@@ -83,6 +113,19 @@ impl Compositor {
         self.mark_all_dirty();
     }
 
+    pub fn set_focus(&mut self, component_id: &str) -> Result<()> {
+        if let Some(component) = self.components.get(component_id) {
+            if component.focusable.is_some() {
+                self.focused_component = Some(component_id.to_string());
+                Ok(())
+            } else {
+                Err(anyhow!("Component is not focusable"))
+            }
+        } else {
+            Err(anyhow!("Component not found"))
+        }
+    }
+
     // Render using diff
     pub fn render<'a, W: Write>(
         &mut self,
@@ -115,6 +158,13 @@ impl Compositor {
         self.previous_buffer = Some(self.current_buffer.clone());
 
         Ok(())
+    }
+
+    pub fn get_cursor_position<'a>(&self, context: &RenderContext<'a>) -> Option<(usize, usize)> {
+        let focused_id = self.focused_component.as_ref()?;
+        let component = self.components.get(focused_id)?;
+        let focusable = component.focusable.as_ref()?;
+        Some(focusable.get_display_cursor(&self.current_buffer, context))
     }
 
     // Force a full re-render (useful after resize or major changes)

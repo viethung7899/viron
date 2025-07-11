@@ -139,6 +139,8 @@ impl Editor {
         let search_box_id = compositor.add_component("search_box", SearchBox, false)?;
         let message_area_id = compositor.add_component("message_area", MessageArea, false)?;
 
+        compositor.set_focus(&editor_view_id)?;
+
         let component_ids = ComponentIds {
             status_line_id,
             editor_view_id,
@@ -261,7 +263,13 @@ impl Editor {
 
         self.stdout.queue(cursor::Hide)?;
         self.compositor.render(&mut context, &mut self.stdout)?;
-        // self.show_cursor()?;
+
+        if let Some((row, col)) = self.compositor.get_cursor_position(&context) {
+            self.stdout
+                .queue(cursor::MoveTo(col as u16, row as u16))?
+                .queue(cursor::Show)?;
+        }
+
         self.stdout.flush()?;
 
         Ok(())
@@ -456,19 +464,6 @@ impl Editor {
         terminal::disable_raw_mode()?;
         tokio::spawn(async move { self.lsp_service.shutdown().await });
 
-        Ok(())
-    }
-
-    fn update_viewport_for_gutter_width(&mut self, gutter_size: usize) -> Result<()> {
-        let (width, height) = terminal::size()?;
-        let required_viewport_width = width as usize - gutter_size;
-
-        // Only update if the width actually changed
-        if self.viewport.width() != required_viewport_width {
-            self.viewport
-                .resize(required_viewport_width, height as usize - 2);
-            self.compositor.mark_all_dirty();
-        }
         Ok(())
     }
 }

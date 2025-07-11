@@ -1,5 +1,5 @@
 use crate::ui::render_buffer::RenderBuffer;
-use crate::ui::{Bounds, Drawable, RenderContext};
+use crate::ui::{Bounds, Drawable, Focusable, RenderContext};
 
 pub struct CommandLine;
 
@@ -21,5 +21,13 @@ impl Drawable for CommandLine {
             width: render_buffer.width,
             height: 1,
         }
+    }
+}
+
+impl Focusable for CommandLine {
+    fn get_display_cursor(&self, buffer: &RenderBuffer, context: &RenderContext) -> (usize, usize) {
+        let command = context.command_buffer;
+        let cursor_col = command.cursor_position() + 1;
+        (buffer.height - 1, cursor_col)
     }
 }

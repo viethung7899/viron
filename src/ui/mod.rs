@@ -1,3 +1,5 @@
+use std::any::Any;
+
 use crate::core::command::{CommandBuffer, SearchBuffer};
 use crate::core::cursor::Cursor;
 use crate::core::message::MessageManager;
@@ -58,4 +60,8 @@ pub trait Drawable {
 
         Ok(())
     }
+}
+
+pub trait Focusable {
+    fn get_display_cursor(&self, buffer: &RenderBuffer, context: &RenderContext) -> (usize, usize);
 }
