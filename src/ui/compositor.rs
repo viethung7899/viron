@@ -31,20 +31,13 @@ impl Compositor {
         drawable: C,
         visible: bool,
     ) -> Result<String> {
-        if self.components.contains_key(id) {
-            return Err(anyhow!("Component already exists"));
-        }
-
-        let drawable = Rc::new(drawable);
-
         let component = Component {
             dirty: true,
             visible,
-            drawable,
+            drawable: Rc::new(drawable),
             focusable: None,
         };
-        self.components.insert(id.to_string(), component);
-        Ok(id.to_string())
+        self.add_iternal_component(id, component)
     }
 
     pub fn add_focusable_component<C: Drawable + Focusable + 'static>(
@@ -53,10 +46,6 @@ impl Compositor {
         drawable: C,
         visible: bool,
     ) -> Result<String> {
-        if self.components.contains_key(id) {
-            return Err(anyhow!("Component already exists"));
-        }
-
         let drawable = Rc::new(drawable);
         let focusable = drawable.clone();
 
@@ -66,6 +55,17 @@ impl Compositor {
             drawable,
             focusable: Some(focusable),
         };
+        self.add_iternal_component(id, component)
+    }
+    
+    fn add_iternal_component(
+        &mut self,
+        id: &str,
+        component: Component,
+    ) -> Result<String> {
+        if self.components.contains_key(id) {
+            return Err(anyhow!("Component already exists"));
+        }
         self.components.insert(id.to_string(), component);
         Ok(id.to_string())
     }
