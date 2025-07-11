@@ -11,22 +11,22 @@ use crate::input::{
 };
 use crate::service::LspService;
 use crate::ui::components::{
-    CommandLine, ComponentIds, EditorView, MIN_GUTTER_SIZE, MessageArea, PendingKeys, SearchBox,
-    StatusLine,
+    CommandLine, ComponentIds, EditorView, MessageArea, PendingKeys, SearchBox, StatusLine,
+    MIN_GUTTER_SIZE,
 };
 use crate::ui::compositor::Compositor;
-use crate::ui::{RenderContext, theme::Theme};
+use crate::ui::{theme::Theme, RenderContext};
 use crate::{
     config::Config,
     core::command::{CommandBuffer, SearchBuffer},
 };
 use anyhow::Result;
-use crossterm::{ExecutableCommand, QueueableCommand, style};
 use crossterm::{
     cursor,
     event::{KeyCode, KeyEvent, KeyModifiers},
     terminal::{self, ClearType},
 };
+use crossterm::{style, ExecutableCommand, QueueableCommand};
 use serde::{Deserialize, Serialize};
 use std::io::{self, Stdout, Write};
 use std::path::{Path, PathBuf};
@@ -131,12 +131,13 @@ impl Editor {
 
         // Add components to the compositor
         let status_line_id = compositor.add_component("status_line", StatusLine, true)?;
-        let editor_view_id = compositor.add_component("editor_view", EditorView, true)?;
+        let editor_view_id = compositor.add_focusable_component("editor_view", EditorView, true)?;
 
         // Add invisible components
         let pending_keys_id = compositor.add_component("pending_keys", PendingKeys, false)?;
-        let command_line_id = compositor.add_component("command_line", CommandLine, false)?;
-        let search_box_id = compositor.add_component("search_box", SearchBox, false)?;
+        let command_line_id =
+            compositor.add_focusable_component("command_line", CommandLine, false)?;
+        let search_box_id = compositor.add_focusable_component("search_box", SearchBox, false)?;
         let message_area_id = compositor.add_component("message_area", MessageArea, false)?;
 
         compositor.set_focus(&editor_view_id)?;
@@ -297,57 +298,6 @@ impl Editor {
         }
         Ok(())
     }
-
-    // fn show_cursor(&mut self) -> Result<()> {
-    //     self.stdout.queue(self.mode.set_cursor_style())?;
-    //     match self.mode {
-    //         Mode::Normal | Mode::Insert => {
-    //             self.show_cursor_in_buffer()?;
-    //         }
-    //         Mode::Command => {
-    //             self.show_cursor_in_command_line()?;
-    //         }
-    //         Mode::Search => {
-    //             self.show_cursor_in_search_box()?;
-    //         }
-    //     }
-    //     Ok(())
-    // }
-
-    // fn show_cursor_in_buffer(&mut self) -> Result<()> {
-    //     let (row, column) = self.cursor.get_display_cursor();
-    //     let viewport = &self.viewport;
-    //     let gutter_size = self.gutter_width();
-
-    //     let screen_row = row - viewport.top_line();
-    //     let screen_col = column - viewport.left_column();
-
-    //     if screen_row < viewport.height() && screen_col < viewport.width() {
-    //         self.stdout
-    //             .queue(cursor::MoveTo(
-    //                 (screen_col + gutter_size) as u16,
-    //                 screen_row as u16,
-    //             ))?
-    //             .queue(cursor::Show)?;
-    //     }
-    //     Ok(())
-    // }
-
-    // fn show_cursor_in_command_line(&mut self) -> Result<()> {
-    //     let position = self.command_buffer.cursor_position();
-    //     self.stdout
-    //         .queue(cursor::MoveTo(position as u16 + 1, self.height as u16 - 1))?
-    //         .queue(cursor::Show)?;
-    //     Ok(())
-    // }
-
-    // fn show_cursor_in_search_box(&mut self) -> Result<()> {
-    //     let position = self.search_buffer.buffer.cursor_position();
-    //     self.stdout
-    //         .queue(cursor::MoveTo(position as u16 + 1, self.height as u16 - 1))?
-    //         .queue(cursor::Show)?;
-    //     Ok(())
-    // }
 
     fn handle_resize(&mut self, width: usize, height: usize) -> Result<()> {
         self.width = width;
