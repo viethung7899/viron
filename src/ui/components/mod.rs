@@ -1,7 +1,5 @@
-mod buffer_view;
 mod command_line;
 mod editor_view;
-mod gutter;
 mod message_area;
 mod pending_keys;
 mod search_box;
