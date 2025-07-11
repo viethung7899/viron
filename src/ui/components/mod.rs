@@ -14,8 +14,6 @@ pub use pending_keys::PendingKeys;
 pub use search_box::SearchBox;
 pub use status_line::StatusLine;
 
-pub use editor_view::MIN_GUTTER_SIZE;
-
 use crate::ui::{Drawable, Focusable};
 
 pub struct ComponentIds {

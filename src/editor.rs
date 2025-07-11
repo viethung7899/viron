@@ -1,4 +1,5 @@
 use crate::config::get_config_dir;
+use crate::constants::{MIN_GUTTER_WIDTH, RESERVED_ROW_COUNT};
 use crate::core::cursor::Cursor;
 use crate::core::viewport::Viewport;
 use crate::core::{buffer_manager::BufferManager, message::MessageManager};
@@ -12,7 +13,6 @@ use crate::input::{
 use crate::service::LspService;
 use crate::ui::components::{
     CommandLine, ComponentIds, EditorView, MessageArea, PendingKeys, SearchBox, StatusLine,
-    MIN_GUTTER_SIZE,
 };
 use crate::ui::compositor::Compositor;
 use crate::ui::{theme::Theme, RenderContext};
@@ -122,7 +122,7 @@ impl Editor {
         let message_manager = MessageManager::new();
         let search_buffer = SearchBuffer::new();
         let cursor = Cursor::new();
-        let viewport = Viewport::new(width as usize, height as usize - 2);
+        let viewport = Viewport::new(width as usize, height as usize - RESERVED_ROW_COUNT);
 
         // Create UI components
         let theme = Theme::default();
@@ -286,7 +286,7 @@ impl Editor {
 
     fn scroll_viewport(&mut self) -> Result<()> {
         let line_count = self.buffer_manager.current_buffer().line_count();
-        let gutter_width = (line_count.to_string().len() + 1).max(MIN_GUTTER_SIZE);
+        let gutter_width = (line_count.to_string().len() + 1).max(MIN_GUTTER_WIDTH);
         if self
             .viewport
             .scroll_to_cursor_with_gutter(&self.cursor, gutter_width)
@@ -303,7 +303,7 @@ impl Editor {
         self.width = width;
         self.height = height;
         self.compositor.resize(width, height);
-        self.viewport.resize(width, height - 2);
+        self.viewport.resize(width, height - RESERVED_ROW_COUNT);
         Ok(())
     }
 

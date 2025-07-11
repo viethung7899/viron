@@ -1,4 +1,5 @@
 mod config;
+mod constants;
 mod core;
 mod editor;
 mod input;

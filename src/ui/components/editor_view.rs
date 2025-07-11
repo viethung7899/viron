@@ -1,4 +1,4 @@
-use crate::core::viewport;
+use crate::constants::{MIN_GUTTER_WIDTH, RESERVED_ROW_COUNT};
 use crate::service::lsp::types::DiagnosticSeverity;
 use crate::ui::render_buffer::RenderBuffer;
 use crate::ui::theme::Style;
@@ -8,7 +8,6 @@ use std::ops::Add;
 use std::str::from_utf8;
 use tree_sitter::Point;
 
-pub const MIN_GUTTER_SIZE: usize = 4;
 const DIAGNOSTIC_MARGIN: usize = 4;
 
 pub struct EditorView;
@@ -17,7 +16,7 @@ impl EditorView {
     fn get_gutter_width(&self, context: &RenderContext<'_>) -> usize {
         let line_count = context.document.buffer.line_count();
         let digits = line_count.to_string().len();
-        (digits + 1).max(MIN_GUTTER_SIZE)
+        (digits + 1).max(MIN_GUTTER_WIDTH)
     }
 
     fn get_gutter_bounds(
@@ -377,7 +376,7 @@ impl Drawable for EditorView {
 
     fn bounds(&self, render_buffer: &RenderBuffer, _context: &RenderContext<'_>) -> Bounds {
         let width = render_buffer.width;
-        let height = render_buffer.height - 2;
+        let height = render_buffer.height - RESERVED_ROW_COUNT;
         Bounds {
             start_row: 0,
             start_col: 0,
