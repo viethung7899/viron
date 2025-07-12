@@ -6,7 +6,7 @@ mod input;
 mod service;
 mod ui;
 
-use crate::config::{get_config_dir, FileConfig};
+use crate::config::get_config_dir;
 use anyhow::Result;
 use crossterm::terminal::ClearType;
 use crossterm::{cursor, terminal};

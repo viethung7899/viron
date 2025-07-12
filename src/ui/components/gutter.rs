@@ -17,70 +17,51 @@ impl Gutter {
         (digits + 1).max(MIN_GUTTER_WIDTH)
     }
 
-    fn draw_absolute(&self, buffer: &mut RenderBuffer, context: &mut RenderContext) -> Result<()> {
-        let Bounds {
-            start_col,
-            width,
-            height,
-            ..
-        } = self.bounds(buffer, context);
-        let top_line = context.viewport.top_line();
-        let line_count = context.document.buffer.line_count();
-        let style = Style::from(context.config.theme.colors.gutter);
-
-        for i in 0..(height) {
-            let line = top_line + i;
-            if line >= line_count {
-                break;
+    fn get_line_text(&self, context: &RenderContext, current_line: usize, line: usize) -> String {
+        match context.config.gutter {
+            GutterConfig::None => String::new(),
+            GutterConfig::Absolute => {
+                format!("{:>w$}", line + 1, w = self.get_width(context) - 1)
             }
-            let line_text = format!("{:>w$}", line + 1, w = width - 1);
-
-            buffer.set_text(i, start_col, &line_text, &style);
-        }
-
-        Ok(())
-    }
-
-    fn draw_relative(&self, buffer: &mut RenderBuffer, context: &mut RenderContext) -> Result<()> {
-        let Bounds {
-            start_col,
-            width,
-            height,
-            ..
-        } = self.bounds(buffer, context);
-        let top_line = context.viewport.top_line();
-        let line_count = context.document.buffer.line_count();
-        let (current_line, _) = context.cursor.get_display_cursor();
-        let style = Style::from(context.config.theme.colors.gutter);
-
-        for i in 0..(height) {
-            let line = top_line + i;
-            if line >= line_count {
-                break;
+            GutterConfig::Relative => {
+                let distance = line.abs_diff(current_line);
+                if distance == 0 {
+                    format!("{:<w$}", line + 1, w = self.get_width(context) - 1)
+                } else {
+                    format!("{:>w$}", distance, w = self.get_width(context) - 1)
+                }
             }
-            let distance = line.abs_diff(current_line);
-            let line_text = if distance == 0 {
-                format!("{:<w$}", line + 1, w = width - 1)
-            } else {
-                format!("{:>w$}", distance, w = width - 1)
-            };
-
-            buffer.set_text(i, start_col, &line_text, &style);
         }
-
-        Ok(())
     }
 }
 
 impl Drawable for Gutter {
     fn draw(&self, buffer: &mut RenderBuffer, context: &mut RenderContext) -> Result<()> {
-        match context.config.gutter {
-            GutterConfig::Absolute => self.draw_absolute(buffer, context),
-            GutterConfig::Relative => self.draw_relative(buffer, context),
-            _ => {
-                return Ok(());
-            }
+        if context.config.gutter == GutterConfig::None {
+            return Ok(());
         }
+        let Bounds {
+            start_col,
+            width,
+            height,
+            ..
+        } = self.bounds(buffer, context);
+        let top_line = context.viewport.top_line();
+        let line_count = context.document.buffer.line_count();
+        let style = Style::from(context.config.theme.colors.gutter);
+        let (current_line, _) = context.cursor.get_display_cursor();
+
+        for i in 0..height {
+            let line = top_line + i;
+            let line_text = if line >= line_count {
+                " ".repeat(width - 1)
+            } else {
+                self.get_line_text(context, current_line, line)
+            };
+            buffer.set_text(i, start_col, &line_text, &style);
+        }
+
+        Ok(())
     }
 
     fn bounds(&self, buffer: &RenderBuffer, context: &RenderContext) -> Bounds {
