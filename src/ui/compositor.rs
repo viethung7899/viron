@@ -2,7 +2,7 @@ use crate::ui::components::Component;
 use crate::ui::render_buffer::RenderBuffer;
 use crate::ui::theme::Style;
 use crate::ui::{Drawable, Focusable, RenderContext};
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use std::rc::Rc;
 use std::{collections::HashMap, io::Write};
 
@@ -57,12 +57,8 @@ impl Compositor {
         };
         self.add_internal_component(id, component)
     }
-    
-    fn add_internal_component(
-        &mut self,
-        id: &str,
-        component: Component,
-    ) -> Result<String> {
+
+    fn add_internal_component(&mut self, id: &str, component: Component) -> Result<String> {
         if self.components.contains_key(id) {
             return Err(anyhow!("Component already exists"));
         }

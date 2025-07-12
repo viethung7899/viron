@@ -36,17 +36,14 @@ impl Executable for EnterMode {
                 ctx.command_buffer.clear();
                 ctx.compositor
                     .mark_visible(&ctx.component_ids.command_line_id, true)?;
-                ctx.compositor.set_focus(
-                    &ctx.component_ids.command_line_id,
-                )?;
+                ctx.compositor
+                    .set_focus(&ctx.component_ids.command_line_id)?;
             }
             Mode::Search => {
                 ctx.search_buffer.buffer.clear();
                 ctx.compositor
                     .mark_visible(&ctx.component_ids.search_box_id, true)?;
-                ctx.compositor.set_focus(
-                    &ctx.component_ids.search_box_id,
-                )?;
+                ctx.compositor.set_focus(&ctx.component_ids.search_box_id)?;
             }
             Mode::Normal | Mode::Insert => {
                 ctx.command_buffer.clear();
@@ -60,6 +57,7 @@ impl Executable for EnterMode {
                 ctx.compositor
                     .mark_visible(&ctx.component_ids.search_box_id, false)?;
             }
+            _ => {}
         };
 
         *ctx.mode = self.mode.clone();
