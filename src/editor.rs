@@ -1,3 +1,4 @@
+use crate::config::editor::Gutter;
 use crate::config::Config;
 use crate::constants::{MIN_GUTTER_WIDTH, RESERVED_ROW_COUNT};
 use crate::core::command::{CommandBuffer, SearchBuffer};
@@ -129,7 +130,8 @@ impl Editor {
 
         // Add components to the compositor
         let status_line_id = compositor.add_component("status_line", StatusLine, true)?;
-        let editor_view_id = compositor.add_focusable_component("editor_view", EditorView::new(), true)?;
+        let editor_view_id =
+            compositor.add_focusable_component("editor_view", EditorView::new(), true)?;
 
         // Add invisible components
         let pending_keys_id = compositor.add_component("pending_keys", PendingKeys, false)?;
@@ -228,6 +230,7 @@ impl Editor {
             buffer_manager: &mut self.buffer_manager,
             command_buffer: &mut self.command_buffer,
             search_buffer: &mut self.search_buffer,
+            config: &self.config,
             message: &mut self.message_manager,
             cursor: &mut self.cursor,
             running: &mut self.running,
@@ -281,7 +284,11 @@ impl Editor {
 
     fn scroll_viewport(&mut self) -> Result<()> {
         let line_count = self.buffer_manager.current_buffer().line_count();
-        let gutter_width = (line_count.to_string().len() + 1).max(MIN_GUTTER_WIDTH);
+        let gutter_width = if self.config.gutter == Gutter::None {
+            0
+        } else {
+            (line_count.to_string().len() + 1).max(MIN_GUTTER_WIDTH)
+        };
         if self
             .viewport
             .scroll_to_cursor_with_gutter(&self.cursor, gutter_width)
