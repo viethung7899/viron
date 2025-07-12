@@ -55,10 +55,10 @@ impl Compositor {
             drawable,
             focusable: Some(focusable),
         };
-        self.add_iternal_component(id, component)
+        self.add_internal_component(id, component)
     }
     
-    fn add_iternal_component(
+    fn add_internal_component(
         &mut self,
         id: &str,
         component: Component,
