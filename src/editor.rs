@@ -1,4 +1,5 @@
 use crate::config::get_config_dir;
+use crate::constants::{MIN_GUTTER_WIDTH, RESERVED_ROW_COUNT};
 use crate::core::cursor::Cursor;
 use crate::core::viewport::Viewport;
 use crate::core::{buffer_manager::BufferManager, message::MessageManager};
@@ -11,10 +12,10 @@ use crate::input::{
 };
 use crate::service::LspService;
 use crate::ui::components::{
-    BufferView, CommandLine, ComponentIds, Gutter, MessageArea, PendingKeys, SearchBox, StatusLine,
+    CommandLine, ComponentIds, EditorView, MessageArea, PendingKeys, SearchBox, StatusLine,
 };
 use crate::ui::compositor::Compositor;
-use crate::ui::{theme::Theme, Component, RenderContext};
+use crate::ui::{theme::Theme, RenderContext};
 use crate::{
     config::Config,
     core::command::{CommandBuffer, SearchBuffer},
@@ -64,8 +65,6 @@ impl Mode {
         }
     }
 }
-
-const MIN_GUTTER_SIZE: usize = 4;
 
 pub struct Editor {
     // Size
@@ -123,38 +122,29 @@ impl Editor {
         let message_manager = MessageManager::new();
         let search_buffer = SearchBuffer::new();
         let cursor = Cursor::new();
-        let viewport = Viewport::new(width as usize - MIN_GUTTER_SIZE, height as usize - 2);
+        let viewport = Viewport::new(width as usize, height as usize - RESERVED_ROW_COUNT);
 
         // Create UI components
         let theme = Theme::default();
         let mut compositor =
             Compositor::new(width as usize, height as usize, &theme.editor_style());
 
-        let status_line_id =
-            compositor.add_component(Component::new("status_line", Box::new(StatusLine)))?;
-        let gutter_id = compositor.add_component(Component::new("gutter", Box::new(Gutter)))?;
-        let buffer_view_id =
-            compositor.add_component(Component::new("buffer_view", Box::new(BufferView)))?;
+        // Add components to the compositor
+        let status_line_id = compositor.add_component("status_line", StatusLine, true)?;
+        let editor_view_id = compositor.add_focusable_component("editor_view", EditorView, true)?;
 
-        let pending_keys_id = compositor.add_component(Component::new_invisible(
-            "pending_keys",
-            Box::new(PendingKeys),
-        ))?;
-        let command_line_id = compositor.add_component(Component::new_invisible(
-            "command_line",
-            Box::new(CommandLine),
-        ))?;
-        let search_box_id = compositor
-            .add_component(Component::new_invisible("search_box", Box::new(SearchBox)))?;
-        let message_area_id = compositor.add_component(Component::new_invisible(
-            "message_area",
-            Box::new(MessageArea),
-        ))?;
+        // Add invisible components
+        let pending_keys_id = compositor.add_component("pending_keys", PendingKeys, false)?;
+        let command_line_id =
+            compositor.add_focusable_component("command_line", CommandLine, false)?;
+        let search_box_id = compositor.add_focusable_component("search_box", SearchBox, false)?;
+        let message_area_id = compositor.add_component("message_area", MessageArea, false)?;
+
+        compositor.set_focus(&editor_view_id)?;
 
         let component_ids = ComponentIds {
             status_line_id,
-            gutter_id,
-            buffer_view_id,
+            editor_view_id,
             pending_keys_id,
             command_line_id,
             message_area_id,
@@ -202,11 +192,6 @@ impl Editor {
         };
 
         Ok(editor)
-    }
-
-    pub async fn load_file(&mut self, path: impl AsRef<Path>) -> Result<()> {
-        let action = actions::OpenBuffer::new(PathBuf::from(path.as_ref()));
-        self.execute_action(&action).await
     }
 
     pub fn load_config(&mut self, config: &Config) -> Result<()> {
@@ -259,9 +244,6 @@ impl Editor {
     }
 
     fn render(&mut self) -> Result<()> {
-        let gutter_width = self.gutter_width();
-        self.update_viewport_for_gutter_width(gutter_width)?;
-
         self.scroll_viewport()?;
 
         let document = self.buffer_manager.current_mut();
@@ -282,7 +264,13 @@ impl Editor {
 
         self.stdout.queue(cursor::Hide)?;
         self.compositor.render(&mut context, &mut self.stdout)?;
-        self.show_cursor()?;
+
+        if let Some((row, col)) = self.compositor.get_cursor_position(&context) {
+            self.stdout
+                .queue(cursor::MoveTo(col as u16, row as u16))?
+                .queue(cursor::Show)?;
+        }
+
         self.stdout.flush()?;
 
         Ok(())
@@ -297,64 +285,17 @@ impl Editor {
     }
 
     fn scroll_viewport(&mut self) -> Result<()> {
-        if self.viewport.scroll_to_cursor(&self.cursor) {
+        let line_count = self.buffer_manager.current_buffer().line_count();
+        let gutter_width = (line_count.to_string().len() + 1).max(MIN_GUTTER_WIDTH);
+        if self
+            .viewport
+            .scroll_to_cursor_with_gutter(&self.cursor, gutter_width)
+        {
             self.compositor
-                .mark_dirty(&self.component_ids.buffer_view_id)?;
-            self.compositor.mark_dirty(&self.component_ids.gutter_id)?;
+                .mark_dirty(&self.component_ids.editor_view_id)?;
             self.compositor
                 .mark_dirty(&self.component_ids.status_line_id)?;
         }
-        Ok(())
-    }
-
-    fn show_cursor(&mut self) -> Result<()> {
-        self.stdout.queue(self.mode.set_cursor_style())?;
-        match self.mode {
-            Mode::Normal | Mode::Insert => {
-                self.show_cursor_in_buffer()?;
-            }
-            Mode::Command => {
-                self.show_cursor_in_command_line()?;
-            }
-            Mode::Search => {
-                self.show_cursor_in_search_box()?;
-            }
-        }
-        Ok(())
-    }
-
-    fn show_cursor_in_buffer(&mut self) -> Result<()> {
-        let (row, column) = self.cursor.get_display_cursor();
-        let viewport = &self.viewport;
-        let gutter_size = self.gutter_width();
-
-        let screen_row = row - viewport.top_line();
-        let screen_col = column - viewport.left_column();
-
-        if screen_row < viewport.height() && screen_col < viewport.width() {
-            self.stdout
-                .queue(cursor::MoveTo(
-                    (screen_col + gutter_size) as u16,
-                    screen_row as u16,
-                ))?
-                .queue(cursor::Show)?;
-        }
-        Ok(())
-    }
-
-    fn show_cursor_in_command_line(&mut self) -> Result<()> {
-        let position = self.command_buffer.cursor_position();
-        self.stdout
-            .queue(cursor::MoveTo(position as u16 + 1, self.height as u16 - 1))?
-            .queue(cursor::Show)?;
-        Ok(())
-    }
-
-    fn show_cursor_in_search_box(&mut self) -> Result<()> {
-        let position = self.search_buffer.buffer.cursor_position();
-        self.stdout
-            .queue(cursor::MoveTo(position as u16 + 1, self.height as u16 - 1))?
-            .queue(cursor::Show)?;
         Ok(())
     }
 
@@ -362,8 +303,7 @@ impl Editor {
         self.width = width;
         self.height = height;
         self.compositor.resize(width, height);
-        self.viewport
-            .resize(width - self.gutter_width(), height - 2);
+        self.viewport.resize(width, height - RESERVED_ROW_COUNT);
         Ok(())
     }
 
@@ -474,26 +414,6 @@ impl Editor {
         terminal::disable_raw_mode()?;
         tokio::spawn(async move { self.lsp_service.shutdown().await });
 
-        Ok(())
-    }
-
-    fn gutter_width(&self) -> usize {
-        let line_count = self.buffer_manager.current_buffer().line_count();
-
-        let digits = line_count.to_string().len();
-        (digits + 1).max(MIN_GUTTER_SIZE)
-    }
-
-    fn update_viewport_for_gutter_width(&mut self, gutter_size: usize) -> Result<()> {
-        let (width, height) = terminal::size()?;
-        let required_viewport_width = width as usize - gutter_size;
-
-        // Only update if the width actually changed
-        if self.viewport.width() != required_viewport_width {
-            self.viewport
-                .resize(required_viewport_width, height as usize - 2);
-            self.compositor.mark_all_dirty();
-        }
         Ok(())
     }
 }

@@ -17,32 +17,42 @@ impl EnterMode {
 #[async_trait(?Send)]
 impl Executable for EnterMode {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
-        match (&ctx.mode, &self.mode) {
-            (Mode::Command, _) => {
+        match &ctx.mode {
+            Mode::Command => {
                 ctx.command_buffer.clear();
                 ctx.compositor
                     .mark_visible(&ctx.component_ids.command_line_id, false)?;
             }
-            (Mode::Search, _) => {
+            Mode::Search => {
                 ctx.search_buffer.buffer.clear();
                 ctx.compositor
                     .mark_visible(&ctx.component_ids.search_box_id, false)?;
             }
-            (_, Mode::Command) => {
+            _ => {}
+        };
+
+        match &self.mode {
+            Mode::Command => {
                 ctx.command_buffer.clear();
                 ctx.compositor
                     .mark_visible(&ctx.component_ids.command_line_id, true)?;
+                ctx.compositor.set_focus(
+                    &ctx.component_ids.command_line_id,
+                )?;
             }
-            (_, Mode::Search) => {
+            Mode::Search => {
                 ctx.search_buffer.buffer.clear();
                 ctx.compositor
                     .mark_visible(&ctx.component_ids.search_box_id, true)?;
-                ctx.compositor
-                    .mark_dirty(&ctx.component_ids.search_box_id)?;
+                ctx.compositor.set_focus(
+                    &ctx.component_ids.search_box_id,
+                )?;
             }
-            (_, Mode::Normal) => {
+            Mode::Normal | Mode::Insert => {
                 ctx.command_buffer.clear();
                 ctx.search_buffer.buffer.clear();
+                ctx.compositor
+                    .set_focus(&ctx.component_ids.editor_view_id)?;
                 ctx.cursor
                     .clamp_column(ctx.buffer_manager.current_buffer(), &Mode::Normal);
                 ctx.compositor
@@ -50,8 +60,8 @@ impl Executable for EnterMode {
                 ctx.compositor
                     .mark_visible(&ctx.component_ids.search_box_id, false)?;
             }
-            _ => {}
-        }
+        };
+
         *ctx.mode = self.mode.clone();
         ctx.compositor
             .mark_dirty(&ctx.component_ids.status_line_id)?;

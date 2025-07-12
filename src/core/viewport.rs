@@ -1,15 +1,12 @@
 use crate::core::buffer::Buffer;
 use crate::core::cursor::Cursor;
-use tree_sitter::Point;
 
 /// Viewport manages which part of the buffer is visible on screen
 #[derive(Debug)]
 pub struct Viewport {
     start_row: usize,
     start_column: usize,
-    /// Number of columns visible in the viewport
     width: usize,
-    /// Number of lines visible in the viewport
     height: usize,
 }
 
@@ -56,34 +53,36 @@ impl Viewport {
         self.start_column
     }
 
-    /// Scrolls the viewport to ensure the cursor is visible
-    /// Returns true if the viewport was scrolled
-    pub fn scroll_to_cursor(&mut self, cursor: &Cursor) -> bool {
+    pub fn content_width(&self, gutter_width: usize) -> usize {
+        self.width.saturating_sub(gutter_width)
+    }
+
+    /// Scrolls the viewport to ensure the cursor is visible, accounting for gutter
+    pub fn scroll_to_cursor_with_gutter(&mut self, cursor: &Cursor, gutter_width: usize) -> bool {
         let (row, column) = cursor.get_display_cursor();
+        let content_width = self.content_width(gutter_width);
 
-        // Scroll vertically if needed
+        let mut scrolled = false;
+
+        // Scroll vertically if needed (unchanged)
         if row < self.start_row {
-            // Cursor is above viewport
             self.start_row = row;
-            return true;
+            scrolled = true;
         } else if row >= self.start_row + self.height {
-            // Cursor is below viewport
             self.start_row = row - self.height + 1;
-            return true;
+            scrolled = true;
         }
 
-        // Scroll horizontally if needed
+        // Scroll horizontally if needed (accounting for reduced content width)
         if column < self.start_column {
-            // Cursor is to the left of viewport
             self.start_column = column;
-            return true;
-        } else if column >= self.start_column + self.width {
-            // Cursor is to the right of viewport
-            self.start_column = column - self.width + 1;
-            return true;
+            scrolled = true;
+        } else if column >= self.start_column + content_width {
+            self.start_column = column - content_width + 1;
+            scrolled = true;
         }
 
-        false
+        scrolled
     }
 
     /// Scrolls up by the specified number of lines
@@ -117,64 +116,5 @@ impl Viewport {
             let max_top = buffer.line_count().saturating_sub(self.height);
             self.start_row = (line - half_height).min(max_top);
         }
-    }
-
-    /// Returns visible content lines from the buffer
-    pub fn get_visible_lines<'a>(&self, buffer: &'a mut Buffer) -> Vec<String> {
-        let mut lines = Vec::new();
-        let end_line = (self.start_row + self.height).min(buffer.line_count());
-
-        for line_idx in self.start_row..end_line {
-            let line = buffer.get_content_line(line_idx);
-
-            // Apply horizontal scrolling
-            if self.start_column < line.len() {
-                let visible = &line[self.start_column.min(line.len())..];
-                lines.push(visible.to_string());
-            } else {
-                lines.push(String::new());
-            }
-        }
-
-        lines
-    }
-
-    /// Translates buffer byte_position to viewport coordinates
-    pub fn buffer_to_viewport(&self, pos: &Point) -> Option<(usize, usize)> {
-        if pos.row < self.start_row || pos.row >= self.start_row + self.height {
-            return None;
-        }
-
-        if pos.column < self.start_column || pos.column >= self.start_column + self.width {
-            return None;
-        }
-
-        Some((pos.row - self.start_row, pos.column - self.start_column))
-    }
-
-    /// Translates viewport coordinates to buffer byte_position
-    pub fn viewport_to_buffer(&self, row: usize, col: usize) -> Point {
-        Point {
-            row: self.start_row + row,
-            column: self.start_column + col,
-        }
-    }
-
-    /// Check if the given buffer byte_position is visible in the viewport
-    pub fn is_position_visible(&self, pos: &Point) -> bool {
-        pos.row >= self.start_row
-            && pos.row < self.start_row + self.height
-            && pos.column >= self.start_column
-            && pos.column < self.start_column + self.width
-    }
-
-    /// Clamps the viewport to ensure it doesn't show beyond buffer bounds
-    pub fn clamp_to_buffer(&mut self, buffer: &Buffer) {
-        // Don't scroll beyond the end of the buffer
-        let max_top = buffer.line_count().saturating_sub(self.height);
-        self.start_row = self.start_row.min(max_top);
-
-        // We don't clamp offset.column here because lines can have different lengths
-        // This is handled when rendering in get_visible_lines
     }
 }

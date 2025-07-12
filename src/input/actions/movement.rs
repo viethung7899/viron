@@ -181,8 +181,7 @@ impl Executable for MoveToViewportCenter {
             ctx.buffer_manager.current_buffer(),
         );
         ctx.compositor
-            .mark_dirty(&ctx.component_ids.buffer_view_id)?;
-        ctx.compositor.mark_dirty(&ctx.component_ids.gutter_id)?;
+            .mark_dirty(&ctx.component_ids.editor_view_id)?;
         Ok(())
     }
 }

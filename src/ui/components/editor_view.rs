@@ -1,7 +1,8 @@
+use crate::constants::{MIN_GUTTER_WIDTH, RESERVED_ROW_COUNT};
 use crate::service::lsp::types::DiagnosticSeverity;
 use crate::ui::render_buffer::RenderBuffer;
 use crate::ui::theme::Style;
-use crate::ui::{Bounds, Drawable, RenderContext};
+use crate::ui::{Bounds, Drawable, Focusable, RenderContext};
 use anyhow::Result;
 use std::ops::Add;
 use std::str::from_utf8;
@@ -9,9 +10,67 @@ use tree_sitter::Point;
 
 const DIAGNOSTIC_MARGIN: usize = 4;
 
-pub struct BufferView;
+pub struct EditorView;
 
-impl BufferView {
+impl EditorView {
+    fn get_gutter_width(&self, context: &RenderContext<'_>) -> usize {
+        let line_count = context.document.buffer.line_count();
+        let digits = line_count.to_string().len();
+        (digits + 1).max(MIN_GUTTER_WIDTH)
+    }
+
+    fn get_gutter_bounds(
+        &self,
+        render_buffer: &RenderBuffer,
+        context: &RenderContext<'_>,
+    ) -> Bounds {
+        let mut bounds = self.bounds(render_buffer, context);
+        bounds.width = self.get_gutter_width(context);
+        bounds
+    }
+
+    fn draw_gutter(
+        &self,
+        buffer: &mut RenderBuffer,
+        context: &mut RenderContext,
+    ) -> anyhow::Result<()> {
+        let top_line = context.viewport.top_line();
+        let style = Style::from(context.theme.colors.gutter);
+        let Bounds {
+            start_col,
+            width,
+            height,
+            ..
+        } = self.get_gutter_bounds(buffer, context);
+        let line_count = context.document.buffer.line_count();
+
+        for i in 0..(height) {
+            let buffer_line = top_line + i;
+            if buffer_line >= line_count {
+                break;
+            }
+
+            let line_number = buffer_line + 1; // 1-indexed line numbers
+            let line_text = format!("{line_number:>w$}", w = width - 1);
+
+            buffer.set_text(i, start_col, &line_text, &style);
+        }
+
+        Ok(())
+    }
+
+    fn get_buffer_bounds(
+        &self,
+        render_buffer: &RenderBuffer,
+        context: &RenderContext<'_>,
+    ) -> Bounds {
+        let gutter_width = self.get_gutter_width(context);
+        let mut bounds = self.bounds(render_buffer, context);
+        bounds.start_col += gutter_width;
+        bounds.width -= gutter_width;
+        bounds
+    }
+
     fn render_plain_text(
         &self,
         render_buffer: &mut RenderBuffer,
@@ -22,7 +81,7 @@ impl BufferView {
             width: visible_width,
             height: visible_height,
             ..
-        } = self.bounds(render_buffer, context);
+        } = self.get_buffer_bounds(render_buffer, context);
         let viewport = context.viewport;
         let buffer = &context.document.buffer;
         let theme = context.theme;
@@ -63,7 +122,7 @@ impl BufferView {
             width: visible_width,
             height: visible_height,
             ..
-        } = self.bounds(render_buffer, context);
+        } = self.get_buffer_bounds(render_buffer, context);
 
         let Some(ref mut syntax_engine) = context.document.syntax_engine else {
             return Err(anyhow::anyhow!("Syntax highlighter is not available"));
@@ -205,7 +264,7 @@ impl BufferView {
             width: visible_width,
             height,
             ..
-        } = self.bounds(render_buffer, context);
+        } = self.get_buffer_bounds(render_buffer, context);
         let left_column = context.viewport.left_column();
 
         let mut lines = bytes.split(|&c| c == b'\n').peekable();
@@ -247,7 +306,7 @@ impl BufferView {
         render_buffer: &mut RenderBuffer,
         context: &mut RenderContext,
     ) -> Result<()> {
-        let bounds = self.bounds(render_buffer, context);
+        let bounds = self.get_buffer_bounds(render_buffer, context);
         let buffer = &context.document.buffer;
         let viewport = context.viewport;
         let starting_line = viewport.top_line();
@@ -289,28 +348,51 @@ impl BufferView {
         }
         Ok(())
     }
+
+    fn draw_buffer(
+        &self,
+        render_buffer: &mut RenderBuffer,
+        context: &mut RenderContext,
+    ) -> Result<()> {
+        if context.document.language.is_plain_text() {
+            return self.render_plain_text(render_buffer, context);
+        }
+
+        if let Err(e) = self.render_with_syntax_highlighting(render_buffer, context) {
+            log::error!("Failed to render buffer with syntax highlighting: {}", e);
+            self.render_plain_text(render_buffer, context)?;
+        }
+
+        Ok(())
+    }
 }
 
-impl Drawable for BufferView {
-    fn draw(&self, buffer: &mut RenderBuffer, context: &mut RenderContext) -> Result<()> {
-        if context.document.language.is_plain_text() {
-            self.render_plain_text(buffer, context)?;
-        } else if let Err(e) = self.render_with_syntax_highlighting(buffer, context) {
-            log::error!("Failed to render buffer with syntax highlighting: {}", e);
-            self.render_plain_text(buffer, context)?;
-        }
-        self.draw_diagnostics(buffer, context)
+impl Drawable for EditorView {
+    fn draw(&self, render_buffer: &mut RenderBuffer, context: &mut RenderContext) -> Result<()> {
+        self.draw_gutter(render_buffer, context)?;
+        self.draw_buffer(render_buffer, context)?;
+        self.draw_diagnostics(render_buffer, context)
     }
 
-    fn bounds(&self, render_buffer: &RenderBuffer, context: &RenderContext<'_>) -> Bounds {
-        let width = context.viewport.width();
-        let height = context.viewport.height();
-        let window_width = render_buffer.width;
+    fn bounds(&self, render_buffer: &RenderBuffer, _context: &RenderContext<'_>) -> Bounds {
+        let width = render_buffer.width;
+        let height = render_buffer.height - RESERVED_ROW_COUNT;
         Bounds {
             start_row: 0,
-            start_col: window_width - width,
+            start_col: 0,
             width,
             height,
         }
+    }
+}
+
+impl Focusable for EditorView {
+    fn get_display_cursor(&self, _: &RenderBuffer, context: &RenderContext) -> (usize, usize) {
+        let viewport = context.viewport;
+        let (row, column) = context.cursor.get_display_cursor();
+        let gutter_width = self.get_gutter_width(context);
+        let screen_row = row - viewport.top_line();
+        let screen_col = column - viewport.left_column();
+        (screen_row, screen_col + gutter_width)
     }
 }

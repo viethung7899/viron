@@ -1,9 +1,9 @@
-use anyhow::Ok;
-
+use crate::constants::RESERVED_ROW_COUNT;
 use crate::editor::Mode;
 use crate::ui::render_buffer::RenderBuffer;
 use crate::ui::theme::Style;
 use crate::ui::{Bounds, Drawable, RenderContext};
+use anyhow::Ok;
 
 pub struct StatusLine;
 
@@ -46,13 +46,10 @@ impl Drawable for StatusLine {
     }
 
     fn bounds(&self, render_buffer: &RenderBuffer, _context: &RenderContext) -> Bounds {
-        let width = render_buffer.width;
-        let height = render_buffer.height;
-        let start_row = height - 2;
         Bounds {
-            start_row,
+            start_row: render_buffer.height - RESERVED_ROW_COUNT,
             start_col: 0,
-            width,
+            width: render_buffer.width,
             height: 1,
         }
     }

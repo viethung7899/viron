@@ -1,25 +1,24 @@
-mod buffer_view;
 mod command_line;
-mod gutter;
+mod editor_view;
 mod message_area;
 mod pending_keys;
 mod search_box;
 mod status_line;
 
-pub use buffer_view::BufferView;
+use std::rc::Rc;
+
 pub use command_line::CommandLine;
-pub use gutter::Gutter;
+pub use editor_view::EditorView;
 pub use message_area::MessageArea;
 pub use pending_keys::PendingKeys;
-pub use status_line::StatusLine;
 pub use search_box::SearchBox;
+pub use status_line::StatusLine;
 
-use crate::ui::Drawable;
+use crate::ui::{Drawable, Focusable};
 
 pub struct ComponentIds {
     pub status_line_id: String,
-    pub gutter_id: String,
-    pub buffer_view_id: String,
+    pub editor_view_id: String,
 
     pub pending_keys_id: String,
     pub command_line_id: String,
@@ -28,28 +27,8 @@ pub struct ComponentIds {
 }
 
 pub struct Component {
-    pub id: String,
     pub dirty: bool,
     pub visible: bool,
-    pub(in crate::ui) drawable: Box<dyn Drawable>,
-}
-
-impl Component {
-    pub fn new(id: &str, drawable: Box<dyn Drawable>) -> Self {
-        Self {
-            id: id.to_string(),
-            dirty: true,
-            visible: true,
-            drawable,
-        }
-    }
-
-    pub fn new_invisible(id: &str, drawable: Box<dyn Drawable>) -> Self {
-        Self {
-            id: id.to_string(),
-            dirty: true,
-            visible: false,
-            drawable,
-        }
-    }
+    pub(in crate::ui) drawable: Rc<dyn Drawable>,
+    pub(in crate::ui) focusable: Option<Rc<dyn Focusable>>,
 }

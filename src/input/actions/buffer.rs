@@ -180,7 +180,7 @@ pub struct RefreshBuffer;
 impl Executable for RefreshBuffer {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         ctx.compositor
-            .mark_dirty(&ctx.component_ids.buffer_view_id)?;
+            .mark_dirty(&ctx.component_ids.editor_view_id)?;
         Ok(())
     }
 }
