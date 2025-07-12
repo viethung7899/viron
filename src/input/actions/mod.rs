@@ -8,6 +8,7 @@ use crate::ui::components::ComponentIds;
 use crate::ui::compositor::Compositor;
 use anyhow::Result;
 use async_trait::async_trait;
+use std::any::Any;
 use std::fmt::Debug;
 
 pub type ActionResult = Result<()>;
@@ -61,7 +62,7 @@ pub trait Executable: Debug {
 }
 
 // The Action trait defines what all actions must implement
-pub trait Action: Debug + Executable {
+pub trait Action: Debug + Executable + Any {
     fn describe(&self) -> &str;
     fn to_serializable(&self) -> ActionDefinition;
     fn clone_box(&self) -> Box<dyn Action>;

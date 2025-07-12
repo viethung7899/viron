@@ -1,10 +1,27 @@
 use crate::config::editor::Gutter;
-use crate::input::actions::{
-    impl_action, Action, ActionContext, ActionResult, Executable,
-};
+use crate::input::actions::definition::ActionDefinition;
+use crate::input::actions::{impl_action, Action, ActionContext, ActionResult, Executable};
 use async_trait::async_trait;
 use std::fmt::Debug;
-use crate::input::actions::definition::ActionDefinition;
+
+pub enum MovementType {
+    Character,
+    Line,
+}
+
+pub trait Movement: Action {
+    fn movement_type(&self) -> MovementType;
+}
+
+macro_rules! impl_movement {
+    ($action_type:ty, $movement_type:expr) => {
+        impl Movement for $action_type {
+            fn movement_type(&self) -> MovementType {
+                $movement_type
+            }
+        }
+    };
+}
 
 #[derive(Debug, Clone)]
 pub struct MoveLeft {
@@ -40,6 +57,7 @@ impl Executable for MoveLeft {
 impl_action!(MoveLeft, "Move cursor left", self {
     ActionDefinition::MoveLeft { previous_line: self.previous_line }
 });
+impl_movement!(MoveLeft, MovementType::Character);
 
 #[derive(Debug, Clone)]
 pub struct MoveRight {
@@ -75,6 +93,7 @@ impl Executable for MoveRight {
 impl_action!(MoveRight, "Move cursor right", self {
     ActionDefinition::MoveRight { next_line: self.next_line }
 });
+impl_movement!(MoveRight, MovementType::Character);
 
 #[derive(Debug, Clone)]
 pub struct MoveUp;
@@ -95,6 +114,7 @@ impl Executable for MoveUp {
 }
 
 impl_action!(MoveUp, "Move cursor up", ActionDefinition::MoveUp);
+impl_movement!(MoveUp, MovementType::Line);
 
 #[derive(Debug, Clone)]
 pub struct MoveDown;
@@ -115,6 +135,7 @@ impl Executable for MoveDown {
 }
 
 impl_action!(MoveDown, "Move cursor down", ActionDefinition::MoveDown);
+impl_movement!(MoveDown, MovementType::Line);
 
 #[derive(Debug, Clone)]
 pub struct MoveToLineStart;
@@ -136,6 +157,7 @@ impl_action!(
     "Move to line start",
     ActionDefinition::MoveToLineStart
 );
+impl_movement!(MoveToLineStart, MovementType::Character);
 
 #[derive(Debug, Clone)]
 pub struct MoveToLineEnd;
@@ -156,6 +178,7 @@ impl_action!(
     "Move to line end",
     ActionDefinition::MoveToLineEnd
 );
+impl_movement!(MoveToLineEnd, MovementType::Character);
 
 #[derive(Debug, Clone)]
 pub struct MoveToTop;
@@ -172,6 +195,7 @@ impl_action!(
     "Move to top of buffer",
     ActionDefinition::MoveToTop
 );
+impl_movement!(MoveToTop, MovementType::Line);
 
 #[derive(Debug, Clone)]
 pub struct MoveToBottom;
@@ -191,6 +215,7 @@ impl_action!(
     "Move to bottom of buffer",
     ActionDefinition::MoveToBottom
 );
+impl_movement!(MoveToBottom, MovementType::Line);
 
 #[derive(Debug, Clone)]
 pub struct MoveToViewportCenter;
@@ -239,6 +264,7 @@ impl_action!(
     "Move to next word",
     ActionDefinition::MoveToNextWord
 );
+impl_movement!(MoveToNextWord, MovementType::Character);
 
 #[derive(Debug, Clone)]
 pub struct MoveToPreviousWord;
@@ -265,6 +291,7 @@ impl_action!(
     "Move to previous word",
     ActionDefinition::MoveToPreviousWord
 );
+impl_movement!(MoveToPreviousWord, MovementType::Character);
 
 #[derive(Debug, Clone)]
 pub struct GoToLine {
@@ -300,6 +327,7 @@ impl Executable for GoToLine {
 impl_action!(GoToLine, "Go to line", self {
     ActionDefinition::GoToLine { line_number: self.line_number }
 });
+impl_movement!(GoToLine, MovementType::Line);
 
 #[derive(Debug, Clone)]
 pub struct GoToPosition {
