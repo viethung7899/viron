@@ -1,11 +1,11 @@
 theme = "catppuchin/mocha"
 gutter = "relative"
 
-# Keybindings for normal mode
-[keymap.normal]
+[keymap.default] # Default keymap for the editor
 "q" = { type = "Quit" }
 "<Esc>" = { type = "EnterMode", params = { mode = "Normal" } }
 
+[keymap.movement] # Movement keymap for the editor
 "h" = { type = "MoveLeft", params = { previous_line = false } }
 "j" = { type = "MoveDown" }
 "k" = { type = "MoveUp" }
@@ -21,30 +21,11 @@ gutter = "relative"
 "$" = { type = "MoveToLineEnd" }
 "0" = { type = "MoveToLineStart" }
 
-"<Home>" = { type = "MoveToLineStart" }
-"<End>" = { type = "MoveToLineEnd" }
-"gg" = { type = "MoveToTop" }
-"G" = { type = "MoveToBottom" }
-"zz" = { type = "MoveToViewportCenter" }
-
 "w" = { type = "MoveToNextWord" }
 "b" = { type = "MoveToPreviousWord" }
 
-"x" = { type = "DeleteChar" }
-"d" = { type = "EnterPendingOperation", params = { operation = "Delete" } }
-"c" = { type = "EnterPendingOperation", params = { operation = "Change" } }
-
-"i" = { type = "EnterMode", params = { mode = "Insert" } }
-":" = { type = "EnterMode", params = { mode = "Command" } }
-"/" = { type = "EnterMode", params = { mode = "Search" } }
-
-"n" = { type = "FindNext" }
-"N" = { type = "FindPrevious" }
-
-"u" = { type = "Undo" }
-"<CONTROL-r>" = { type = "Redo" }
-
-"gd" = { type = "GoToDefinition" }
+"<Home>" = { type = "MoveToLineStart" }
+"<End>" = { type = "MoveToLineEnd" }
 
 "a" = { type = "Composite", params = { description = "Insert after the cursor", actions = [
     { type = "EnterMode", params = { mode = "insert" } },
@@ -66,21 +47,23 @@ gutter = "relative"
     { type = "EnterMode", params = { mode = "insert" } }
 ] } }
 
-# Keybindings for insert mode
-[keymap.insert]
-"<Esc>" = { type = "EnterMode", params = { mode = "normal" } }
-"<Delete>" = { type = "DeleteChar" }
-"<Backspace>" = { type = "Backspace" }
-"<Enter>" = { type = "InsertNewLine" }
-"<Left>" = { type = "MoveLeft", params = { previous_line = true } }
-"<Right>" = { type = "MoveRight", params = { next_line = true } }
-"<Up>" = { type = "MoveUp" }
-"<Down>" = { type = "MoveDown" }
-"<Home>" = { type = "MoveToLineStart" }
-"<End>" = { type = "MoveToLineEnd" }
+[keymap.normal] # Keymode for normal mode only
+"gg" = { type = "MoveToTop" }
+"G" = { type = "MoveToBottom" }
+"zz" = { type = "MoveToViewportCenter" }
 
-[keymap.command]
-"<Esc>" = { type = "EnterMode", params = { mode = "normal" } }
+"x" = { type = "DeleteChar" }
+"d" = { type = "EnterPendingOperation", params = { operation = "Delete" } }
+"c" = { type = "EnterPendingOperation", params = { operation = "Change" } }
 
-[keymap.search]
-"<Esc>" = { type = "EnterMode", params = { mode = "normal" } }
+"i" = { type = "EnterMode", params = { mode = "Insert" } }
+":" = { type = "EnterMode", params = { mode = "Command" } }
+"/" = { type = "EnterMode", params = { mode = "Search" } }
+
+"n" = { type = "FindNext" }
+"N" = { type = "FindPrevious" }
+
+"u" = { type = "Undo" }
+"<CONTROL-r>" = { type = "Redo" }
+
+"gd" = { type = "GoToDefinition" }
