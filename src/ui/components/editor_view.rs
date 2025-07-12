@@ -35,7 +35,7 @@ impl EditorView {
         context: &mut RenderContext,
     ) -> anyhow::Result<()> {
         let top_line = context.viewport.top_line();
-        let style = Style::from(context.theme.colors.gutter);
+        let style = Style::from(context.config.theme.colors.gutter);
         let Bounds {
             start_col,
             width,
@@ -84,7 +84,7 @@ impl EditorView {
         } = self.get_buffer_bounds(render_buffer, context);
         let viewport = context.viewport;
         let buffer = &context.document.buffer;
-        let theme = context.theme;
+        let theme = &context.config.theme;
 
         let top_line = viewport.top_line();
         let left_col = viewport.left_column();
@@ -130,7 +130,7 @@ impl EditorView {
 
         let viewport = context.viewport;
         let buffer = &context.document.buffer;
-        let theme = context.theme;
+        let theme = &context.config.theme;
         let editor_style = theme.editor_style();
 
         let code = buffer.to_bytes();
@@ -193,7 +193,7 @@ impl EditorView {
         }
 
         while let Some(info) = info_iter.next() {
-            let style = context.theme.style_for_token(&info.scope);
+            let style = context.config.theme.style_for_token(&info.scope);
             let bytes = &code[info.byte_range.start..info.byte_range.end];
             position.row = info.end_position.row;
             position.column = info.end_position.column;
@@ -335,7 +335,10 @@ impl EditorView {
                 .skip(viewport.left_column().saturating_sub(column))
                 .collect();
 
-            let style = context.theme.get_diagnostic_style(&diagnostic.severity);
+            let style = context
+                .config
+                .theme
+                .get_diagnostic_style(&diagnostic.severity);
 
             render_buffer.set_text(
                 line - starting_line,

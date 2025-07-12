@@ -1,10 +1,11 @@
-use crate::config::get_config_dir;
+use crate::config::Config;
 use crate::constants::{MIN_GUTTER_WIDTH, RESERVED_ROW_COUNT};
+use crate::core::command::{CommandBuffer, SearchBuffer};
 use crate::core::cursor::Cursor;
 use crate::core::viewport::Viewport;
 use crate::core::{buffer_manager::BufferManager, message::MessageManager};
 use crate::input::actions::Executable;
-use crate::input::keymaps::{KeyEvent as VironKeyEvent, KeyMap, KeySequence};
+use crate::input::keymaps::{KeyEvent as VironKeyEvent, KeySequence};
 use crate::input::{
     actions,
     actions::ActionContext,
@@ -16,10 +17,6 @@ use crate::ui::components::{
 };
 use crate::ui::compositor::Compositor;
 use crate::ui::{theme::Theme, RenderContext};
-use crate::{
-    config::FileConfig,
-    core::command::{CommandBuffer, SearchBuffer},
-};
 use anyhow::Result;
 use crossterm::{
     cursor,
@@ -82,13 +79,14 @@ pub struct Editor {
     mode: Mode,
     stdout: Stdout,
 
+    // Config
+    config: Config,
+
     // UI Components
     compositor: Compositor,
-    theme: Theme,
     component_ids: ComponentIds,
 
     // Input handling
-    keymap: KeyMap,
     pending_keys: KeySequence,
     event_handler: EventHandler,
 
@@ -152,7 +150,6 @@ impl Editor {
         };
 
         // Create input handling
-        let keymap = KeyMap::new();
         let pending_keys = KeySequence::new();
         let event_handler = EventHandler::new();
 
@@ -173,11 +170,11 @@ impl Editor {
             mode: Mode::Normal,
             stdout,
 
-            theme,
+            config: Config::default(),
+
             compositor,
             component_ids,
 
-            keymap,
             pending_keys,
             event_handler,
 
@@ -194,10 +191,8 @@ impl Editor {
         Ok(editor)
     }
 
-    pub fn load_config(&mut self, config: &FileConfig) -> Result<()> {
-        self.keymap = KeyMap::load_from_config(&config.keymap)?;
-        let theme_path = get_config_dir().join(format!("themes/{}.json", config.theme));
-        self.theme = Theme::load_from_file(theme_path)?;
+    pub fn load_config(&mut self, config: impl AsRef<Path>) -> Result<()> {
+        self.config = Config::load_from_file(config)?;
         Ok(())
     }
 
@@ -250,7 +245,7 @@ impl Editor {
         let uri = document.uri().unwrap_or_default();
 
         let mut context = RenderContext {
-            theme: &self.theme,
+            config: &self.config,
             cursor: &self.cursor,
             document,
             diagnostics: self.lsp_service.get_diagnostics(&uri),
@@ -312,6 +307,7 @@ impl Editor {
         let key_event = VironKeyEvent::from(key);
         self.pending_keys.add(key_event.clone());
         let action = self
+            .config
             .keymap
             .get_action(&self.mode, &self.pending_keys)
             .cloned();
@@ -324,7 +320,11 @@ impl Editor {
             return Some(action.clone());
         }
 
-        if self.keymap.is_partial_match(&self.mode, &self.pending_keys) {
+        if self
+            .config
+            .keymap
+            .is_partial_match(&self.mode, &self.pending_keys)
+        {
             self.compositor
                 .mark_visible(&self.component_ids.pending_keys_id, true)
                 .ok();

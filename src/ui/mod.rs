@@ -1,12 +1,10 @@
-use std::any::Any;
-
+use crate::config::Config;
 use crate::core::command::{CommandBuffer, SearchBuffer};
 use crate::core::cursor::Cursor;
 use crate::core::message::MessageManager;
 use crate::core::viewport::Viewport;
 use crate::editor::Mode;
 use crate::ui::render_buffer::RenderBuffer;
-use crate::ui::theme::Theme;
 
 pub(crate) mod components;
 pub mod compositor;
@@ -23,7 +21,7 @@ pub struct RenderContext<'a> {
     pub diagnostics: &'a [Diagnostic],
     pub cursor: &'a Cursor,
     pub mode: &'a Mode,
-    pub theme: &'a Theme,
+    pub config: &'a Config,
     pub command_buffer: &'a CommandBuffer,
     pub search_buffer: &'a SearchBuffer,
     pub message_manager: &'a MessageManager,
@@ -54,7 +52,7 @@ pub trait Drawable {
                 row,
                 start_col,
                 &" ".repeat(width),
-                &context.theme.editor_style(),
+                &context.config.theme.editor_style(),
             );
         }
 

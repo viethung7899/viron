@@ -19,7 +19,12 @@ impl Drawable for PendingKeys {
         }
         let text = format!("  {:w$}", pending_keys, w = width - 2);
 
-        buffer.set_text(start_row, start_col, &text, &context.theme.editor_style());
+        buffer.set_text(
+            start_row,
+            start_col,
+            &text,
+            &context.config.theme.editor_style(),
+        );
 
         Ok(())
     }

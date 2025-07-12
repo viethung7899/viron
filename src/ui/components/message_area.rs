@@ -31,8 +31,8 @@ impl Drawable for MessageArea {
 }
 
 fn get_style_for_message(message_type: &MessageType, context: &RenderContext) -> Style {
-    let mut style = context.theme.editor_style();
-    let colors = &context.theme.colors.diagnostic;
+    let mut style = context.config.theme.editor_style();
+    let colors = &context.config.theme.colors.diagnostic;
     match message_type {
         MessageType::Error => {
             style.foreground = colors.error.foreground.clone();

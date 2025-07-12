@@ -13,6 +13,7 @@ impl Drawable for StatusLine {
             start_row, width, ..
         } = self.bounds(buffer, context);
         let document = &context.document;
+        let theme = &context.config.theme;
 
         let left = format!(" {} ", context.mode.to_name().to_uppercase());
 
@@ -28,15 +29,15 @@ impl Drawable for StatusLine {
         let center = format!("{file:<center_width$}");
 
         let colors = match context.mode {
-            Mode::Normal => context.theme.colors.status.normal,
-            Mode::Insert => context.theme.colors.status.insert,
-            Mode::Command => context.theme.colors.status.command,
-            Mode::Search => context.theme.colors.status.search,
+            Mode::Normal => theme.colors.status.normal,
+            Mode::Insert => theme.colors.status.insert,
+            Mode::Command => theme.colors.status.command,
+            Mode::Search => theme.colors.status.search,
         };
 
         let mut outer = Style::from(colors);
         outer.bold = true;
-        let inner = Style::from(context.theme.colors.status.inner);
+        let inner = Style::from(theme.colors.status.inner);
 
         buffer.set_text(start_row, 0, &left, &outer);
         buffer.set_text(start_row, left.len(), &center, &inner);

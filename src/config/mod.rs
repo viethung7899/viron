@@ -17,7 +17,7 @@ pub struct FileConfig {
 }
 
 impl FileConfig {
-    pub fn load_from_file(path: impl AsRef<Path>) -> anyhow::Result<Self> {
+    fn load_from_file(path: impl AsRef<Path>) -> anyhow::Result<Self> {
         let string = std::fs::read_to_string(path)?;
         let config = toml::from_str(&string)?;
         Ok(config)
@@ -48,5 +48,13 @@ impl TryFrom<FileConfig> for Config {
             keymap,
             gutter: file_config.gutter,
         })
+    }
+}
+
+impl Config {
+    pub fn load_from_file(path: impl AsRef<Path>) -> anyhow::Result<Self> {
+        let file_config = FileConfig::load_from_file(path)?;
+        let config = Config::try_from(file_config)?;
+        Ok(config)
     }
 }

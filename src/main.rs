@@ -29,7 +29,7 @@ async fn main() -> Result<()> {
 
     // Load the config
     let config_path = get_config_dir().join("config.toml");
-    editor.load_config(&FileConfig::load_from_file(config_path)?)?;
+    editor.load_config(config_path)?;
 
     // Set up error handling for the editor's run method
     let result = editor.run().await;
