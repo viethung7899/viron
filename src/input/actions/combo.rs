@@ -17,6 +17,7 @@ impl RepeatedAction {
 #[async_trait(?Send)]
 impl Executable for RepeatedAction {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+        log::info!("Executing RepeatedAction with repeat: {}", self.repeat);
         for _ in 0..self.repeat {
             self.action.execute(ctx).await?;
         }

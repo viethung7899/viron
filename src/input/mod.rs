@@ -1,11 +1,13 @@
 use crate::core::mode;
 use crate::core::mode::Mode;
 use crate::core::operation::Operator;
+use crate::input::actions::{
+    create_action_from_definition, ActionDefinition, ComboAction, RepeatedAction,
+};
 use crate::input::keymaps::KeyMap;
 use crate::input::keys::{KeyEvent, KeySequence};
 use actions::{Action, Executable};
 use crossterm::event::{KeyCode, KeyModifiers};
-use crate::input::actions::{create_action_from_definition, ActionDefinition, ComboAction, RepeatedAction};
 
 pub mod actions;
 mod command_parser;
@@ -13,11 +15,13 @@ pub mod events;
 pub mod keymaps;
 pub mod keys;
 
+#[derive(Debug)]
 pub struct PendingOperation {
     pub operator: Operator,
     pub repeat: Option<usize>,
 }
 
+#[derive(Debug)]
 pub struct InputState {
     pub repeat: Option<usize>,
     pub sequence: KeySequence,
@@ -134,7 +138,7 @@ impl InputState {
         let action = keymap.get_action(mode, &self.sequence);
 
         if let Some(definition) = action {
-            self.clear();
+            self.sequence.clear();
             return Some(definition.clone());
         }
 

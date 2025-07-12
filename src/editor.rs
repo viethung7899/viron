@@ -173,7 +173,7 @@ impl Editor {
             self.render()?;
             match self.event_handler.next().await? {
                 InputEvent::Key(key) => {
-                    if let Some(action) = self.handle_key(key) {
+                    if let Some(action) = self.handle_key(key)? {
                         self.execute_action(action.as_ref()).await?;
                     }
                 }
@@ -278,7 +278,7 @@ impl Editor {
         Ok(())
     }
 
-    fn handle_key(&mut self, key: KeyEvent) -> Option<Box<dyn Executable>> {
+    fn handle_key(&mut self, key: KeyEvent) -> Result<Option<Box<dyn Executable>>> {
         // Convert to our key event type
         let key_event = VironKeyEvent::from(key);
 
@@ -290,11 +290,22 @@ impl Editor {
         };
 
         if default_action.is_some() {
-            return default_action;
+            return Ok(default_action);
         };
 
-        // Handle key sequence
-        None
+        self.input_state.add_key(key_event);
+        self.compositor
+            .mark_visible(&self.component_ids.pending_keys_id, true)?;
+        self.compositor
+            .mark_dirty(&self.component_ids.pending_keys_id)?;
+
+        let action = self.input_state.get_executable(&self.mode, &self.keymap);
+        if action.is_some() {
+            self.compositor
+                .mark_visible(&self.component_ids.pending_keys_id, false)?;
+            self.input_state.clear()
+        }
+        Ok(action)
     }
 
     async fn handle_tick(&mut self) -> Result<()> {

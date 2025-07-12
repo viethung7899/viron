@@ -31,6 +31,11 @@ impl Executable for EnterMode {
                 ctx.compositor
                     .mark_visible(&ctx.component_ids.search_box_id, false)?;
             }
+            Mode::OperationPending => {
+                ctx.input_state.clear();
+                ctx.compositor
+                    .mark_visible(&ctx.component_ids.pending_keys_id, true)?;
+            }
             _ => {}
         };
 
@@ -53,12 +58,21 @@ impl Executable for EnterMode {
                 ctx.search_buffer.buffer.clear();
                 ctx.compositor
                     .set_focus(&ctx.component_ids.editor_view_id)?;
+                ctx.input_state.clear();
                 ctx.cursor
                     .clamp_column(ctx.buffer_manager.current_buffer(), &Mode::Normal);
                 ctx.compositor
                     .mark_visible(&ctx.component_ids.command_line_id, false)?;
                 ctx.compositor
                     .mark_visible(&ctx.component_ids.search_box_id, false)?;
+                ctx.compositor
+                    .mark_visible(&ctx.component_ids.pending_keys_id, false)?;
+            }
+            Mode::OperationPending => {
+                ctx.compositor
+                    .set_focus(&ctx.component_ids.editor_view_id)?;
+                ctx.compositor
+                    .mark_visible(&ctx.component_ids.pending_keys_id, true)?;
             }
             _ => {}
         };
@@ -82,9 +96,7 @@ impl Action for EnterMode {
     }
 
     fn to_serializable(&self) -> ActionDefinition {
-        ActionDefinition::EnterMode {
-            mode: self.mode,
-        }
+        ActionDefinition::EnterMode { mode: self.mode }
     }
 
     fn clone_box(&self) -> Box<dyn Action> {
@@ -115,14 +127,12 @@ impl Action for EnterPendingOperation {
     fn describe(&self) -> &str {
         match self.0 {
             Operator::Delete => "Delete",
-            Operator::Change => "Change"
+            Operator::Change => "Change",
         }
     }
 
     fn to_serializable(&self) -> ActionDefinition {
-        ActionDefinition::EnterPendingOperation {
-            operator: self.0
-        }
+        ActionDefinition::EnterPendingOperation { operator: self.0 }
     }
 
     fn clone_box(&self) -> Box<dyn Action> {

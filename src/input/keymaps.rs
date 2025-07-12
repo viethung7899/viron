@@ -34,11 +34,11 @@ impl KeyMap {
 
     pub fn get_action(&self, mode: &Mode, sequence: &KeySequence) -> Option<&ActionDefinition> {
         let definition = match mode {
-            Mode::Normal => self.normal.get(sequence).or(self.movement.get(sequence)),
+            Mode::Normal => self.normal.get(sequence).or_else(|| self.movement.get(sequence)),
             Mode::OperationPending => self.movement.get(sequence),
             _ => None,
         };
-        definition.or(self.default.get(sequence))
+        definition.or_else(|| self.default.get(sequence))
     }
 
     pub fn is_partial_match(&self, mode: &Mode, sequence: &KeySequence) -> bool {
