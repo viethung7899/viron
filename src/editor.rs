@@ -17,7 +17,7 @@ use crate::ui::components::{
 use crate::ui::compositor::Compositor;
 use crate::ui::{theme::Theme, RenderContext};
 use crate::{
-    config::Config,
+    config::FileConfig,
     core::command::{CommandBuffer, SearchBuffer},
 };
 use anyhow::Result;
@@ -194,7 +194,7 @@ impl Editor {
         Ok(editor)
     }
 
-    pub fn load_config(&mut self, config: &Config) -> Result<()> {
+    pub fn load_config(&mut self, config: &FileConfig) -> Result<()> {
         self.keymap = KeyMap::load_from_config(&config.keymap)?;
         let theme_path = get_config_dir().join(format!("themes/{}.json", config.theme));
         self.theme = Theme::load_from_file(theme_path)?;
