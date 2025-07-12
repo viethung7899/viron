@@ -1,5 +1,6 @@
 use crate::constants::{MIN_GUTTER_WIDTH, RESERVED_ROW_COUNT};
 use crate::service::lsp::types::DiagnosticSeverity;
+use crate::ui::components::gutter::Gutter;
 use crate::ui::render_buffer::RenderBuffer;
 use crate::ui::theme::Style;
 use crate::ui::{Bounds, Drawable, Focusable, RenderContext};
@@ -10,61 +11,23 @@ use tree_sitter::Point;
 
 const DIAGNOSTIC_MARGIN: usize = 4;
 
-pub struct EditorView;
+pub struct EditorView {
+    gutter: Gutter,
+}
 
 impl EditorView {
-    fn get_gutter_width(&self, context: &RenderContext<'_>) -> usize {
-        let line_count = context.document.buffer.line_count();
-        let digits = line_count.to_string().len();
-        (digits + 1).max(MIN_GUTTER_WIDTH)
+    pub fn new() -> Self {
+        Self { gutter: Gutter }
     }
+}
 
-    fn get_gutter_bounds(
-        &self,
-        render_buffer: &RenderBuffer,
-        context: &RenderContext<'_>,
-    ) -> Bounds {
-        let mut bounds = self.bounds(render_buffer, context);
-        bounds.width = self.get_gutter_width(context);
-        bounds
-    }
-
-    fn draw_gutter(
-        &self,
-        buffer: &mut RenderBuffer,
-        context: &mut RenderContext,
-    ) -> anyhow::Result<()> {
-        let top_line = context.viewport.top_line();
-        let style = Style::from(context.config.theme.colors.gutter);
-        let Bounds {
-            start_col,
-            width,
-            height,
-            ..
-        } = self.get_gutter_bounds(buffer, context);
-        let line_count = context.document.buffer.line_count();
-
-        for i in 0..(height) {
-            let buffer_line = top_line + i;
-            if buffer_line >= line_count {
-                break;
-            }
-
-            let line_number = buffer_line + 1; // 1-indexed line numbers
-            let line_text = format!("{line_number:>w$}", w = width - 1);
-
-            buffer.set_text(i, start_col, &line_text, &style);
-        }
-
-        Ok(())
-    }
-
+impl EditorView {
     fn get_buffer_bounds(
         &self,
         render_buffer: &RenderBuffer,
         context: &RenderContext<'_>,
     ) -> Bounds {
-        let gutter_width = self.get_gutter_width(context);
+        let gutter_width = self.gutter.get_width(context);
         let mut bounds = self.bounds(render_buffer, context);
         bounds.start_col += gutter_width;
         bounds.width -= gutter_width;
@@ -372,7 +335,7 @@ impl EditorView {
 
 impl Drawable for EditorView {
     fn draw(&self, render_buffer: &mut RenderBuffer, context: &mut RenderContext) -> Result<()> {
-        self.draw_gutter(render_buffer, context)?;
+        self.gutter.draw(render_buffer, context)?;
         self.draw_buffer(render_buffer, context)?;
         self.draw_diagnostics(render_buffer, context)
     }
@@ -393,7 +356,7 @@ impl Focusable for EditorView {
     fn get_display_cursor(&self, _: &RenderBuffer, context: &RenderContext) -> (usize, usize) {
         let viewport = context.viewport;
         let (row, column) = context.cursor.get_display_cursor();
-        let gutter_width = self.get_gutter_width(context);
+        let gutter_width = self.gutter.get_width(context);
         let screen_row = row - viewport.top_line();
         let screen_col = column - viewport.left_column();
         (screen_row, screen_col + gutter_width)

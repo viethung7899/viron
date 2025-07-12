@@ -129,7 +129,7 @@ impl Editor {
 
         // Add components to the compositor
         let status_line_id = compositor.add_component("status_line", StatusLine, true)?;
-        let editor_view_id = compositor.add_focusable_component("editor_view", EditorView, true)?;
+        let editor_view_id = compositor.add_focusable_component("editor_view", EditorView::new(), true)?;
 
         // Add invisible components
         let pending_keys_id = compositor.add_component("pending_keys", PendingKeys, false)?;
