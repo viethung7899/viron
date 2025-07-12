@@ -1,52 +1,9 @@
 use crate::core::operation::Operator;
-use crate::input::actions::{Action, ActionContext, ActionDefinition, ActionResult, Executable};
+use crate::input::actions::{
+    create_action_from_definition, Action, ActionContext, ActionDefinition, ActionResult,
+    Executable,
+};
 use async_trait::async_trait;
-
-#[derive(Debug, Clone)]
-pub struct RepeatingAction {
-    repeat: usize,
-    action: Box<dyn Action>,
-}
-
-impl RepeatingAction {
-    pub fn new(repeat: usize, action: Box<dyn Action>) -> Self {
-        Self { repeat, action }
-    }
-}
-
-#[async_trait(?Send)]
-impl Executable for RepeatingAction {
-    async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
-        for _ in 0..self.repeat {
-            self.action.execute(ctx).await?;
-        }
-        Ok(())
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct ComboAction {
-    operator: Operator,
-    repeat: usize,
-    motion: Box<dyn Action>,
-}
-
-impl ComboAction {
-    pub fn new(operator: Operator, repeat: usize, motion: Box<dyn Action>) -> Self {
-        Self {
-            operator,
-            repeat,
-            motion,
-        }
-    }
-}
-
-#[async_trait(?Send)]
-impl Executable for ComboAction {
-    async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
-        todo!()
-    }
-}
 
 // A composite action that runs multiple actions in sequence
 #[derive(Debug, Clone)]
@@ -120,5 +77,52 @@ impl Executable for CompositeExecutable {
             action.execute(ctx).await?;
         }
         Ok(())
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct RepeatingAction {
+    repeat: usize,
+    action: ActionDefinition,
+}
+
+impl RepeatingAction {
+    pub fn new(repeat: usize, action: ActionDefinition) -> Self {
+        Self { repeat, action }
+    }
+}
+
+#[async_trait(?Send)]
+impl Executable for RepeatingAction {
+    async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+        let action = create_action_from_definition(&self.action);
+        for _ in 0..self.repeat {
+            action.execute(ctx).await?;
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct ComboAction {
+    operator: Operator,
+    repeat: usize,
+    motion: ActionDefinition,
+}
+
+impl ComboAction {
+    pub fn new(operator: Operator, repeat: usize, motion: ActionDefinition) -> Self {
+        Self {
+            operator,
+            repeat,
+            motion,
+        }
+    }
+}
+
+#[async_trait(?Send)]
+impl Executable for ComboAction {
+    async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+        todo!()
     }
 }

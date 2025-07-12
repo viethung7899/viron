@@ -1,14 +1,12 @@
 use crate::core::mode;
 use crate::core::mode::Mode;
 use crate::core::operation::Operator;
-use crate::input::actions::{
-    ComboAction, RepeatingAction,
-};
+use crate::input::actions::{ComboAction, RepeatingAction};
 use crate::input::keymaps::KeyMap;
 use crate::input::keys::{KeyEvent, KeySequence};
-use actions::{Action, Executable};
-use crossterm::event::{KeyCode, KeyModifiers};
 use actions::definition::{create_action_from_definition, ActionDefinition};
+use actions::Executable;
+use crossterm::event::{KeyCode, KeyModifiers};
 
 pub mod actions;
 mod command_parser;
@@ -111,25 +109,24 @@ impl InputState {
             return None;
         };
 
-        let action = create_action_from_definition(&definition);
         if let ActionDefinition::EnterMode { mode } = &definition {
             if let Mode::OperationPending(operation) = mode {
                 self.push_operation(operation.clone());
             } else {
                 self.clear();
             }
-            return Some(action);
+            return Some(create_action_from_definition(&definition));
         }
 
         let repeat = self.get_total_repeat();
 
         let executable: Box<dyn Executable> = if let Some(pending) = self.pending_operation.as_ref()
         {
-            Box::new(ComboAction::new(pending.operator, repeat, action))
+            Box::new(ComboAction::new(pending.operator, repeat, definition))
         } else if repeat > 1 {
-            Box::new(RepeatingAction::new(repeat, action))
+            Box::new(RepeatingAction::new(repeat, definition))
         } else {
-            action
+            create_action_from_definition(&definition)
         };
         self.clear();
         Some(executable)

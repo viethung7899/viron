@@ -151,3 +151,27 @@ pub fn create_action_from_definition(definition: &ActionDefinition) -> Box<dyn A
         }
     }
 }
+
+pub enum MovementType {
+    Line,
+    Character,
+}
+
+impl ActionDefinition {
+    pub fn get_movement_type(&self) -> Option<MovementType> {
+        match self {
+            ActionDefinition::MoveLeft { .. }
+            | ActionDefinition::MoveRight { .. }
+            | ActionDefinition::MoveToLineStart
+            | ActionDefinition::MoveToLineEnd
+            | ActionDefinition::MoveToNextWord
+            | ActionDefinition::MoveToPreviousWord => Some(MovementType::Character),
+            ActionDefinition::MoveUp
+            | ActionDefinition::MoveDown
+            | ActionDefinition::MoveToTop
+            | ActionDefinition::MoveToBottom
+            | ActionDefinition::GoToLine { .. } => Some(MovementType::Line),
+            _ => None,
+        }
+    }
+}

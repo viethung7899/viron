@@ -1,14 +1,15 @@
+use crate::config::Config;
 use crate::core::buffer_manager::BufferManager;
 use crate::core::command::{CommandBuffer, SearchBuffer};
 use crate::core::message::MessageManager;
 use crate::core::mode::Mode;
 use crate::core::{cursor::Cursor, viewport::Viewport};
+use crate::input::InputState;
 use crate::service::LspService;
 use crate::ui::components::ComponentIds;
 use crate::ui::compositor::Compositor;
 use anyhow::Result;
 use async_trait::async_trait;
-use std::any::Any;
 use std::fmt::Debug;
 
 pub type ActionResult = Result<()>;
@@ -62,7 +63,7 @@ pub trait Executable: Debug {
 }
 
 // The Action trait defines what all actions must implement
-pub trait Action: Debug + Executable + Any {
+pub trait Action: Debug + Executable {
     fn describe(&self) -> &str;
     fn to_serializable(&self) -> ActionDefinition;
     fn clone_box(&self) -> Box<dyn Action>;
@@ -73,7 +74,6 @@ impl Clone for Box<dyn Action> {
         self.clone_box()
     }
 }
-
 macro_rules! impl_action {
     ($action_type:ty, $description:expr, $self:ident $definition_block:block) => {
         impl Action for $action_type {
@@ -106,6 +106,4 @@ macro_rules! impl_action {
     };
 }
 
-use crate::config::Config;
-use crate::input::InputState;
 pub(super) use impl_action;
