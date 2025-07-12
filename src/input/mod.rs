@@ -2,12 +2,13 @@ use crate::core::mode;
 use crate::core::mode::Mode;
 use crate::core::operation::Operator;
 use crate::input::actions::{
-    create_action_from_definition, ActionDefinition, ComboAction, RepeatingAction,
+    ComboAction, RepeatingAction,
 };
 use crate::input::keymaps::KeyMap;
 use crate::input::keys::{KeyEvent, KeySequence};
 use actions::{Action, Executable};
 use crossterm::event::{KeyCode, KeyModifiers};
+use actions::definition::{create_action_from_definition, ActionDefinition};
 
 pub mod actions;
 mod command_parser;

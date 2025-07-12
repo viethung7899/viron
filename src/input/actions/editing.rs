@@ -2,11 +2,12 @@ use crate::core::history::edit::Edit;
 use crate::core::message::Message;
 use crate::core::mode::Mode;
 use crate::input::actions::{
-    impl_action, movement, system, Action, ActionContext, ActionDefinition, ActionResult,
+    impl_action, movement, system, Action, ActionContext, ActionResult,
     Executable,
 };
 use async_trait::async_trait;
 use std::fmt::Debug;
+use crate::input::actions::definition::ActionDefinition;
 
 fn after_edit(ctx: &mut ActionContext, edit: &Edit) -> ActionResult {
     let document = ctx.buffer_manager.current_mut();

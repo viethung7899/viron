@@ -1,8 +1,9 @@
 use crate::core::mode::Mode;
 use crate::core::operation::Operator;
-use crate::input::actions::{Action, ActionContext, ActionDefinition, ActionResult, Executable};
+use crate::input::actions::{Action, ActionContext, ActionResult, Executable};
 use async_trait::async_trait;
 use std::fmt::Debug;
+use crate::input::actions::definition::ActionDefinition;
 
 #[derive(Debug, Clone)]
 pub struct EnterMode {
