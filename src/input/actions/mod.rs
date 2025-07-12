@@ -38,6 +38,7 @@ pub struct ActionContext<'a> {
     pub command_buffer: &'a mut CommandBuffer,
     pub search_buffer: &'a mut SearchBuffer,
     pub message: &'a mut MessageManager,
+    pub config: &'a Config,
 
     pub cursor: &'a mut Cursor,
     pub viewport: &'a mut Viewport,
@@ -175,6 +176,7 @@ macro_rules! impl_action {
     };
 }
 
+use crate::config::Config;
 pub(super) use impl_action;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

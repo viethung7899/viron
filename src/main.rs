@@ -6,7 +6,7 @@ mod input;
 mod service;
 mod ui;
 
-use crate::config::{get_config_dir, Config};
+use crate::config::get_config_dir;
 use anyhow::Result;
 use crossterm::terminal::ClearType;
 use crossterm::{cursor, terminal};
@@ -29,7 +29,7 @@ async fn main() -> Result<()> {
 
     // Load the config
     let config_path = get_config_dir().join("config.toml");
-    editor.load_config(&Config::load_from_file(config_path)?)?;
+    editor.load_config(config_path)?;
 
     // Set up error handling for the editor's run method
     let result = editor.run().await;

@@ -7,13 +7,14 @@ pub struct SearchBox;
 
 impl Drawable for SearchBox {
     fn draw(&self, buffer: &mut RenderBuffer, context: &mut RenderContext) -> anyhow::Result<()> {
+        let theme = &context.config.theme;
         let Bounds {
             start_row, width, ..
         } = self.bounds(buffer, context);
         let search_buffer = context.search_buffer;
         let error_style = Style {
-            foreground: context.theme.colors.diagnostic.error.foreground,
-            background: context.theme.colors.editor.background,
+            foreground: theme.colors.diagnostic.error.foreground,
+            background: theme.colors.editor.background,
             ..Default::default()
         };
 
@@ -21,7 +22,7 @@ impl Drawable for SearchBox {
             Mode::Search => {
                 let search = search_buffer.buffer.content();
                 let formatted = format!("/{search:<width$}");
-                buffer.set_text(start_row, 0, &formatted, &context.theme.editor_style());
+                buffer.set_text(start_row, 0, &formatted, &theme.editor_style());
             }
             _ => {
                 let last_search = search_buffer.last_search.clone();
@@ -37,13 +38,13 @@ impl Drawable for SearchBox {
                         start_row,
                         0,
                         &format!("{counter:>width$}"),
-                        &context.theme.editor_style(),
+                        &theme.editor_style(),
                     );
                     buffer.set_text(
                         start_row,
                         0,
                         &format!("/{last_search}"),
-                        &context.theme.editor_style(),
+                        &theme.editor_style(),
                     );
                 } else {
                     let formatted =

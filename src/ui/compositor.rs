@@ -37,7 +37,7 @@ impl Compositor {
             drawable: Rc::new(drawable),
             focusable: None,
         };
-        self.add_iternal_component(id, component)
+        self.add_internal_component(id, component)
     }
 
     pub fn add_focusable_component<C: Drawable + Focusable + 'static>(

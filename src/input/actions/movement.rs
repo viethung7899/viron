@@ -1,3 +1,4 @@
+use crate::config::editor::Gutter;
 use crate::input::actions::{
     impl_action, Action, ActionContext, ActionDefinition, ActionResult, Executable,
 };
@@ -18,11 +19,17 @@ impl MoveLeft {
 #[async_trait(?Send)]
 impl Executable for MoveLeft {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+        let old_row = ctx.cursor.get_point().row;
         ctx.cursor.move_left(
             ctx.buffer_manager.current_buffer(),
             ctx.mode,
             self.previous_line,
         );
+        let new_row = ctx.cursor.get_point().row;
+        if old_row != new_row && ctx.config.gutter == Gutter::Relative {
+            ctx.compositor
+                .mark_dirty(&ctx.component_ids.editor_view_id)?;
+        }
         ctx.compositor
             .mark_dirty(&ctx.component_ids.status_line_id)?;
         Ok(())
@@ -47,11 +54,17 @@ impl MoveRight {
 #[async_trait(?Send)]
 impl Executable for MoveRight {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+        let old_row = ctx.cursor.get_point().row;
         ctx.cursor.move_right(
             ctx.buffer_manager.current_buffer(),
             ctx.mode,
             self.next_line,
         );
+        let new_row = ctx.cursor.get_point().row;
+        if old_row != new_row && ctx.config.gutter == Gutter::Relative {
+            ctx.compositor
+                .mark_dirty(&ctx.component_ids.editor_view_id)?;
+        }
         ctx.compositor
             .mark_dirty(&ctx.component_ids.status_line_id)?;
         Ok(())
@@ -70,6 +83,10 @@ impl Executable for MoveUp {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         ctx.cursor
             .move_up(ctx.buffer_manager.current_buffer(), ctx.mode);
+        if ctx.config.gutter == Gutter::Relative {
+            ctx.compositor
+                .mark_dirty(&ctx.component_ids.editor_view_id)?;
+        }
         ctx.compositor
             .mark_dirty(&ctx.component_ids.status_line_id)?;
         Ok(())
@@ -86,6 +103,10 @@ impl Executable for MoveDown {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         ctx.cursor
             .move_down(ctx.buffer_manager.current_buffer(), ctx.mode);
+        if ctx.config.gutter == Gutter::Relative {
+            ctx.compositor
+                .mark_dirty(&ctx.component_ids.editor_view_id)?;
+        }
         ctx.compositor
             .mark_dirty(&ctx.component_ids.status_line_id)?;
         Ok(())
@@ -198,8 +219,13 @@ pub struct MoveToNextWord;
 #[async_trait(?Send)]
 impl Executable for MoveToNextWord {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+        let old_row = ctx.cursor.get_point().row;
         let buffer = ctx.buffer_manager.current_buffer();
         let cursor = ctx.cursor.find_next_word(buffer);
+        if cursor.get_point().row != old_row && ctx.config.gutter == Gutter::Relative {
+            ctx.compositor
+                .mark_dirty(&ctx.component_ids.editor_view_id)?;
+        }
         ctx.cursor.set_point(cursor.get_point(), buffer);
         ctx.compositor
             .mark_dirty(&ctx.component_ids.status_line_id)?;
@@ -219,8 +245,13 @@ pub struct MoveToPreviousWord;
 #[async_trait(?Send)]
 impl Executable for MoveToPreviousWord {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+        let old_row = ctx.cursor.get_point().row;
         let buffer = ctx.buffer_manager.current_buffer();
         let cursor = ctx.cursor.find_previous_word(buffer);
+        if cursor.get_point().row != old_row && ctx.config.gutter == Gutter::Relative {
+            ctx.compositor
+                .mark_dirty(&ctx.component_ids.editor_view_id)?;
+        }
         ctx.cursor.set_point(cursor.get_point(), buffer);
         ctx.compositor
             .mark_dirty(&ctx.component_ids.status_line_id)?;
@@ -248,12 +279,16 @@ impl GoToLine {
 #[async_trait(?Send)]
 impl Executable for GoToLine {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+        let old_line = ctx.cursor.get_point().row;
         let buffer = ctx.buffer_manager.current_buffer();
         ctx.cursor.go_to_line(self.line_number, buffer, ctx.mode);
         let new_line = ctx.cursor.get_point().row;
         let viewport = &ctx.viewport;
         if new_line < viewport.top_line() || new_line >= viewport.top_line() + viewport.height() {
             MoveToViewportCenter.execute(ctx).await?;
+        } else if old_line != new_line && ctx.config.gutter == Gutter::Relative {
+            ctx.compositor
+                .mark_dirty(&ctx.component_ids.editor_view_id)?;
         }
         ctx.compositor
             .mark_dirty(&ctx.component_ids.status_line_id)?;

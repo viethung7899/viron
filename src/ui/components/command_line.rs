@@ -10,7 +10,7 @@ impl Drawable for CommandLine {
         } = self.bounds(buffer, context);
         let command = context.command_buffer.content();
         let formatted = format!(":{command:<width$}");
-        buffer.set_text(start_row, 0, &formatted, &context.theme.editor_style());
+        buffer.set_text(start_row, 0, &formatted, &context.config.theme.editor_style());
         Ok(())
     }
 
