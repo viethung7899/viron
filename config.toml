@@ -1,4 +1,5 @@
 theme = "catppuchin/mocha"
+gutter = "relative"
 
 # Keybindings for normal mode
 [keymap.normal]

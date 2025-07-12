@@ -1,4 +1,4 @@
-mod editor;
+pub mod editor;
 
 use crate::config::editor::Gutter;
 use crate::input::keymaps::{KeyMap, KeyMapConfig};
