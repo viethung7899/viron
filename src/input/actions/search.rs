@@ -79,20 +79,14 @@ impl Executable for SearchBackspace {
 }
 
 #[derive(Debug, Clone)]
-pub struct SearchSubmit {
-    pub pattern: String,
-}
-
-impl SearchSubmit {
-    pub fn new(pattern: String) -> Self {
-        Self { pattern }
-    }
-}
+pub struct SearchSubmit;
 
 #[async_trait(?Send)]
 impl Executable for SearchSubmit {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
-        if self.pattern.is_empty() {
+        let pattern = ctx.search_buffer.buffer.content();
+
+        if pattern.is_empty() {
             return system::ShowMessage(Message::error(
                 "E: Search pattern cannot be empty".to_string(),
             ))
@@ -101,7 +95,7 @@ impl Executable for SearchSubmit {
         }
         let result = ctx
             .search_buffer
-            .search(&self.pattern, &ctx.buffer_manager.current_buffer());
+            .search(&pattern, &ctx.buffer_manager.current_buffer());
         if let Err(e) = result {
             system::ShowMessage(Message::error(format!("E: {e}")))
                 .execute(ctx)

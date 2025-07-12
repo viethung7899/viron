@@ -1,9 +1,11 @@
+use crate::core::mode;
 use crate::core::mode::Mode;
 use crate::core::operation::Operator;
 use crate::input::keymaps::KeyMap;
 use crate::input::keys::{KeyEvent, KeySequence};
 use actions::{Action, Executable};
-use crossterm::event::KeyCode;
+use crossterm::event::{KeyCode, KeyModifiers};
+use crate::input::actions::{create_action_from_definition, ActionDefinition, ComboAction, RepeatedAction};
 
 pub mod actions;
 mod command_parser;
@@ -93,28 +95,104 @@ impl InputState {
         }
     }
 
+    pub fn get_total_repeat(&self) -> usize {
+        let motion_repeat = self.repeat.unwrap_or(1);
+        let operation_repeat = self
+            .pending_operation
+            .as_ref()
+            .and_then(|op| op.repeat)
+            .unwrap_or(1);
+        motion_repeat * operation_repeat
+    }
+
     pub fn get_executable(&mut self, mode: &Mode, keymap: &KeyMap) -> Option<Box<dyn Executable>> {
-        None
+        let Some(definition) = self.get_action_from_sequence(mode, keymap) else {
+            return None;
+        };
+        let repeat = self.get_total_repeat();
+        if let Some(pending) = self.pending_operation.as_ref() {
+            Some(Box::new(ComboAction::new(
+                pending.operator,
+                repeat,
+                create_action_from_definition(&definition),
+            )))
+        } else if repeat > 1 {
+            Some(Box::new(RepeatedAction::new(repeat, create_action_from_definition(&definition))))
+        } else {
+            Some(create_action_from_definition(&definition))
+        }
     }
 
     fn get_action_from_sequence(
         &mut self,
         mode: &Mode,
         keymap: &KeyMap,
-    ) -> Option<Box<dyn Action>> {
+    ) -> Option<ActionDefinition> {
         if self.sequence.keys.is_empty() {
             return None;
         };
         let action = keymap.get_action(mode, &self.sequence);
 
-        if let Some(action) = action {
+        if let Some(definition) = action {
             self.clear();
-            return Some(action.clone());
-        };
+            return Some(definition.clone());
+        }
 
         if !keymap.is_partial_match(&mode, &self.sequence) {
             self.clear();
         }
         None
+    }
+}
+
+pub fn get_default_insert_action(key_event: &KeyEvent) -> Option<Box<dyn Executable>> {
+    let executable: Box<dyn Executable> = match (key_event.code, key_event.modifiers) {
+        (KeyCode::Esc, _) => Box::new(actions::EnterMode::new(mode::Mode::Normal)),
+        (KeyCode::Char(ch), KeyModifiers::NONE | KeyModifiers::SHIFT) => {
+            Box::new(actions::InsertChar::new(ch))
+        }
+        (KeyCode::Backspace, _) => Box::new(actions::Backspace),
+        (KeyCode::Delete, _) => Box::new(actions::DeleteChar),
+        (KeyCode::Left, _) => Box::new(actions::MoveLeft::new(true)),
+        (KeyCode::Right, _) => Box::new(actions::MoveRight::new(true)),
+        (KeyCode::Up, _) => Box::new(actions::MoveUp),
+        (KeyCode::Down, _) => Box::new(actions::MoveDown),
+        (KeyCode::Enter, _) => Box::new(actions::InsertNewLine),
+        (KeyCode::Home, _) => Box::new(actions::MoveToLineStart),
+        (KeyCode::End, _) => Box::new(actions::MoveToLineEnd),
+        _ => return None,
+    };
+    Some(executable)
+}
+
+pub fn get_default_command_action(key_event: &KeyEvent) -> Option<Box<dyn Executable>> {
+    let executable: Box<dyn Executable> = match (key_event.code, key_event.modifiers) {
+        (KeyCode::Esc, _) => Box::new(actions::EnterMode::new(mode::Mode::Normal)),
+        (KeyCode::Char(ch), KeyModifiers::NONE | KeyModifiers::SHIFT) => {
+            Box::new(actions::CommandInsertChar::new(ch))
+        }
+        (KeyCode::Enter, _) => Box::new(actions::CommandExecute),
+        (KeyCode::Left, _) => Box::new(actions::CommandMoveLeft),
+        (KeyCode::Right, _) => Box::new(actions::CommandMoveLeft),
+        (KeyCode::Backspace, _) => Box::new(actions::CommandBackspace),
+        (KeyCode::Delete, _) => Box::new(actions::CommandDeleteChar),
+        _ => {
+            return None;
+        }
+    };
+    Some(executable)
+}
+
+pub fn get_default_search_action(key_event: &KeyEvent) -> Option<Box<dyn Executable>> {
+    match (key_event.code, key_event.modifiers) {
+        (KeyCode::Char(ch), KeyModifiers::NONE | KeyModifiers::SHIFT) => {
+            Some(Box::new(actions::SearchInsertChar::new(ch)))
+        }
+        (KeyCode::Enter, _) => Some(Box::new(actions::SearchSubmit)),
+        (KeyCode::Left, _) => Some(Box::new(actions::SearchMoveLeft)),
+        (KeyCode::Right, _) => Some(Box::new(actions::SearchMoveLeft)),
+        (KeyCode::Backspace, _) => Some(Box::new(actions::SearchBackspace)),
+        (KeyCode::Delete, _) => Some(Box::new(actions::SearchDeleteChar)),
+        _ => None,
     }
 }

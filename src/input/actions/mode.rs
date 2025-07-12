@@ -104,6 +104,7 @@ impl EnterPendingOperation {
 #[async_trait(?Send)]
 impl Executable for EnterPendingOperation {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+        ctx.input_state.push_operation(self.0);
         EnterMode::new(mode::Mode::OperationPending)
             .execute(ctx)
             .await

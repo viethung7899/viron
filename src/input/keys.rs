@@ -88,9 +88,8 @@ impl KeySequence {
                     let key_str = parts[1];
 
                     let modifiers = match modifier_str {
-                        "SHIFT" => KeyModifiers::SHIFT,
-                        "CONTROL" => KeyModifiers::CONTROL,
-                        "ALT" => KeyModifiers::ALT,
+                        "C" => KeyModifiers::CONTROL,
+                        "A" => KeyModifiers::ALT,
                         _ => KeyModifiers::NONE,
                     };
 

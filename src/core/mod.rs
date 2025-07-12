@@ -7,6 +7,7 @@ pub mod history;
 pub mod language;
 pub mod message;
 pub mod mode;
+pub mod operation;
 pub mod syntax;
 pub mod utf8;
 pub mod viewport;

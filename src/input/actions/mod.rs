@@ -15,6 +15,7 @@ use std::path::PathBuf;
 pub type ActionResult = Result<()>;
 
 mod buffer;
+mod combo;
 mod command;
 mod editing;
 mod lsp;
@@ -24,6 +25,7 @@ mod search;
 mod system;
 
 pub use buffer::*;
+pub use combo::*;
 pub use command::*;
 pub use editing::*;
 pub use lsp::*;
@@ -44,6 +46,8 @@ pub struct ActionContext<'a> {
     pub viewport: &'a mut Viewport,
     pub mode: &'a mut Mode,
     pub running: &'a mut bool,
+
+    pub input_state: &'a mut InputState,
 
     pub compositor: &'a mut Compositor,
     pub component_ids: &'a ComponentIds,
@@ -176,6 +180,8 @@ macro_rules! impl_action {
     };
 }
 
+use crate::core::operation::Operator;
+use crate::input::InputState;
 use crate::config::Config;
 pub(super) use impl_action;
 
@@ -224,7 +230,10 @@ pub enum ActionDefinition {
 
     // Mode actions
     EnterMode {
-        mode: String,
+        mode: Mode,
+    },
+    EnterPendingOperation {
+        operator: Operator,
     },
 
     // Buffer actions
@@ -287,14 +296,9 @@ pub fn create_action_from_definition(definition: &ActionDefinition) -> Box<dyn A
         ActionDefinition::FindPrevious => Box::new(FindPrevious),
 
         // Mode actions
-        ActionDefinition::EnterMode { mode } => {
-            let mode = match mode.as_str() {
-                "insert" => Mode::Insert,
-                "command" => Mode::Command,
-                "search" => Mode::Search,
-                _ => Mode::Normal, // Default fallback
-            };
-            Box::new(EnterMode::new(mode))
+        ActionDefinition::EnterMode { mode } => Box::new(EnterMode::new(*mode)),
+        ActionDefinition::EnterPendingOperation { operator } => {
+            Box::new(EnterPendingOperation::new(*operator))
         }
 
         // Buffer actions

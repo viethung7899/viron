@@ -12,7 +12,7 @@ pub mod render_buffer;
 pub mod theme;
 
 use crate::core::document::Document;
-use crate::input::keys::KeySequence;
+use crate::input::InputState;
 use crate::service::lsp::types::Diagnostic;
 
 pub struct RenderContext<'a> {
@@ -25,7 +25,7 @@ pub struct RenderContext<'a> {
     pub command_buffer: &'a CommandBuffer,
     pub search_buffer: &'a SearchBuffer,
     pub message_manager: &'a MessageManager,
-    pub pending_keys: &'a KeySequence,
+    pub input_state: &'a InputState,
 }
 
 pub struct Bounds {

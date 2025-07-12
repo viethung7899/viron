@@ -13,7 +13,7 @@ impl Drawable for PendingKeys {
             ..
         } = self.bounds(buffer, context);
 
-        let pending_keys = context.pending_keys.to_string();
+        let pending_keys = context.input_state.to_string();
         if pending_keys.is_empty() {
             return self.clear(buffer, context);
         }
