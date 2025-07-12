@@ -27,26 +27,6 @@ gutter = "relative"
 "<Home>" = { type = "MoveToLineStart" }
 "<End>" = { type = "MoveToLineEnd" }
 
-"a" = { type = "Composite", params = { description = "Insert after the cursor", actions = [
-    { type = "EnterMode", params = { mode = "Insert" } },
-    { type = "MoveRight", params = { next_line = true } }
-] } }
-
-"A" = { type = "Composite", params = { description = "Insert at the end of the line", actions = [
-    { type = "EnterMode", params = { mode = "Insert" } },
-    { type = "MoveToLineEnd" }
-] } }
-
-"o" = { type = "Composite", params = { description = "Insert new line below the current line", actions = [
-    { type = "InsertNewLineBelow" },
-    { type = "EnterMode", params = { mode = "Insert" } }
-] } }
-
-"O" = { type = "Composite", params = { description = "Insert new line above the current line", actions = [
-    { type = "InsertNewLineAbove" },
-    { type = "EnterMode", params = { mode = "Insert" } }
-] } }
-
 [keymap.normal] # Keymode for normal mode only
 "gg" = { type = "MoveToTop" }
 "G" = { type = "MoveToBottom" }
@@ -67,3 +47,26 @@ gutter = "relative"
 "<CONTROL-r>" = { type = "Redo" }
 
 "gd" = { type = "GoToDefinition" }
+
+"a" = { type = "Composite", params = { description = "Insert after the cursor", actions = [
+    { type = "EnterMode", params = { mode = "Insert" } },
+    { type = "MoveRight", params = { next_line = true } }
+] } }
+
+"A" = { type = "Composite", params = { description = "Insert at the end of the line", actions = [
+    { type = "EnterMode", params = { mode = "Insert" } },
+    { type = "MoveToLineEnd" }
+] } }
+
+"o" = { type = "Composite", params = { description = "Insert new line below the current line", actions = [
+    { type = "InsertNewLineBelow" },
+    { type = "EnterMode", params = { mode = "Insert" } }
+] } }
+
+"O" = { type = "Composite", params = { description = "Insert new line above the current line", actions = [
+    { type = "InsertNewLineAbove" },
+    { type = "EnterMode", params = { mode = "Insert" } }
+] } }
+
+[keymap.pending.delete]
+"d" = { type = "DeleteCurrentLine" }

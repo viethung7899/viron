@@ -3,7 +3,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 use crate::core::mode::Mode;
-use crate::input::actions::ActionDefinition;
+use crate::core::operation::Operator;
+use crate::input::actions::definition::ActionDefinition;
 use crate::input::keys::KeySequence;
 
 #[derive(Debug, Default)]
@@ -11,6 +12,12 @@ pub struct KeyMap {
     pub default: HashMap<KeySequence, ActionDefinition>,
     pub movement: HashMap<KeySequence, ActionDefinition>,
     pub normal: HashMap<KeySequence, ActionDefinition>,
+    pub pending: PendingKeyMap,
+}
+
+#[derive(Debug, Default)]
+pub struct PendingKeyMap {
+    pub delete: HashMap<KeySequence, ActionDefinition>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Default)]
@@ -21,6 +28,13 @@ pub struct KeyMapConfig {
     pub movement: HashMap<String, ActionDefinition>,
     #[serde(default = "default_map")]
     pub normal: HashMap<String, ActionDefinition>,
+    pub pending: PendingKeyMapConfig,
+}
+
+#[derive(Debug, Serialize, Deserialize, Default)]
+pub struct PendingKeyMapConfig {
+    #[serde(default = "default_map")]
+    pub delete: HashMap<String, ActionDefinition>,
 }
 
 fn default_map() -> HashMap<String, ActionDefinition> {
@@ -38,7 +52,10 @@ impl KeyMap {
                 .normal
                 .get(sequence)
                 .or_else(|| self.movement.get(sequence)),
-            Mode::OperationPending(_) => self.movement.get(sequence),
+            Mode::OperationPending(Operator::Delete) => self
+                .movement
+                .get(sequence)
+                .or_else(|| self.pending.delete.get(sequence)),
             _ => None,
         };
         definition.or_else(|| self.default.get(sequence))
@@ -66,18 +83,23 @@ impl KeyMap {
         let mut keymap = Self::new();
 
         for (key_str, action_def) in &config.normal {
-            let sequence = KeySequence::from_string(&key_str)?;
+            let sequence = KeySequence::from_string(key_str)?;
             keymap.normal.insert(sequence, action_def.clone());
         }
 
         for (key_str, action_def) in &config.default {
-            let sequence = KeySequence::from_string(&key_str)?;
+            let sequence = KeySequence::from_string(key_str)?;
             keymap.default.insert(sequence, action_def.clone());
         }
 
         for (key_str, action_def) in &config.movement {
-            let sequence = KeySequence::from_string(&key_str)?;
+            let sequence = KeySequence::from_string(key_str)?;
             keymap.movement.insert(sequence, action_def.clone());
+        }
+
+        for (key_str, action_def) in &config.pending.delete {
+            let sequence = KeySequence::from_string(key_str)?;
+            keymap.pending.delete.insert(sequence, action_def.clone());
         }
 
         Ok(keymap)
