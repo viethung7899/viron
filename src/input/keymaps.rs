@@ -40,6 +40,7 @@ impl KeyMap {
     pub fn get_action(&self, mode: &Mode, sequence: &KeySequence) -> Option<&Box<dyn Action>> {
         match mode {
             Mode::Normal => self.normal.get(sequence),
+            Mode::OperationPending => self.normal.get(sequence),
             Mode::Insert => self.insert.get(sequence),
             Mode::Command => self.command.get(sequence),
             Mode::Search => self.search.get(sequence),
@@ -49,6 +50,7 @@ impl KeyMap {
     pub fn is_partial_match(&self, mode: &Mode, sequence: &KeySequence) -> bool {
         let map = match mode {
             Mode::Normal => &self.normal,
+            Mode::OperationPending => &self.normal,
             Mode::Insert => &self.insert,
             Mode::Command => &self.command,
             Mode::Search => &self.search,

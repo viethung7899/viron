@@ -7,6 +7,7 @@ pub enum Mode {
     Insert,
     Command,
     Search,
+    OperationPending,
 }
 
 impl Mode {
@@ -16,15 +17,17 @@ impl Mode {
             Mode::Insert => "insert".to_string(),
             Mode::Command => "command".to_string(),
             Mode::Search => "search".to_string(),
+            Mode::OperationPending => "o-pending".to_string(),
         }
     }
 
     pub fn to_name(&self) -> &str {
         match self {
-            Mode::Normal => "Normal",
-            Mode::Insert => "Insert",
-            Mode::Command => "Command",
-            Mode::Search => "Search",
+            Mode::Normal => "normal",
+            Mode::Insert => "insert",
+            Mode::Command => "command",
+            Mode::Search => "search",
+            Mode::OperationPending => "o-pending",
         }
     }
 

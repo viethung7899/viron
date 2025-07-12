@@ -3,6 +3,7 @@ use crate::config::Config;
 use crate::constants::{MIN_GUTTER_WIDTH, RESERVED_ROW_COUNT};
 use crate::core::command::{CommandBuffer, SearchBuffer};
 use crate::core::cursor::Cursor;
+use crate::core::mode::Mode;
 use crate::core::viewport::Viewport;
 use crate::core::{buffer_manager::BufferManager, message::MessageManager};
 use crate::input::actions::Executable;
@@ -28,7 +29,6 @@ use crossterm::{
 use crossterm::{style, ExecutableCommand, QueueableCommand};
 use std::io::{self, Stdout, Write};
 use std::path::{Path, PathBuf};
-use crate::core::mode::Mode;
 
 pub struct Editor {
     // Size
@@ -264,6 +264,57 @@ impl Editor {
             self.compositor
                 .mark_dirty(&self.component_ids.status_line_id)?;
         }
+        Ok(())
+    }
+
+    fn show_cursor(&mut self) -> Result<()> {
+        self.stdout.queue(self.mode.set_cursor_style())?;
+        match self.mode {
+            Mode::Normal | Mode::Insert | Mode::OperationPending => {
+                self.show_cursor_in_buffer()?;
+            }
+            Mode::Command => {
+                self.show_cursor_in_command_line()?;
+            }
+            Mode::Search => {
+                self.show_cursor_in_search_box()?;
+            }
+        }
+        Ok(())
+    }
+
+    fn show_cursor_in_buffer(&mut self) -> Result<()> {
+        let (row, column) = self.cursor.get_display_cursor();
+        let viewport = &self.viewport;
+        let gutter_size = self.gutter_width();
+
+        let screen_row = row - viewport.top_line();
+        let screen_col = column - viewport.left_column();
+
+        if screen_row < viewport.height() && screen_col < viewport.width() {
+            self.stdout
+                .queue(cursor::MoveTo(
+                    (screen_col + gutter_size) as u16,
+                    screen_row as u16,
+                ))?
+                .queue(cursor::Show)?;
+        }
+        Ok(())
+    }
+
+    fn show_cursor_in_command_line(&mut self) -> Result<()> {
+        let position = self.command_buffer.cursor_position();
+        self.stdout
+            .queue(cursor::MoveTo(position as u16 + 1, self.height as u16 - 1))?
+            .queue(cursor::Show)?;
+        Ok(())
+    }
+
+    fn show_cursor_in_search_box(&mut self) -> Result<()> {
+        let position = self.search_buffer.buffer.cursor_position();
+        self.stdout
+            .queue(cursor::MoveTo(position as u16 + 1, self.height as u16 - 1))?
+            .queue(cursor::Show)?;
         Ok(())
     }
 

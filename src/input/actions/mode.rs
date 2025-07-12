@@ -76,6 +76,7 @@ impl Action for EnterMode {
             Mode::Insert => "Enter insert mode",
             Mode::Command => "Enter command mode",
             Mode::Search => "Enter search mode",
+            Mode::OperationPending => "Enter operation pending mode",
         }
     }
 
