@@ -4,16 +4,18 @@ gutter = "relative"
 # Keybindings for normal mode
 [keymap.normal]
 "q" = { type = "Quit" }
-"<Esc>" = { type = "EnterMode", params = { mode = "normal" } }
+"<Esc>" = { type = "EnterMode", params = { mode = "Normal" } }
 
 "h" = { type = "MoveLeft", params = { previous_line = false } }
 "j" = { type = "MoveDown" }
 "k" = { type = "MoveUp" }
 "l" = { type = "MoveRight", params = { next_line = false } }
+
 "<Left>" = { type = "MoveLeft", params = { previous_line = false } }
 "<Right>" = { type = "MoveRight", params = { next_line = false } }
 "<Up>" = { type = "MoveUp" }
 "<Down>" = { type = "MoveDown" }
+
 "<Backspace>" = { type = "MoveLeft", params = { previous_line = true } }
 
 "$" = { type = "MoveToLineEnd" }
@@ -29,12 +31,12 @@ gutter = "relative"
 "b" = { type = "MoveToPreviousWord" }
 
 "x" = { type = "DeleteChar" }
-"dd" = { type = "DeleteCurrentLine" }
-"dw" = { type = "DeleteWord" }
+"d" = { type = "EnterPendingOperation", params = { operation = "Delete" } }
+"c" = { type = "EnterPendingOperation", params = { operation = "Change" } }
 
-"i" = { type = "EnterMode", params = { mode = "insert" } }
-":" = { type = "EnterMode", params = { mode = "command" } }
-"/" = { type = "EnterMode", params = { mode = "search" } }
+"i" = { type = "EnterMode", params = { mode = "Insert" } }
+":" = { type = "EnterMode", params = { mode = "Command" } }
+"/" = { type = "EnterMode", params = { mode = "Search" } }
 
 "n" = { type = "FindNext" }
 "N" = { type = "FindPrevious" }

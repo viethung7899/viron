@@ -1,5 +1,8 @@
 use crate::core::mode::Mode;
-use crate::input::actions::{Action, ActionContext, ActionDefinition, ActionResult, Executable};
+use crate::core::operation::Operator;
+use crate::input::actions::{
+    mode, Action, ActionContext, ActionDefinition, ActionResult, Executable,
+};
 use async_trait::async_trait;
 use std::fmt::Debug;
 
@@ -80,7 +83,44 @@ impl Action for EnterMode {
 
     fn to_serializable(&self) -> ActionDefinition {
         ActionDefinition::EnterMode {
-            mode: self.mode.to_string(),
+            mode: self.mode,
+        }
+    }
+
+    fn clone_box(&self) -> Box<dyn Action> {
+        Box::new(self.clone())
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct EnterPendingOperation(pub Operator);
+
+impl EnterPendingOperation {
+    pub fn new(operator: Operator) -> Self {
+        Self(operator)
+    }
+}
+
+#[async_trait(?Send)]
+impl Executable for EnterPendingOperation {
+    async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+        EnterMode::new(mode::Mode::OperationPending)
+            .execute(ctx)
+            .await
+    }
+}
+
+impl Action for EnterPendingOperation {
+    fn describe(&self) -> &str {
+        match self.0 {
+            Operator::Delete => "Delete",
+            Operator::Change => "Change"
+        }
+    }
+
+    fn to_serializable(&self) -> ActionDefinition {
+        ActionDefinition::EnterPendingOperation {
+            operator: self.0
         }
     }
 
