@@ -7,7 +7,6 @@ use crate::core::mode::Mode;
 use crate::core::viewport::Viewport;
 use crate::core::{buffer_manager::BufferManager, message::MessageManager};
 use crate::input::actions::Executable;
-use crate::input::keymaps::KeyMap;
 use crate::input::keys::KeyEvent as VironKeyEvent;
 use crate::input::{
     actions, actions::ActionContext,
@@ -119,8 +118,6 @@ impl Editor {
         };
 
         // Create input handling
-        let pending_keys = KeySequence::new();
-        let keymap = KeyMap::new();
         let event_handler = EventHandler::new();
 
         // Create LSP service
@@ -299,7 +296,9 @@ impl Editor {
         self.compositor
             .mark_dirty(&self.component_ids.pending_keys_id)?;
 
-        let action = self.input_state.get_executable(&self.mode, &self.keymap);
+        let action = self
+            .input_state
+            .get_executable(&self.mode, &self.config.keymap);
         if self.input_state.is_empty() {
             self.compositor
                 .mark_visible(&self.component_ids.pending_keys_id, false)?;

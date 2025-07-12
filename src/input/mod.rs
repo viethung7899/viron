@@ -109,15 +109,16 @@ impl InputState {
         let Some(definition) = self.get_action_from_sequence(mode, keymap) else {
             return None;
         };
-        let action = create_action_from_definition(&definition);
 
-        match &definition {
-            ActionDefinition::EnterPendingOperation { operator } => {
-                self.push_operation(*operator);
-                return Some(action);
+        let action = create_action_from_definition(&definition);
+        if let ActionDefinition::EnterMode { mode } = &definition {
+            if let Mode::OperationPending(operation) = mode {
+                self.push_operation(operation.clone());
+            } else {
+                self.clear();
             }
-            _ => {}
-        };
+            return Some(action);
+        }
 
         let repeat = self.get_total_repeat();
 

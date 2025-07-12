@@ -1,5 +1,6 @@
 use crossterm::cursor;
 use serde::{Deserialize, Serialize};
+use crate::core::operation::Operator;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Mode {
@@ -7,7 +8,7 @@ pub enum Mode {
     Insert,
     Command,
     Search,
-    OperationPending,
+    OperationPending(Operator),
 }
 
 impl Mode {
@@ -17,7 +18,7 @@ impl Mode {
             Mode::Insert => "insert".to_string(),
             Mode::Command => "command".to_string(),
             Mode::Search => "search".to_string(),
-            Mode::OperationPending => "o-pending".to_string(),
+            Mode::OperationPending(_) => "o-pending".to_string(),
         }
     }
 
@@ -27,7 +28,7 @@ impl Mode {
             Mode::Insert => "insert",
             Mode::Command => "command",
             Mode::Search => "search",
-            Mode::OperationPending => "o-pending",
+            Mode::OperationPending(_) => "o-pending",
         }
     }
 

@@ -180,7 +180,6 @@ macro_rules! impl_action {
     };
 }
 
-use crate::core::operation::Operator;
 use crate::input::InputState;
 use crate::config::Config;
 pub(super) use impl_action;
@@ -231,9 +230,6 @@ pub enum ActionDefinition {
     // Mode actions
     EnterMode {
         mode: Mode,
-    },
-    EnterPendingOperation {
-        operator: Operator,
     },
 
     // Buffer actions
@@ -297,9 +293,6 @@ pub fn create_action_from_definition(definition: &ActionDefinition) -> Box<dyn A
 
         // Mode actions
         ActionDefinition::EnterMode { mode } => Box::new(EnterMode::new(*mode)),
-        ActionDefinition::EnterPendingOperation { operator } => {
-            Box::new(EnterPendingOperation::new(*operator))
-        }
 
         // Buffer actions
         ActionDefinition::NextBuffer => Box::new(NextBuffer),

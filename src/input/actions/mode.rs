@@ -1,8 +1,6 @@
 use crate::core::mode::Mode;
 use crate::core::operation::Operator;
-use crate::input::actions::{
-    mode, Action, ActionContext, ActionDefinition, ActionResult, Executable,
-};
+use crate::input::actions::{Action, ActionContext, ActionDefinition, ActionResult, Executable};
 use async_trait::async_trait;
 use std::fmt::Debug;
 
@@ -31,10 +29,10 @@ impl Executable for EnterMode {
                 ctx.compositor
                     .mark_visible(&ctx.component_ids.search_box_id, false)?;
             }
-            Mode::OperationPending => {
+            Mode::OperationPending(_) => {
                 ctx.input_state.clear();
                 ctx.compositor
-                    .mark_visible(&ctx.component_ids.pending_keys_id, true)?;
+                    .mark_visible(&ctx.component_ids.pending_keys_id, false)?;
             }
             _ => {}
         };
@@ -68,13 +66,12 @@ impl Executable for EnterMode {
                 ctx.compositor
                     .mark_visible(&ctx.component_ids.pending_keys_id, false)?;
             }
-            Mode::OperationPending => {
+            Mode::OperationPending(_) => {
                 ctx.compositor
                     .set_focus(&ctx.component_ids.editor_view_id)?;
                 ctx.compositor
                     .mark_visible(&ctx.component_ids.pending_keys_id, true)?;
             }
-            _ => {}
         };
 
         *ctx.mode = self.mode.clone();
@@ -91,7 +88,8 @@ impl Action for EnterMode {
             Mode::Insert => "Enter insert mode",
             Mode::Command => "Enter command mode",
             Mode::Search => "Enter search mode",
-            Mode::OperationPending => "Enter operation pending mode",
+            Mode::OperationPending(Operator::Change) => "Change",
+            Mode::OperationPending(Operator::Delete) => "Delete",
         }
     }
 
@@ -110,31 +108,5 @@ pub struct EnterPendingOperation(pub Operator);
 impl EnterPendingOperation {
     pub fn new(operator: Operator) -> Self {
         Self(operator)
-    }
-}
-
-#[async_trait(?Send)]
-impl Executable for EnterPendingOperation {
-    async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
-        EnterMode::new(mode::Mode::OperationPending)
-            .execute(ctx)
-            .await
-    }
-}
-
-impl Action for EnterPendingOperation {
-    fn describe(&self) -> &str {
-        match self.0 {
-            Operator::Delete => "Delete",
-            Operator::Change => "Change",
-        }
-    }
-
-    fn to_serializable(&self) -> ActionDefinition {
-        ActionDefinition::EnterPendingOperation { operator: self.0 }
-    }
-
-    fn clone_box(&self) -> Box<dyn Action> {
-        Box::new(self.clone())
     }
 }

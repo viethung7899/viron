@@ -33,7 +33,7 @@ impl Drawable for StatusLine {
             Mode::Insert => theme.colors.status.insert,
             Mode::Command => theme.colors.status.command,
             Mode::Search => theme.colors.status.search,
-            Mode::OperationPending => theme.colors.status.normal,
+            Mode::OperationPending(_) => theme.colors.status.normal,
         };
 
         let mut outer = Style::from(colors);

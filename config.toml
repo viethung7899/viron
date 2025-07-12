@@ -53,8 +53,8 @@ gutter = "relative"
 "zz" = { type = "MoveToViewportCenter" }
 
 "x" = { type = "DeleteChar" }
-"d" = { type = "EnterPendingOperation", params = { operator = "Delete" } }
-"c" = { type = "EnterPendingOperation", params = { operator = "Change" } }
+"d" = { type = "EnterMode", params = { mode = { OperationPending = "Delete" } } }
+"c" = { type = "EnterMode", params = { mode = { OperationPending = "Change" } } }
 
 "i" = { type = "EnterMode", params = { mode = "Insert" } }
 ":" = { type = "EnterMode", params = { mode = "Command" } }

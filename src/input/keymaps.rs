@@ -34,17 +34,20 @@ impl KeyMap {
 
     pub fn get_action(&self, mode: &Mode, sequence: &KeySequence) -> Option<&ActionDefinition> {
         let definition = match mode {
-            Mode::Normal => self.normal.get(sequence).or_else(|| self.movement.get(sequence)),
-            Mode::OperationPending => self.movement.get(sequence),
+            Mode::Normal => self
+                .normal
+                .get(sequence)
+                .or_else(|| self.movement.get(sequence)),
+            Mode::OperationPending(_) => self.movement.get(sequence),
             _ => None,
         };
         definition.or_else(|| self.default.get(sequence))
     }
 
     pub fn is_partial_match(&self, mode: &Mode, sequence: &KeySequence) -> bool {
-        let keys: Box<dyn Iterator<Item=&KeySequence>> = match mode {
+        let keys: Box<dyn Iterator<Item = &KeySequence>> = match mode {
             Mode::Normal => Box::new(self.movement.keys().chain(self.normal.keys())),
-            Mode::OperationPending => Box::new(self.movement.keys()),
+            Mode::OperationPending(_) => Box::new(self.movement.keys()),
             _ => {
                 return false; // No partial matches in other modes
             }
