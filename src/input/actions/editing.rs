@@ -1,6 +1,6 @@
 use crate::core::history::edit::Edit;
 use crate::core::message::Message;
-use crate::editor::Mode;
+use crate::core::mode::Mode;
 use crate::input::actions::{
     impl_action, movement, system, Action, ActionContext, ActionDefinition, ActionResult,
     Executable,
@@ -271,7 +271,9 @@ impl Executable for DeleteWord {
             return Ok(());
         }
 
-        let Some((deleted_text, _)) = buffer.delete_string(start_position, end_position - start_position) else {
+        let Some((deleted_text, _)) =
+            buffer.delete_string(start_position, end_position - start_position)
+        else {
             return Ok(());
         };
 

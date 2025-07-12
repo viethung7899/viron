@@ -1,8 +1,8 @@
 use crate::core::buffer_manager::BufferManager;
 use crate::core::command::{CommandBuffer, SearchBuffer};
 use crate::core::message::MessageManager;
+use crate::core::mode::Mode;
 use crate::core::{cursor::Cursor, viewport::Viewport};
-use crate::editor::Mode;
 use crate::service::LspService;
 use crate::ui::components::ComponentIds;
 use crate::ui::compositor::Compositor;

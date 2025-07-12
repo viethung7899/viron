@@ -6,7 +6,8 @@ use crate::core::cursor::Cursor;
 use crate::core::viewport::Viewport;
 use crate::core::{buffer_manager::BufferManager, message::MessageManager};
 use crate::input::actions::Executable;
-use crate::input::keymaps::{KeyEvent as VironKeyEvent, KeySequence};
+use crate::input::keymaps::KeyMap;
+use crate::input::keys::{KeyEvent as VironKeyEvent, KeySequence};
 use crate::input::{
     actions,
     actions::ActionContext,
@@ -25,44 +26,9 @@ use crossterm::{
     terminal::{self, ClearType},
 };
 use crossterm::{style, ExecutableCommand, QueueableCommand};
-use serde::{Deserialize, Serialize};
 use std::io::{self, Stdout, Write};
 use std::path::{Path, PathBuf};
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum Mode {
-    Normal,
-    Insert,
-    Command,
-    Search,
-}
-
-impl Mode {
-    pub fn to_string(&self) -> String {
-        match self {
-            Mode::Normal => "normal".to_string(),
-            Mode::Insert => "insert".to_string(),
-            Mode::Command => "command".to_string(),
-            Mode::Search => "search".to_string(),
-        }
-    }
-
-    pub fn to_name(&self) -> &str {
-        match self {
-            Mode::Normal => "Normal",
-            Mode::Insert => "Insert",
-            Mode::Command => "Command",
-            Mode::Search => "Search",
-        }
-    }
-
-    pub fn set_cursor_style(&self) -> cursor::SetCursorStyle {
-        match self {
-            Mode::Insert => cursor::SetCursorStyle::SteadyBar,
-            _ => cursor::SetCursorStyle::SteadyBlock,
-        }
-    }
-}
+use crate::core::mode::Mode;
 
 pub struct Editor {
     // Size

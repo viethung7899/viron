@@ -1,7 +1,5 @@
-use crate::{
-    core::{buffer::Buffer, utf8::Utf8CharIterator},
-    editor::Mode,
-};
+use crate::core::mode::Mode;
+use crate::core::{buffer::Buffer, utf8::Utf8CharIterator};
 use tree_sitter::Point;
 
 #[derive(Debug, Clone, Default)]
@@ -229,7 +227,7 @@ impl Cursor {
         new_cursor.preferred_column = new_cursor.char_column;
         new_cursor
     }
-    
+
     pub fn clamp_row(&mut self, buffer: &Buffer) {
         if self.row >= buffer.line_count() {
             self.row = buffer.line_count().saturating_sub(1);

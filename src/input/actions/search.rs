@@ -1,5 +1,5 @@
 use crate::core::message::Message;
-use crate::editor::Mode;
+use crate::core::mode::Mode;
 use crate::input::actions::{
     impl_action, mode, movement, system, Action, ActionDefinition, Executable,
 };

@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 
 use crate::core::message::Message;
-use crate::editor::Mode;
+use crate::core::mode::Mode;
 use crate::input::actions::{mode, system, Executable};
 use crate::input::actions::{ActionContext, ActionResult};
 use crate::input::command_parser::parse_command;

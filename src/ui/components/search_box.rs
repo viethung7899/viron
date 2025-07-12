@@ -1,4 +1,4 @@
-use crate::editor::Mode;
+use crate::core::mode::Mode;
 use crate::ui::render_buffer::RenderBuffer;
 use crate::ui::theme::Style;
 use crate::ui::{Bounds, Drawable, Focusable, RenderContext};

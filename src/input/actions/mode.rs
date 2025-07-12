@@ -1,4 +1,4 @@
-use crate::editor::Mode;
+use crate::core::mode::Mode;
 use crate::input::actions::{Action, ActionContext, ActionDefinition, ActionResult, Executable};
 use async_trait::async_trait;
 use std::fmt::Debug;
