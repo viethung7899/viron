@@ -28,23 +28,23 @@ gutter = "relative"
 "<End>" = { type = "MoveToLineEnd" }
 
 "a" = { type = "Composite", params = { description = "Insert after the cursor", actions = [
-    { type = "EnterMode", params = { mode = "insert" } },
+    { type = "EnterMode", params = { mode = "Insert" } },
     { type = "MoveRight", params = { next_line = true } }
 ] } }
 
 "A" = { type = "Composite", params = { description = "Insert at the end of the line", actions = [
-    { type = "EnterMode", params = { mode = "insert" } },
+    { type = "EnterMode", params = { mode = "Insert" } },
     { type = "MoveToLineEnd" }
 ] } }
 
 "o" = { type = "Composite", params = { description = "Insert new line below the current line", actions = [
     { type = "InsertNewLineBelow" },
-    { type = "EnterMode", params = { mode = "insert" } }
+    { type = "EnterMode", params = { mode = "Insert" } }
 ] } }
 
 "O" = { type = "Composite", params = { description = "Insert new line above the current line", actions = [
     { type = "InsertNewLineAbove" },
-    { type = "EnterMode", params = { mode = "insert" } }
+    { type = "EnterMode", params = { mode = "Insert" } }
 ] } }
 
 [keymap.normal] # Keymode for normal mode only
@@ -53,8 +53,8 @@ gutter = "relative"
 "zz" = { type = "MoveToViewportCenter" }
 
 "x" = { type = "DeleteChar" }
-"d" = { type = "EnterPendingOperation", params = { operation = "Delete" } }
-"c" = { type = "EnterPendingOperation", params = { operation = "Change" } }
+"d" = { type = "EnterPendingOperation", params = { operator = "Delete" } }
+"c" = { type = "EnterPendingOperation", params = { operator = "Change" } }
 
 "i" = { type = "EnterMode", params = { mode = "Insert" } }
 ":" = { type = "EnterMode", params = { mode = "Command" } }
