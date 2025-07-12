@@ -300,10 +300,9 @@ impl Editor {
             .mark_dirty(&self.component_ids.pending_keys_id)?;
 
         let action = self.input_state.get_executable(&self.mode, &self.keymap);
-        if action.is_some() {
+        if self.input_state.is_empty() {
             self.compositor
                 .mark_visible(&self.component_ids.pending_keys_id, false)?;
-            self.input_state.clear()
         }
         Ok(action)
     }

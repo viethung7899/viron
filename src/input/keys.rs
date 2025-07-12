@@ -25,6 +25,10 @@ impl KeySequence {
     pub fn new() -> Self {
         Self { keys: Vec::new() }
     }
+    
+    pub fn is_empty(&self) -> bool {
+        self.keys.is_empty()
+    }
 
     pub fn from_keys(keys: Vec<KeyEvent>) -> Self {
         Self { keys }

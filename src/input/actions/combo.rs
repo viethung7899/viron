@@ -3,19 +3,19 @@ use crate::input::actions::{Action, ActionContext, ActionResult, Executable};
 use async_trait::async_trait;
 
 #[derive(Debug, Clone)]
-pub struct RepeatedAction {
+pub struct RepeatingAction {
     repeat: usize,
     action: Box<dyn Action>,
 }
 
-impl RepeatedAction {
+impl RepeatingAction {
     pub fn new(repeat: usize, action: Box<dyn Action>) -> Self {
         Self { repeat, action }
     }
 }
 
 #[async_trait(?Send)]
-impl Executable for RepeatedAction {
+impl Executable for RepeatingAction {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         log::info!("Executing RepeatedAction with repeat: {}", self.repeat);
         for _ in 0..self.repeat {

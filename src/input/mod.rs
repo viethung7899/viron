@@ -2,7 +2,7 @@ use crate::core::mode;
 use crate::core::mode::Mode;
 use crate::core::operation::Operator;
 use crate::input::actions::{
-    create_action_from_definition, ActionDefinition, ComboAction, RepeatedAction,
+    create_action_from_definition, ActionDefinition, ComboAction, RepeatingAction,
 };
 use crate::input::keymaps::KeyMap;
 use crate::input::keys::{KeyEvent, KeySequence};
@@ -37,12 +37,16 @@ impl InputState {
         }
     }
 
-    pub fn push_operation(&mut self, operator: Operator) {
+    fn push_operation(&mut self, operator: Operator) {
         self.pending_operation = Some(PendingOperation {
             operator,
             repeat: self.repeat,
         });
         self.repeat = None;
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.repeat.is_none() && self.pending_operation.is_none() && self.sequence.is_empty()
     }
 
     pub fn clear(&mut self) {
@@ -51,7 +55,7 @@ impl InputState {
         self.sequence.clear();
     }
 
-    pub fn to_string(&self) -> String {
+    pub fn display(&self) -> String {
         let mut result = String::new();
         if let Some(ref pending) = self.pending_operation {
             if let Some(repeat) = pending.repeat {
@@ -79,15 +83,7 @@ impl InputState {
     }
 
     fn add_number_key(&mut self, number: usize) {
-        if let Some(ref mut pending_operation) = self.pending_operation {
-            if let Some(ref mut repeat) = pending_operation.repeat {
-                *repeat = *repeat * 10 + number;
-            } else if number > 0 {
-                pending_operation.repeat = Some(number);
-            } else {
-                self.clear();
-            }
-        } else if let Some(ref mut repeat) = self.repeat {
+        if let Some(ref mut repeat) = self.repeat {
             *repeat = *repeat * 10 + number;
         } else if number > 0 {
             self.repeat = Some(number);
@@ -99,7 +95,7 @@ impl InputState {
         }
     }
 
-    pub fn get_total_repeat(&self) -> usize {
+    fn get_total_repeat(&self) -> usize {
         let motion_repeat = self.repeat.unwrap_or(1);
         let operation_repeat = self
             .pending_operation
@@ -113,18 +109,28 @@ impl InputState {
         let Some(definition) = self.get_action_from_sequence(mode, keymap) else {
             return None;
         };
+        let action = create_action_from_definition(&definition);
+
+        match &definition {
+            ActionDefinition::EnterPendingOperation { operator } => {
+                self.push_operation(*operator);
+                return Some(action);
+            }
+            _ => {}
+        };
+
         let repeat = self.get_total_repeat();
-        if let Some(pending) = self.pending_operation.as_ref() {
-            Some(Box::new(ComboAction::new(
-                pending.operator,
-                repeat,
-                create_action_from_definition(&definition),
-            )))
+
+        let executable: Box<dyn Executable> = if let Some(pending) = self.pending_operation.as_ref()
+        {
+            Box::new(ComboAction::new(pending.operator, repeat, action))
         } else if repeat > 1 {
-            Some(Box::new(RepeatedAction::new(repeat, create_action_from_definition(&definition))))
+            Box::new(RepeatingAction::new(repeat, action))
         } else {
-            Some(create_action_from_definition(&definition))
-        }
+            action
+        };
+        self.clear();
+        Some(executable)
     }
 
     fn get_action_from_sequence(
