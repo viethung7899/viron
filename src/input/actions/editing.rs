@@ -3,7 +3,7 @@ use crate::core::message::Message;
 use crate::core::mode::Mode;
 use crate::input::actions::definition::ActionDefinition;
 use crate::input::actions::{
-    impl_action, movement, system, Action, ActionContext, ActionResult, Executable,
+    Action, ActionContext, ActionResult, Executable, impl_action, movement, system,
 };
 use async_trait::async_trait;
 use std::fmt::Debug;
@@ -228,21 +228,17 @@ pub struct DeleteCurrentLine;
 impl Executable for DeleteCurrentLine {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         let buffer = ctx.buffer_manager.current_buffer_mut();
-        let point = ctx.cursor.get_point();
-
-        // Move cursor to beginning of current line
-        let mut start_point = point.clone();
-        start_point.column = 0;
-        let start_byte = buffer.cursor_position(&start_point);
-        let content_line = buffer.get_content_line(point.row);
-        let byte_count = content_line.len();
-
-        buffer.delete_string(start_byte, byte_count);
-
+        let start_point = ctx.cursor.get_point();
+        let Some((deleted, start_byte)) = buffer.delete_line(start_point.row) else {
+            return Ok(());
+        };
         ctx.cursor.clamp_row(buffer);
         ctx.cursor.clamp_column(buffer, ctx.mode);
         let new_point = ctx.cursor.get_point();
-        let edit = Edit::delete(start_byte, start_point, content_line, point, new_point);
+        let edit = Edit::delete(
+            start_byte, 
+            buffer.point_at_position(start_byte), 
+            deleted, start_point, new_point);
         after_edit(ctx, &edit)?;
         ctx.buffer_manager.current_mut().history.push(edit);
         Ok(())
