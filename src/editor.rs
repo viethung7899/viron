@@ -77,12 +77,7 @@ impl Editor {
         let (width, height) = terminal::size()?;
 
         // Create core components
-
-        let buffer_manager = file
-            .as_ref()
-            .map(|file| BufferManager::new_with_file(file.as_ref()))
-            .unwrap_or(BufferManager::new());
-
+        let buffer_manager = BufferManager::new();
         let command_buffer = CommandBuffer::new();
         let message_manager = MessageManager::new();
         let search_buffer = SearchBuffer::new();
@@ -153,7 +148,9 @@ impl Editor {
         if let Some(file) = file {
             let action = actions::OpenBuffer::new(PathBuf::from(file.as_ref()));
             editor.execute_action(&action).await?;
-        };
+        } else {
+            editor.buffer_manager.new_buffer();
+        }
 
         Ok(editor)
     }
