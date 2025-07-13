@@ -182,7 +182,7 @@ pub fn get_default_command_action(key_event: &KeyEvent) -> Option<Box<dyn Execut
         }
         (KeyCode::Enter, _) => Box::new(actions::CommandExecute),
         (KeyCode::Left, _) => Box::new(actions::CommandMoveLeft),
-        (KeyCode::Right, _) => Box::new(actions::CommandMoveLeft),
+        (KeyCode::Right, _) => Box::new(actions::CommandMoveRight),
         (KeyCode::Backspace, _) => Box::new(actions::CommandBackspace),
         (KeyCode::Delete, _) => Box::new(actions::CommandDeleteChar),
         _ => {
@@ -199,7 +199,7 @@ pub fn get_default_search_action(key_event: &KeyEvent) -> Option<Box<dyn Executa
         }
         (KeyCode::Enter, _) => Some(Box::new(actions::SearchSubmit)),
         (KeyCode::Left, _) => Some(Box::new(actions::SearchMoveLeft)),
-        (KeyCode::Right, _) => Some(Box::new(actions::SearchMoveLeft)),
+        (KeyCode::Right, _) => Some(Box::new(actions::SearchMoveRight)),
         (KeyCode::Backspace, _) => Some(Box::new(actions::SearchBackspace)),
         (KeyCode::Delete, _) => Some(Box::new(actions::SearchDeleteChar)),
         _ => None,

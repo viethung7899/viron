@@ -135,7 +135,7 @@ impl ComboAction {
         let after = ctx.cursor.get_point();
 
         let from = before.min(after);
-        let to = after.max(after);
+        let to = before.max(after);
 
         let buffer = ctx.buffer_manager.current_buffer_mut();
         let result = match movement_type {
