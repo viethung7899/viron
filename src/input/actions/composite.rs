@@ -1,5 +1,7 @@
+use crate::core::history::edit::Edit;
 use crate::core::mode::Mode;
 use crate::core::operation::Operator;
+use crate::input::actions::editing::after_edit;
 use crate::input::actions::{
     create_action_from_definition, Action, ActionContext, ActionDefinition, ActionResult, EnterMode,
     Executable, InsertNewLineAbove, MovementType,
@@ -136,22 +138,35 @@ impl ComboAction {
         let to = after.max(after);
 
         let buffer = ctx.buffer_manager.current_buffer_mut();
-        match movement_type {
+        let result = match movement_type {
             MovementType::Line => {
                 let start_line = from.row;
                 let end_line = to.row;
-                buffer.delete_multiple_lines(start_line, end_line);
+                buffer.delete_multiple_lines(start_line, end_line)
             }
             MovementType::Character => {
                 let start = buffer.cursor_position(&from);
                 let end = buffer.cursor_position(&to);
-                buffer.delete_string(start, end - start);
+                buffer.delete_string(start, end - start)
             }
-        }
-        
+        };
+
+        let Some((deleted, start_byte)) = result else {
+            return Ok(());
+        };
+
+        let edit = Edit::delete(
+            start_byte,
+            buffer.point_at_position(start_byte),
+            deleted,
+            from,
+            to,
+        );
         ctx.cursor.set_point(from, buffer);
         ctx.cursor.clamp_row(buffer);
         ctx.cursor.clamp_column(buffer, ctx.mode);
+        after_edit(ctx, &edit)?;
+        ctx.buffer_manager.current_mut().history.push(edit);
         Ok(())
     }
 
@@ -161,7 +176,7 @@ impl ComboAction {
         };
         if self.perform_delete(ctx).await.is_err() {
             return Ok(());
-        }
+        };
         match movement_type {
             MovementType::Line => {
                 InsertNewLineAbove.execute(ctx).await?;
@@ -177,11 +192,11 @@ impl ComboAction {
 #[async_trait(?Send)]
 impl Executable for ComboAction {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+        EnterMode::new(Mode::Normal).execute(ctx).await?;
         match self.operator {
             Operator::Delete => self.perform_delete(ctx).await,
             Operator::Change => self.perform_change(ctx).await,
         }?;
-        ctx.compositor.mark_all_dirty();
         Ok(())
     }
 }
