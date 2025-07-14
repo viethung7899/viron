@@ -119,9 +119,8 @@ impl InputState {
         }
 
         let repeat = self.get_total_repeat();
-
-        let pending = &self.pending_operation.clone();
-        if let Some(pending) = pending.as_ref() {
+        
+        if let Some(pending) = self.pending_operation.as_ref().cloned() {
             self.clear();
             if definition.is_movement_type() {
                 return Some(Box::new(ComboAction::new(

@@ -55,7 +55,10 @@ impl KeyMap {
                 .movement
                 .get(sequence)
                 .or_else(|| self.pending.delete.get(sequence)),
-            Mode::OperationPending(Operator::Change) => self.movement.get(sequence),
+            Mode::OperationPending(Operator::Change) => self
+                .movement
+                .get(sequence)
+                .or_else(|| self.pending.change.get(sequence)),
             _ => None,
         };
         definition.or_else(|| self.default.get(sequence))

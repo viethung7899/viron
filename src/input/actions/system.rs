@@ -1,9 +1,8 @@
 use crate::core::message::Message;
 use crate::input::actions::{
-    impl_action, Action, ActionContext, ActionResult, Executable,
+    impl_action, Action, ActionContext, ActionDefinition, ActionResult, Executable,
 };
 use async_trait::async_trait;
-use crate::input::actions::definition::ActionDefinition;
 
 #[derive(Debug, Clone)]
 pub struct Quit;

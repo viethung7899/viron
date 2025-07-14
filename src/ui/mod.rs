@@ -1,8 +1,7 @@
-use crate::core::command::{CommandBuffer, SearchBuffer};
 use crate::config::Config;
+use crate::core::command::{CommandBuffer, SearchBuffer};
 use crate::core::cursor::Cursor;
 use crate::core::message::MessageManager;
-use crate::core::mode::Mode;
 use crate::core::viewport::Viewport;
 use crate::ui::render_buffer::RenderBuffer;
 
@@ -12,6 +11,7 @@ pub mod render_buffer;
 pub mod theme;
 
 use crate::core::document::Document;
+use crate::core::mode::Mode;
 use crate::input::InputState;
 use crate::service::lsp::types::Diagnostic;
 
