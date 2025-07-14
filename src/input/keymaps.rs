@@ -1,88 +1,43 @@
-use anyhow::{Result};
-use crossterm::event::{KeyCode, KeyEvent as CrosstermKeyEvent, KeyModifiers};
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::fs;
-use std::path::Path;
 
-use crate::editor::Mode;
-use crate::input::actions::{Action, ActionDefinition, create_action_from_definition};
-
-// Wrapper around crossterm's KeyEvent for easier handling
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct KeyEvent {
-    pub code: KeyCode,
-    pub modifiers: KeyModifiers,
-}
-
-impl From<CrosstermKeyEvent> for KeyEvent {
-    fn from(event: CrosstermKeyEvent) -> Self {
-        Self {
-            code: event.code,
-            modifiers: event.modifiers,
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct KeySequence {
-    pub keys: Vec<KeyEvent>,
-}
-
-impl KeySequence {
-    pub fn new() -> Self {
-        Self { keys: Vec::new() }
-    }
-
-    pub fn from_keys(keys: Vec<KeyEvent>) -> Self {
-        Self { keys }
-    }
-
-    pub fn add(&mut self, key: KeyEvent) {
-        self.keys.push(key);
-    }
-
-    pub fn clear(&mut self) {
-        self.keys.clear();
-    }
-
-    pub fn is_prefix_of(&self, other: &KeySequence) -> bool {
-        if self.keys.len() > other.keys.len() {
-            return false;
-        }
-
-        for (i, key) in self.keys.iter().enumerate() {
-            if *key != other.keys[i] {
-                return false;
-            }
-        }
-
-        true
-    }
-}
+use crate::core::mode::Mode;
+use crate::core::operation::Operator;
+use crate::input::actions::definition::ActionDefinition;
+use crate::input::keys::KeySequence;
 
 #[derive(Debug, Default)]
 pub struct KeyMap {
-    pub normal: HashMap<KeySequence, Box<dyn Action>>,
-    pub insert: HashMap<KeySequence, Box<dyn Action>>,
-    pub command: HashMap<KeySequence, Box<dyn Action>>,
-    pub search: HashMap<KeySequence, Box<dyn Action>>,
+    pub default: HashMap<KeySequence, ActionDefinition>,
+    pub movement: HashMap<KeySequence, ActionDefinition>,
+    pub normal: HashMap<KeySequence, ActionDefinition>,
+    pub pending: PendingKeyMap,
+}
+
+#[derive(Debug, Default)]
+pub struct PendingKeyMap {
+    pub delete: HashMap<KeySequence, ActionDefinition>,
+    pub change: HashMap<KeySequence, ActionDefinition>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Default)]
 pub struct KeyMapConfig {
-    #[serde(default = "default_map")]
+    #[serde(default)]
+    pub default: HashMap<String, ActionDefinition>,
+    #[serde(default)]
+    pub movement: HashMap<String, ActionDefinition>,
+    #[serde(default)]
     pub normal: HashMap<String, ActionDefinition>,
-    #[serde(default = "default_map")]
-    pub insert: HashMap<String, ActionDefinition>,
-    #[serde(default = "default_map")]
-    pub command: HashMap<String, ActionDefinition>,
-    #[serde(default = "default_map")]
-    pub search: HashMap<String, ActionDefinition>,
+    pub pending: PendingKeyMapConfig,
 }
 
-fn default_map() -> HashMap<String, ActionDefinition> {
-    HashMap::new()
+#[derive(Debug, Serialize, Deserialize, Default)]
+pub struct PendingKeyMapConfig {
+    #[serde(default)]
+    pub delete: HashMap<String, ActionDefinition>,
+    #[serde(default)]
+    pub change: HashMap<String, ActionDefinition>,
 }
 
 impl KeyMap {
@@ -90,24 +45,35 @@ impl KeyMap {
         Self::default()
     }
 
-    pub fn get_action(&self, mode: &Mode, sequence: &KeySequence) -> Option<&Box<dyn Action>> {
-        match mode {
-            Mode::Normal => self.normal.get(sequence),
-            Mode::Insert => self.insert.get(sequence),
-            Mode::Command => self.command.get(sequence),
-            Mode::Search => self.search.get(sequence),
-        }
+    pub fn get_action(&self, mode: &Mode, sequence: &KeySequence) -> Option<&ActionDefinition> {
+        let definition = match mode {
+            Mode::Normal => self
+                .normal
+                .get(sequence)
+                .or_else(|| self.movement.get(sequence)),
+            Mode::OperationPending(Operator::Delete) => self
+                .movement
+                .get(sequence)
+                .or_else(|| self.pending.delete.get(sequence)),
+            Mode::OperationPending(Operator::Change) => self
+                .movement
+                .get(sequence)
+                .or_else(|| self.pending.change.get(sequence)),
+            _ => None,
+        };
+        definition.or_else(|| self.default.get(sequence))
     }
 
     pub fn is_partial_match(&self, mode: &Mode, sequence: &KeySequence) -> bool {
-        let map = match mode {
-            Mode::Normal => &self.normal,
-            Mode::Insert => &self.insert,
-            Mode::Command => &self.command,
-            Mode::Search => &self.search,
+        let keys: Box<dyn Iterator<Item = &KeySequence>> = match mode {
+            Mode::Normal => Box::new(self.movement.keys().chain(self.normal.keys())),
+            Mode::OperationPending(_) => Box::new(self.movement.keys()),
+            _ => {
+                return false; // No partial matches in other modes
+            }
         };
 
-        for key in map.keys() {
+        for key in keys {
             if sequence.is_prefix_of(key) && sequence.keys.len() < key.keys.len() {
                 return true;
             }
@@ -119,159 +85,31 @@ impl KeyMap {
     pub fn load_from_config(config: &KeyMapConfig) -> Result<Self> {
         let mut keymap = Self::new();
 
-        // Load normal mode mappings
         for (key_str, action_def) in &config.normal {
-            let sequence = KeySequence::from_string(&key_str)?;
-            let action = create_action_from_definition(&action_def);
-            keymap.normal.insert(sequence, action);
+            let sequence = KeySequence::from_string(key_str)?;
+            keymap.normal.insert(sequence, action_def.clone());
         }
 
-        // Load insert mode mappings
-        for (key_str, action_def) in &config.insert {
-            let sequence = KeySequence::from_string(&key_str)?;
-            let action = create_action_from_definition(&action_def);
-            keymap.insert.insert(sequence, action);
+        for (key_str, action_def) in &config.default {
+            let sequence = KeySequence::from_string(key_str)?;
+            keymap.default.insert(sequence, action_def.clone());
         }
 
-        // Load command mode mappings
-        for (key_str, action_def) in &config.command {
-            let sequence = KeySequence::from_string(&key_str)?;
-            let action = create_action_from_definition(&action_def);
-            keymap.command.insert(sequence, action);
+        for (key_str, action_def) in &config.movement {
+            let sequence = KeySequence::from_string(key_str)?;
+            keymap.movement.insert(sequence, action_def.clone());
         }
 
-        // Load search mode mappings
-        for (key_str, action_def) in &config.search {
-            let sequence = KeySequence::from_string(&key_str)?;
-            let action = create_action_from_definition(&action_def);
-            keymap.search.insert(sequence, action);
+        for (key_str, action_def) in &config.pending.delete {
+            let sequence = KeySequence::from_string(key_str)?;
+            keymap.pending.delete.insert(sequence, action_def.clone());
+        }
+
+        for (key_str, action_def) in &config.pending.change {
+            let sequence = KeySequence::from_string(key_str)?;
+            keymap.pending.change.insert(sequence, action_def.clone());
         }
 
         Ok(keymap)
-    }
-
-    pub fn save_to_file(&self, path: impl AsRef<Path>) -> Result<()> {
-        let config = self.to_config();
-        let toml_str = toml::to_string_pretty(&config)?;
-        fs::write(path, toml_str)?;
-        Ok(())
-    }
-
-    pub fn to_config(&self) -> KeyMapConfig {
-        let mut normal_mode = HashMap::new();
-        let mut insert_mode = HashMap::new();
-        let mut command_mode = HashMap::new();
-        let mut search_mode = HashMap::new();
-
-        for (seq, action) in &self.normal {
-            normal_mode.insert(seq.to_string(), action.to_serializable());
-        }
-
-        for (seq, action) in &self.insert {
-            insert_mode.insert(seq.to_string(), action.to_serializable());
-        }
-
-        for (seq, action) in &self.command {
-            command_mode.insert(seq.to_string(), action.to_serializable());
-        }
-
-        for (seq, action) in &self.search {
-            search_mode.insert(seq.to_string(), action.to_serializable());
-        }
-
-        KeyMapConfig {
-            normal: normal_mode,
-            insert: insert_mode,
-            command: command_mode,
-            search: search_mode,
-        }
-    }
-}
-
-impl KeySequence {
-    pub fn to_string(&self) -> String {
-        self.keys
-            .iter()
-            .map(|key| match key.code {
-                KeyCode::Char(c) if key.modifiers == KeyModifiers::NONE => c.to_string(),
-                KeyCode::Char(c) => format!("<{:?}-{}>", key.modifiers, c),
-                _ => format!("<{:?}>", key.code),
-            })
-            .collect::<Vec<_>>()
-            .join("")
-    }
-
-    pub fn from_string(s: &str) -> Result<Self> {
-        let mut keys = Vec::new();
-        let mut chars = s.chars().peekable();
-
-        while let Some(c) = chars.next() {
-            if c == '<' {
-                // Parse special key
-                let mut special = String::new();
-                while let Some(next) = chars.next() {
-                    if next == '>' {
-                        break;
-                    }
-                    special.push(next);
-                }
-
-                // Parse the special key
-                if special.contains('-') {
-                    let parts: Vec<&str> = special.split('-').collect();
-                    let modifier_str = parts[0];
-                    let key_str = parts[1];
-
-                    let modifiers = match modifier_str {
-                        "SHIFT" => KeyModifiers::SHIFT,
-                        "CONTROL" => KeyModifiers::CONTROL,
-                        "ALT" => KeyModifiers::ALT,
-                        _ => KeyModifiers::NONE,
-                    };
-
-                    if key_str.len() == 1 {
-                        let c = key_str.chars().next().unwrap();
-                        keys.push(KeyEvent {
-                            code: KeyCode::Char(c),
-                            modifiers,
-                        });
-                    }
-                } else {
-                    // Handle special keys like <Esc>, <Enter>, etc.
-                    let code = match special.as_str() {
-                        "Esc" => KeyCode::Esc,
-                        "Enter" => KeyCode::Enter,
-                        "Backspace" => KeyCode::Backspace,
-                        "Tab" => KeyCode::Tab,
-                        "Space" => KeyCode::Char(' '),
-                        "Left" => KeyCode::Left,
-                        "Right" => KeyCode::Right,
-                        "Up" => KeyCode::Up,
-                        "Down" => KeyCode::Down,
-                        "Home" => KeyCode::Home,
-                        "End" => KeyCode::End,
-                        // Add more special keys as needed
-                        _ => continue, // Skip unknown keys
-                    };
-
-                    keys.push(KeyEvent {
-                        code,
-                        modifiers: KeyModifiers::NONE,
-                    });
-                }
-            } else {
-                // Regular character
-                keys.push(KeyEvent {
-                    code: KeyCode::Char(c),
-                    modifiers: if c.is_ascii_uppercase() {
-                        KeyModifiers::SHIFT
-                    } else {
-                        KeyModifiers::NONE
-                    },
-                });
-            }
-        }
-
-        Ok(KeySequence::from_keys(keys))
     }
 }

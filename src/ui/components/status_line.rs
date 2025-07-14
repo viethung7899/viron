@@ -1,5 +1,5 @@
 use crate::constants::RESERVED_ROW_COUNT;
-use crate::editor::Mode;
+use crate::core::mode::Mode;
 use crate::ui::render_buffer::RenderBuffer;
 use crate::ui::theme::Style;
 use crate::ui::{Bounds, Drawable, RenderContext};
@@ -33,6 +33,7 @@ impl Drawable for StatusLine {
             Mode::Insert => theme.colors.status.insert,
             Mode::Command => theme.colors.status.command,
             Mode::Search => theme.colors.status.search,
+            Mode::OperationPending(_) => theme.colors.status.normal,
         };
 
         let mut outer = Style::from(colors);

@@ -1,10 +1,8 @@
 use crate::config::editor::Gutter;
-use crate::input::actions::{
-    impl_action, Action, ActionContext, ActionDefinition, ActionResult, Executable,
-};
+use crate::input::actions::definition::ActionDefinition;
+use crate::input::actions::{impl_action, Action, ActionContext, ActionResult, Executable};
 use async_trait::async_trait;
 use std::fmt::Debug;
-
 #[derive(Debug, Clone)]
 pub struct MoveLeft {
     previous_line: bool,

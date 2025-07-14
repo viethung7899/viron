@@ -235,6 +235,40 @@ impl Buffer {
         Some((deleted_string, position))
     }
 
+    pub fn delete_line(&mut self, line: usize) -> Option<(String, usize)> {
+        if line >= self.line_count() {
+            return None;
+        };
+
+        let start = self.line_starts[line];
+        let end = if line + 1 < self.line_starts.len() {
+            self.line_starts[line + 1]
+        } else {
+            self.buffer.len_without_gap()
+        };
+        self.delete_string(start, end - start)
+    }
+
+    pub fn delete_multiple_lines(
+        &mut self,
+        start_line: usize,
+        end_line: usize,
+    ) -> Option<(String, usize)> {
+        if start_line >= self.line_count() || end_line >= self.line_count() || start_line > end_line
+        {
+            return None;
+        }
+
+        let start = self.line_starts[start_line];
+        let end = if end_line + 1 < self.line_starts.len() {
+            self.line_starts[end_line + 1]
+        } else {
+            self.buffer.len_without_gap()
+        };
+
+        self.delete_string(start, end - start)
+    }
+
     pub fn apply_edit(&mut self, change: &Edit) {
         match change {
             Edit::Insert(Insert {

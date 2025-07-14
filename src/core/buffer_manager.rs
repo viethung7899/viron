@@ -16,25 +16,11 @@ pub struct BufferManager {
 
 impl BufferManager {
     pub fn new() -> Self {
-        // Create a default empty document
-        let mut documents = Vec::new();
-        documents.push(Document::new());
-
         Self {
-            documents,
-            current_index: 0,
-            path_to_index: HashMap::new(),
-        }
-    }
-
-    pub fn new_with_file(path: &Path) -> Self {
-        let mut manager = Self {
             documents: Vec::new(),
             current_index: 0,
             path_to_index: HashMap::new(),
-        };
-        manager.open_file(path);
-        manager
+        }
     }
 
     // Get the current active document
@@ -78,7 +64,7 @@ impl BufferManager {
 
         // Set as current
         self.current_index = index;
-        
+
         index
     }
 

@@ -1,11 +1,9 @@
 use async_trait::async_trait;
 
 use crate::core::message::Message;
-use crate::input::actions::{
-    impl_action, movement, system, Action, ActionContext, ActionDefinition, ActionResult,
-    Executable,
-};
+use crate::input::actions::{impl_action, system, Action, ActionContext, ActionResult, Executable};
 
+use crate::input::actions::definition::ActionDefinition;
 use std::fmt::Debug;
 use std::path::PathBuf;
 

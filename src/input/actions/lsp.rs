@@ -1,9 +1,10 @@
 use crate::core::message::Message;
 use crate::input::actions::Action;
 use crate::input::actions::{
-    impl_action, system, ActionContext, ActionDefinition, ActionResult, Executable,
+    impl_action, system, ActionContext, ActionResult, Executable,
 };
 use async_trait::async_trait;
+use crate::input::actions::definition::ActionDefinition;
 
 #[derive(Debug, Clone)]
 pub struct GoToDefinition;

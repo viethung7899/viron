@@ -1,14 +1,14 @@
 use crate::core::history::edit::Edit;
 use crate::core::message::Message;
-use crate::editor::Mode;
+use crate::core::mode::Mode;
+use crate::input::actions::definition::ActionDefinition;
 use crate::input::actions::{
-    impl_action, movement, system, Action, ActionContext, ActionDefinition, ActionResult,
-    Executable,
+    impl_action, movement, system, Action, ActionContext, ActionResult, Executable,
 };
 use async_trait::async_trait;
 use std::fmt::Debug;
 
-fn after_edit(ctx: &mut ActionContext, edit: &Edit) -> ActionResult {
+pub(super) fn after_edit(ctx: &mut ActionContext, edit: &Edit) -> ActionResult {
     let document = ctx.buffer_manager.current_mut();
     document.mark_modified();
 
@@ -228,21 +228,15 @@ pub struct DeleteCurrentLine;
 impl Executable for DeleteCurrentLine {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         let buffer = ctx.buffer_manager.current_buffer_mut();
-        let point = ctx.cursor.get_point();
-
-        // Move cursor to beginning of current line
-        let mut start_point = point.clone();
-        start_point.column = 0;
-        let start_byte = buffer.cursor_position(&start_point);
-        let content_line = buffer.get_content_line(point.row);
-        let byte_count = content_line.len();
-
-        buffer.delete_string(start_byte, byte_count);
-
-        ctx.cursor.clamp_row(buffer);
-        ctx.cursor.clamp_column(buffer, ctx.mode);
-        let new_point = ctx.cursor.get_point();
-        let edit = Edit::delete(start_byte, start_point, content_line, point, new_point);
+        let start_point = ctx.cursor.get_point();
+        let (deleted, start_byte) = buffer.delete_line(start_point.row).unwrap();
+        let edit = Edit::delete(
+            start_byte,
+            buffer.point_at_position(start_byte),
+            deleted,
+            start_point,
+            start_point,
+        );
         after_edit(ctx, &edit)?;
         ctx.buffer_manager.current_mut().history.push(edit);
         Ok(())
@@ -256,33 +250,22 @@ impl_action!(
 );
 
 #[derive(Debug, Clone)]
-pub struct DeleteWord;
+pub struct ChangeCurrentLine;
 
 #[async_trait(?Send)]
-impl Executable for DeleteWord {
+impl Executable for ChangeCurrentLine {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
-        let buffer = ctx.buffer_manager.current_buffer_mut();
-        let point = ctx.cursor.get_point();
-        let start_position = buffer.cursor_position(&point);
-
-        let cursor = ctx.cursor.find_next_word(buffer);
-        let end_position = buffer.cursor_position(&cursor.get_point());
-        if start_position >= end_position {
-            return Ok(());
-        }
-
-        let Some((deleted_text, _)) = buffer.delete_string(start_position, end_position - start_position) else {
-            return Ok(());
-        };
-
-        let edit = Edit::delete(start_position, point, deleted_text, point, point);
-        after_edit(ctx, &edit)?;
-        ctx.buffer_manager.current_mut().history.push(edit);
+        DeleteCurrentLine.execute(ctx).await?;
+        InsertNewLineAbove.execute(ctx).await?;
         Ok(())
     }
 }
 
-impl_action!(DeleteWord, "Delete word", ActionDefinition::DeleteWord);
+impl_action!(
+    ChangeCurrentLine,
+    "Change current line",
+    ActionDefinition::ChangeCurrentLine
+);
 
 #[derive(Debug, Clone)]
 pub struct Undo;

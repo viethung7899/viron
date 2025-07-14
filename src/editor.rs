@@ -3,14 +3,16 @@ use crate::config::Config;
 use crate::constants::{MIN_GUTTER_WIDTH, RESERVED_ROW_COUNT};
 use crate::core::command::{CommandBuffer, SearchBuffer};
 use crate::core::cursor::Cursor;
+use crate::core::mode::Mode;
 use crate::core::viewport::Viewport;
 use crate::core::{buffer_manager::BufferManager, message::MessageManager};
-use crate::input::actions::Executable;
-use crate::input::keymaps::{KeyEvent as VironKeyEvent, KeySequence};
+use crate::input::actions::{EnterMode, Executable};
+use crate::input::keys::KeyEvent as VironKeyEvent;
 use crate::input::{
-    actions,
-    actions::ActionContext,
+    actions, actions::ActionContext,
     events::{EventHandler, InputEvent},
+    get_default_command_action,
+    get_default_insert_action, get_default_search_action, InputState,
 };
 use crate::service::LspService;
 use crate::ui::components::{
@@ -19,50 +21,15 @@ use crate::ui::components::{
 use crate::ui::compositor::Compositor;
 use crate::ui::{theme::Theme, RenderContext};
 use anyhow::Result;
+use crossterm::cursor::SetCursorStyle;
 use crossterm::{
     cursor,
-    event::{KeyCode, KeyEvent, KeyModifiers},
+    event::KeyEvent,
     terminal::{self, ClearType},
 };
 use crossterm::{style, ExecutableCommand, QueueableCommand};
-use serde::{Deserialize, Serialize};
 use std::io::{self, Stdout, Write};
 use std::path::{Path, PathBuf};
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum Mode {
-    Normal,
-    Insert,
-    Command,
-    Search,
-}
-
-impl Mode {
-    pub fn to_string(&self) -> String {
-        match self {
-            Mode::Normal => "normal".to_string(),
-            Mode::Insert => "insert".to_string(),
-            Mode::Command => "command".to_string(),
-            Mode::Search => "search".to_string(),
-        }
-    }
-
-    pub fn to_name(&self) -> &str {
-        match self {
-            Mode::Normal => "Normal",
-            Mode::Insert => "Insert",
-            Mode::Command => "Command",
-            Mode::Search => "Search",
-        }
-    }
-
-    pub fn set_cursor_style(&self) -> cursor::SetCursorStyle {
-        match self {
-            Mode::Insert => cursor::SetCursorStyle::SteadyBar,
-            _ => cursor::SetCursorStyle::SteadyBlock,
-        }
-    }
-}
 
 pub struct Editor {
     // Size
@@ -88,7 +55,7 @@ pub struct Editor {
     component_ids: ComponentIds,
 
     // Input handling
-    pending_keys: KeySequence,
+    input_state: InputState,
     event_handler: EventHandler,
 
     // Services
@@ -111,12 +78,7 @@ impl Editor {
         let (width, height) = terminal::size()?;
 
         // Create core components
-
-        let buffer_manager = file
-            .as_ref()
-            .map(|file| BufferManager::new_with_file(file.as_ref()))
-            .unwrap_or(BufferManager::new());
-
+        let buffer_manager = BufferManager::new();
         let command_buffer = CommandBuffer::new();
         let message_manager = MessageManager::new();
         let search_buffer = SearchBuffer::new();
@@ -152,7 +114,6 @@ impl Editor {
         };
 
         // Create input handling
-        let pending_keys = KeySequence::new();
         let event_handler = EventHandler::new();
 
         // Create LSP service
@@ -177,7 +138,7 @@ impl Editor {
             compositor,
             component_ids,
 
-            pending_keys,
+            input_state: InputState::new(),
             event_handler,
 
             lsp_service,
@@ -188,7 +149,9 @@ impl Editor {
         if let Some(file) = file {
             let action = actions::OpenBuffer::new(PathBuf::from(file.as_ref()));
             editor.execute_action(&action).await?;
-        };
+        } else {
+            editor.buffer_manager.new_buffer();
+        }
 
         Ok(editor)
     }
@@ -205,8 +168,11 @@ impl Editor {
             self.render()?;
             match self.event_handler.next().await? {
                 InputEvent::Key(key) => {
-                    if let Some(action) = self.handle_key(key) {
+                    if let Some(action) = self.handle_key(key)? {
                         self.execute_action(action.as_ref()).await?;
+                        if self.input_state.is_empty() && matches!(self.mode, Mode::OperationPending(_)) {
+                            self.execute_action(&EnterMode::new(Mode::Normal)).await?;
+                        }
                     }
                 }
                 InputEvent::Resize(width, height) => {
@@ -237,6 +203,7 @@ impl Editor {
             compositor: &mut self.compositor,
             component_ids: &mut self.component_ids,
             lsp_service: &mut self.lsp_service,
+            input_state: &mut self.input_state,
         };
         action.execute(&mut context).await
     }
@@ -257,15 +224,17 @@ impl Editor {
             command_buffer: &self.command_buffer,
             search_buffer: &self.search_buffer,
             message_manager: &self.message_manager,
-            pending_keys: &self.pending_keys,
+            input_state: &self.input_state,
         };
 
         self.stdout.queue(cursor::Hide)?;
         self.compositor.render(&mut context, &mut self.stdout)?;
 
         if let Some((row, col)) = self.compositor.get_cursor_position(&context) {
+            let set_cursor_style = self.get_cursor_style();
             self.stdout
                 .queue(cursor::MoveTo(col as u16, row as u16))?
+                .queue(set_cursor_style)?
                 .queue(cursor::Show)?;
         }
 
@@ -309,44 +278,45 @@ impl Editor {
         Ok(())
     }
 
-    fn handle_key(&mut self, key: KeyEvent) -> Option<Box<dyn Executable>> {
+    fn handle_key(&mut self, key: KeyEvent) -> Result<Option<Box<dyn Executable>>> {
         // Convert to our key event type
         let key_event = VironKeyEvent::from(key);
-        self.pending_keys.add(key_event.clone());
-        let action = self
-            .config
-            .keymap
-            .get_action(&self.mode, &self.pending_keys)
-            .cloned();
 
-        if let Some(action) = &action {
-            self.pending_keys.clear();
-            self.compositor
-                .mark_visible(&self.component_ids.pending_keys_id, false)
-                .ok();
-            return Some(action.clone());
-        }
-
-        if self
-            .config
-            .keymap
-            .is_partial_match(&self.mode, &self.pending_keys)
-        {
-            self.compositor
-                .mark_visible(&self.component_ids.pending_keys_id, true)
-                .ok();
-            return None;
-        }
-
-        self.pending_keys.clear();
-        self.compositor
-            .mark_visible(&self.component_ids.pending_keys_id, false)
-            .ok();
-        match &self.mode {
-            Mode::Insert => self.handle_default_insert_event(&key_event),
-            Mode::Command => self.handle_default_command_event(&key_event),
-            Mode::Search => self.handle_default_search_event(&key_event),
+        let default_action = match &self.mode {
+            Mode::Insert => get_default_insert_action(&key_event),
+            Mode::Command => get_default_command_action(&key_event),
+            Mode::Search => get_default_search_action(&key_event),
             _ => None,
+        };
+
+        if default_action.is_some() {
+            return Ok(default_action);
+        };
+
+        self.input_state.add_key(key_event);
+        self.compositor
+            .mark_visible(&self.component_ids.pending_keys_id, true)?;
+        self.compositor
+            .mark_dirty(&self.component_ids.pending_keys_id)?;
+
+        let action = self
+            .input_state
+            .get_executable(&self.mode, &self.config.keymap);
+        if self.input_state.is_empty() {
+            self.compositor
+                .mark_visible(&self.component_ids.pending_keys_id, false)?;
+        }
+        Ok(action)
+    }
+
+    fn get_cursor_style(&self) -> SetCursorStyle {
+        if !self.input_state.is_empty() {
+            return SetCursorStyle::SteadyUnderScore;
+        }
+        match self.mode {
+            Mode::Normal => SetCursorStyle::DefaultUserShape,
+            Mode::Insert | Mode::Command | Mode::Search => SetCursorStyle::BlinkingBar,
+            Mode::OperationPending(_) => SetCursorStyle::SteadyUnderScore,
         }
     }
 
@@ -358,65 +328,12 @@ impl Editor {
         Ok(())
     }
 
-    fn handle_default_insert_event(
-        &mut self,
-        key_event: &VironKeyEvent,
-    ) -> Option<Box<dyn Executable>> {
-        let code = key_event.code;
-        let modifiers = key_event.modifiers;
-        match (code, modifiers) {
-            (KeyCode::Char(ch), KeyModifiers::NONE | KeyModifiers::SHIFT) => {
-                Some(Box::new(actions::InsertChar::new(ch)))
-            }
-            _ => None,
-        }
-    }
-
-    fn handle_default_command_event(
-        &mut self,
-        key_event: &VironKeyEvent,
-    ) -> Option<Box<dyn Executable>> {
-        let code = key_event.code;
-        let modifiers = key_event.modifiers;
-        match (code, modifiers) {
-            (KeyCode::Char(ch), KeyModifiers::NONE | KeyModifiers::SHIFT) => {
-                Some(Box::new(actions::CommandInsertChar::new(ch)))
-            }
-            (KeyCode::Enter, _) => Some(Box::new(actions::CommandExecute)),
-            (KeyCode::Left, _) => Some(Box::new(actions::CommandMoveLeft)),
-            (KeyCode::Right, _) => Some(Box::new(actions::CommandMoveLeft)),
-            (KeyCode::Backspace, _) => Some(Box::new(actions::CommandBackspace)),
-            (KeyCode::Delete, _) => Some(Box::new(actions::CommandDeleteChar)),
-            _ => None,
-        }
-    }
-
-    fn handle_default_search_event(
-        &mut self,
-        key_event: &VironKeyEvent,
-    ) -> Option<Box<dyn Executable>> {
-        let code = key_event.code;
-        let modifiers = key_event.modifiers;
-        match (code, modifiers) {
-            (KeyCode::Char(ch), KeyModifiers::NONE | KeyModifiers::SHIFT) => {
-                Some(Box::new(actions::SearchInsertChar::new(ch)))
-            }
-            (KeyCode::Enter, _) => Some(Box::new(actions::SearchSubmit::new(
-                self.search_buffer.buffer.content(),
-            ))),
-            (KeyCode::Left, _) => Some(Box::new(actions::SearchMoveLeft)),
-            (KeyCode::Right, _) => Some(Box::new(actions::SearchMoveLeft)),
-            (KeyCode::Backspace, _) => Some(Box::new(actions::SearchBackspace)),
-            (KeyCode::Delete, _) => Some(Box::new(actions::SearchDeleteChar)),
-            _ => None,
-        }
-    }
-
     pub async fn cleanup(mut self) -> Result<()> {
         // Restore terminal state
         self.stdout
             .execute(style::ResetColor)?
             .execute(cursor::Show)?
+            .execute(SetCursorStyle::DefaultUserShape)?
             .execute(terminal::LeaveAlternateScreen)?;
         terminal::disable_raw_mode()?;
         tokio::spawn(async move { self.lsp_service.shutdown().await });

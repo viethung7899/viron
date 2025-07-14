@@ -1,7 +1,5 @@
-use crate::{
-    core::{buffer::Buffer, utf8::Utf8CharIterator},
-    editor::Mode,
-};
+use crate::core::mode::Mode;
+use crate::core::{buffer::Buffer, utf8::Utf8CharIterator};
 use tree_sitter::Point;
 
 #[derive(Debug, Clone, Default)]
@@ -43,7 +41,7 @@ impl Cursor {
         }
 
         let prefix = &line_bytes[..self.byte_column];
-        return Utf8CharIterator::new(&prefix).count();
+        Utf8CharIterator::new(&prefix).count()
     }
 
     fn char_to_byte_column(&self, buffer: &Buffer) -> usize {
@@ -65,7 +63,7 @@ impl Cursor {
         } else if self.row > 0 && previous_line {
             self.row -= 1;
             self.char_column = buffer.get_line_length(self.row).saturating_sub(1);
-            if *mode != Mode::Insert {
+            if !mode.is_insert_type() {
                 // In non-insert mode, don't allow cursor to go beyond the last character
                 self.char_column = self.char_column.saturating_sub(1);
             }
@@ -76,15 +74,13 @@ impl Cursor {
 
     /// Move cursor one character to the right
     pub fn move_right(&mut self, buffer: &Buffer, mode: &Mode, next_line: bool) {
-        let line_length = buffer.get_line_length(self.row).saturating_sub(1);
+        let mut line_length = buffer.get_line_length(self.row).saturating_sub(1);
 
-        let at_end_of_line = if *mode == Mode::Insert {
-            self.char_column >= line_length
-        } else {
-            self.char_column >= line_length.saturating_sub(1)
-        };
+        if !mode.is_insert_type() {
+            line_length = line_length.saturating_sub(1);
+        }
 
-        if !at_end_of_line {
+        if self.char_column < line_length {
             self.char_column += 1;
         } else if self.row + 1 < buffer.line_count() && next_line {
             self.row += 1;
@@ -122,12 +118,11 @@ impl Cursor {
 
     /// Move to the end of the current line
     pub fn move_to_line_end(&mut self, buffer: &Buffer, mode: &Mode) {
-        let line_length = buffer.get_line_length(self.row).saturating_sub(1);
-        if *mode == Mode::Insert {
-            self.char_column = line_length;
-        } else {
-            self.char_column = line_length.saturating_sub(1);
+        let mut line_length = buffer.get_line_length(self.row).saturating_sub(1);
+        if !mode.is_insert_type() {
+            line_length = line_length.saturating_sub(1);
         }
+        self.char_column = line_length;
         self.sync_byte_column(buffer);
         self.preferred_column = self.char_column;
     }
@@ -229,7 +224,7 @@ impl Cursor {
         new_cursor.preferred_column = new_cursor.char_column;
         new_cursor
     }
-    
+
     pub fn clamp_row(&mut self, buffer: &Buffer) {
         if self.row >= buffer.line_count() {
             self.row = buffer.line_count().saturating_sub(1);
@@ -238,18 +233,13 @@ impl Cursor {
 
     /// Ensure the cursor is at a valid position in the current line
     pub fn clamp_column(&mut self, buffer: &Buffer, mode: &Mode) {
-        let line_length = buffer.get_line_length(self.row).saturating_sub(1);
-
-        // In insert mode, cursor can be at the end of line
-        // In normal mode, cursor can only be on the last character
-        let max_column = if *mode == Mode::Insert {
-            line_length
-        } else {
-            line_length.saturating_sub(1)
-        };
+        let mut line_length = buffer.get_line_length(self.row).saturating_sub(1);
+        if !mode.is_insert_type() {
+            line_length = line_length.saturating_sub(1);
+        }
 
         // Try to maintain the preferred column if possible
-        self.char_column = self.preferred_column.min(max_column);
+        self.char_column = self.preferred_column.min(line_length);
         self.sync_byte_column(buffer);
     }
 
@@ -264,12 +254,11 @@ impl Cursor {
     }
 
     pub fn go_to_column(&mut self, column: usize, buffer: &Buffer, mode: &Mode) {
-        let line_length = buffer.get_line_length(self.row);
-        if *mode == Mode::Insert {
-            self.char_column = column.min(line_length);
-        } else {
-            self.char_column = column.min(line_length.saturating_sub(1));
+        let mut line_length = buffer.get_line_length(self.row);
+        if !mode.is_insert_type() {
+            line_length = line_length.saturating_sub(1);
         }
+        self.char_column = column.min(line_length);
         self.sync_byte_column(buffer);
         self.preferred_column = self.char_column;
     }

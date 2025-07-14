@@ -1,40 +1,44 @@
 theme = "catppuchin/mocha"
 gutter = "relative"
 
-# Keybindings for normal mode
-[keymap.normal]
+[keymap.default] # Default keymap for the editor
 "q" = { type = "Quit" }
-"<Esc>" = { type = "EnterMode", params = { mode = "normal" } }
+"<Esc>" = { type = "EnterMode", params = { mode = "Normal" } }
 
+[keymap.movement] # Movement keymap for the editor
 "h" = { type = "MoveLeft", params = { previous_line = false } }
 "j" = { type = "MoveDown" }
 "k" = { type = "MoveUp" }
 "l" = { type = "MoveRight", params = { next_line = false } }
+
 "<Left>" = { type = "MoveLeft", params = { previous_line = false } }
 "<Right>" = { type = "MoveRight", params = { next_line = false } }
 "<Up>" = { type = "MoveUp" }
 "<Down>" = { type = "MoveDown" }
+
 "<Backspace>" = { type = "MoveLeft", params = { previous_line = true } }
 
 "$" = { type = "MoveToLineEnd" }
 "0" = { type = "MoveToLineStart" }
 
+"w" = { type = "MoveToNextWord" }
+"b" = { type = "MoveToPreviousWord" }
+
 "<Home>" = { type = "MoveToLineStart" }
 "<End>" = { type = "MoveToLineEnd" }
+
+[keymap.normal] # Keymode for normal mode only
 "gg" = { type = "MoveToTop" }
 "G" = { type = "MoveToBottom" }
 "zz" = { type = "MoveToViewportCenter" }
 
-"w" = { type = "MoveToNextWord" }
-"b" = { type = "MoveToPreviousWord" }
-
 "x" = { type = "DeleteChar" }
-"dd" = { type = "DeleteCurrentLine" }
-"dw" = { type = "DeleteWord" }
+"d" = { type = "EnterMode", params = { mode = { OperationPending = "Delete" } } }
+"c" = { type = "EnterMode", params = { mode = { OperationPending = "Change" } } }
 
-"i" = { type = "EnterMode", params = { mode = "insert" } }
-":" = { type = "EnterMode", params = { mode = "command" } }
-"/" = { type = "EnterMode", params = { mode = "search" } }
+"i" = { type = "EnterMode", params = { mode = "Insert" } }
+":" = { type = "EnterMode", params = { mode = "Command" } }
+"/" = { type = "EnterMode", params = { mode = "Search" } }
 
 "n" = { type = "FindNext" }
 "N" = { type = "FindPrevious" }
@@ -45,40 +49,27 @@ gutter = "relative"
 "gd" = { type = "GoToDefinition" }
 
 "a" = { type = "Composite", params = { description = "Insert after the cursor", actions = [
-    { type = "EnterMode", params = { mode = "insert" } },
+    { type = "EnterMode", params = { mode = "Insert" } },
     { type = "MoveRight", params = { next_line = true } }
 ] } }
 
 "A" = { type = "Composite", params = { description = "Insert at the end of the line", actions = [
-    { type = "EnterMode", params = { mode = "insert" } },
+    { type = "EnterMode", params = { mode = "Insert" } },
     { type = "MoveToLineEnd" }
 ] } }
 
 "o" = { type = "Composite", params = { description = "Insert new line below the current line", actions = [
     { type = "InsertNewLineBelow" },
-    { type = "EnterMode", params = { mode = "insert" } }
+    { type = "EnterMode", params = { mode = "Insert" } }
 ] } }
 
 "O" = { type = "Composite", params = { description = "Insert new line above the current line", actions = [
     { type = "InsertNewLineAbove" },
-    { type = "EnterMode", params = { mode = "insert" } }
+    { type = "EnterMode", params = { mode = "Insert" } }
 ] } }
 
-# Keybindings for insert mode
-[keymap.insert]
-"<Esc>" = { type = "EnterMode", params = { mode = "normal" } }
-"<Delete>" = { type = "DeleteChar" }
-"<Backspace>" = { type = "Backspace" }
-"<Enter>" = { type = "InsertNewLine" }
-"<Left>" = { type = "MoveLeft", params = { previous_line = true } }
-"<Right>" = { type = "MoveRight", params = { next_line = true } }
-"<Up>" = { type = "MoveUp" }
-"<Down>" = { type = "MoveDown" }
-"<Home>" = { type = "MoveToLineStart" }
-"<End>" = { type = "MoveToLineEnd" }
+[keymap.pending.delete]
+"d" = { type = "DeleteCurrentLine" }
 
-[keymap.command]
-"<Esc>" = { type = "EnterMode", params = { mode = "normal" } }
-
-[keymap.search]
-"<Esc>" = { type = "EnterMode", params = { mode = "normal" } }
+[keymap.pending.change]
+"c" = { type = "ChangeCurrentLine" }
