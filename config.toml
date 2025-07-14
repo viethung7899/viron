@@ -70,3 +70,6 @@ gutter = "relative"
 
 [keymap.pending.delete]
 "d" = { type = "DeleteCurrentLine" }
+
+[keymap.pending.change]
+"c" = { type = "ChangeCurrentLine" }

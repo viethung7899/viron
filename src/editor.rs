@@ -1,5 +1,5 @@
-use crate::config::editor::Gutter;
 use crate::config::Config;
+use crate::config::editor::Gutter;
 use crate::constants::{MIN_GUTTER_WIDTH, RESERVED_ROW_COUNT};
 use crate::core::command::{CommandBuffer, SearchBuffer};
 use crate::core::cursor::Cursor;
@@ -9,24 +9,24 @@ use crate::core::{buffer_manager::BufferManager, message::MessageManager};
 use crate::input::actions::Executable;
 use crate::input::keys::KeyEvent as VironKeyEvent;
 use crate::input::{
-    actions, actions::ActionContext,
+    InputState, actions,
+    actions::ActionContext,
     events::{EventHandler, InputEvent},
-    get_default_command_action,
-    get_default_insert_action, get_default_search_action, InputState,
+    get_default_command_action, get_default_insert_action, get_default_search_action,
 };
 use crate::service::LspService;
 use crate::ui::components::{
     CommandLine, ComponentIds, EditorView, MessageArea, PendingKeys, SearchBox, StatusLine,
 };
 use crate::ui::compositor::Compositor;
-use crate::ui::{theme::Theme, RenderContext};
+use crate::ui::{RenderContext, theme::Theme};
 use anyhow::Result;
+use crossterm::{ExecutableCommand, QueueableCommand, style};
 use crossterm::{
     cursor,
-    event::{KeyCode, KeyEvent, KeyModifiers},
+    event::KeyEvent,
     terminal::{self, ClearType},
 };
-use crossterm::{style, ExecutableCommand, QueueableCommand};
 use std::io::{self, Stdout, Write};
 use std::path::{Path, PathBuf};
 
@@ -309,20 +309,6 @@ impl Editor {
             self.execute_action(action.as_ref()).await?;
         }
         Ok(())
-    }
-
-    fn handle_default_insert_event(
-        &mut self,
-        key_event: &VironKeyEvent,
-    ) -> Option<Box<dyn Executable>> {
-        let code = key_event.code;
-        let modifiers = key_event.modifiers;
-        match (code, modifiers) {
-            (KeyCode::Char(ch), KeyModifiers::NONE | KeyModifiers::SHIFT) => {
-                Some(Box::new(actions::InsertChar::new(ch)))
-            }
-            _ => None,
-        }
     }
 
     pub async fn cleanup(mut self) -> Result<()> {

@@ -1,11 +1,7 @@
 use crate::core::mode::Mode;
 use crate::input::actions::composite::CompositeAction;
 use crate::input::actions::{
-    Action, Backspace, CloseBuffer, DeleteChar, DeleteCurrentLine, DeleteWord, EnterMode, FindNext,
-    FindPrevious, GoToDefinition, GoToLine, InsertChar, InsertNewLine, InsertNewLineAbove,
-    InsertNewLineBelow, MoveDown, MoveLeft, MoveRight, MoveToBottom, MoveToLineEnd,
-    MoveToLineStart, MoveToNextWord, MoveToPreviousWord, MoveToTop, MoveToViewportCenter, MoveUp,
-    NextBuffer, OpenBuffer, PreviousBuffer, Quit, Redo, Undo, WriteBuffer,
+    Action, Backspace, ChangeCurrentLine, CloseBuffer, DeleteChar, DeleteCurrentLine, EnterMode, FindNext, FindPrevious, GoToDefinition, GoToLine, InsertChar, InsertNewLine, InsertNewLineAbove, InsertNewLineBelow, MoveDown, MoveLeft, MoveRight, MoveToBottom, MoveToLineEnd, MoveToLineStart, MoveToNextWord, MoveToPreviousWord, MoveToTop, MoveToViewportCenter, MoveUp, NextBuffer, OpenBuffer, PreviousBuffer, Quit, Redo, Undo, WriteBuffer
 };
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -44,7 +40,7 @@ pub enum ActionDefinition {
     Backspace,
     DeleteChar,
     DeleteCurrentLine,
-    DeleteWord,
+    ChangeCurrentLine,
 
     Undo,
     Redo,
@@ -108,7 +104,7 @@ pub fn create_action_from_definition(definition: &ActionDefinition) -> Box<dyn A
         ActionDefinition::InsertNewLineBelow => Box::new(InsertNewLineBelow),
         ActionDefinition::InsertNewLineAbove => Box::new(InsertNewLineAbove),
         ActionDefinition::DeleteCurrentLine => Box::new(DeleteCurrentLine),
-        ActionDefinition::DeleteWord => Box::new(DeleteWord),
+        ActionDefinition::ChangeCurrentLine => Box::new(ChangeCurrentLine),
 
         ActionDefinition::Undo => Box::new(Undo),
         ActionDefinition::Redo => Box::new(Redo),

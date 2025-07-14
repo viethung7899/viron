@@ -18,27 +18,26 @@ pub struct KeyMap {
 #[derive(Debug, Default)]
 pub struct PendingKeyMap {
     pub delete: HashMap<KeySequence, ActionDefinition>,
+    pub change: HashMap<KeySequence, ActionDefinition>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Default)]
 pub struct KeyMapConfig {
-    #[serde(default = "default_map")]
+    #[serde(default)]
     pub default: HashMap<String, ActionDefinition>,
-    #[serde(default = "default_map")]
+    #[serde(default)]
     pub movement: HashMap<String, ActionDefinition>,
-    #[serde(default = "default_map")]
+    #[serde(default)]
     pub normal: HashMap<String, ActionDefinition>,
     pub pending: PendingKeyMapConfig,
 }
 
 #[derive(Debug, Serialize, Deserialize, Default)]
 pub struct PendingKeyMapConfig {
-    #[serde(default = "default_map")]
+    #[serde(default)]
     pub delete: HashMap<String, ActionDefinition>,
-}
-
-fn default_map() -> HashMap<String, ActionDefinition> {
-    HashMap::new()
+    #[serde(default)]
+    pub change: HashMap<String, ActionDefinition>,
 }
 
 impl KeyMap {
@@ -101,6 +100,11 @@ impl KeyMap {
         for (key_str, action_def) in &config.pending.delete {
             let sequence = KeySequence::from_string(key_str)?;
             keymap.pending.delete.insert(sequence, action_def.clone());
+        }
+
+        for (key_str, action_def) in &config.pending.change {
+            let sequence = KeySequence::from_string(key_str)?;
+            keymap.pending.change.insert(sequence, action_def.clone());
         }
 
         Ok(keymap)

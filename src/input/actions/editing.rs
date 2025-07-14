@@ -236,9 +236,12 @@ impl Executable for DeleteCurrentLine {
         ctx.cursor.clamp_column(buffer, ctx.mode);
         let new_point = ctx.cursor.get_point();
         let edit = Edit::delete(
-            start_byte, 
-            buffer.point_at_position(start_byte), 
-            deleted, start_point, new_point);
+            start_byte,
+            buffer.point_at_position(start_byte),
+            deleted,
+            start_point,
+            new_point,
+        );
         after_edit(ctx, &edit)?;
         ctx.buffer_manager.current_mut().history.push(edit);
         Ok(())
@@ -252,35 +255,38 @@ impl_action!(
 );
 
 #[derive(Debug, Clone)]
-pub struct DeleteWord;
+
+pub struct ChangeCurrentLine;
 
 #[async_trait(?Send)]
-impl Executable for DeleteWord {
+impl Executable for ChangeCurrentLine {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         let buffer = ctx.buffer_manager.current_buffer_mut();
-        let point = ctx.cursor.get_point();
-        let start_position = buffer.cursor_position(&point);
-
-        let cursor = ctx.cursor.find_next_word(buffer);
-        let end_position = buffer.cursor_position(&cursor.get_point());
-        if start_position >= end_position {
-            return Ok(());
-        }
-
-        let Some((deleted_text, _)) =
-            buffer.delete_string(start_position, end_position - start_position)
-        else {
+        let start_point = ctx.cursor.get_point();
+        let Some((deleted, start_byte)) = buffer.delete_line(start_point.row) else {
             return Ok(());
         };
-
-        let edit = Edit::delete(start_position, point, deleted_text, point, point);
+        ctx.cursor.clamp_row(buffer);
+        ctx.cursor.clamp_column(buffer, ctx.mode);
+        let new_point = ctx.cursor.get_point();
+        let edit = Edit::delete(
+            start_byte,
+            buffer.point_at_position(start_byte),
+            deleted,
+            start_point,
+            new_point,
+        );
         after_edit(ctx, &edit)?;
         ctx.buffer_manager.current_mut().history.push(edit);
         Ok(())
     }
 }
 
-impl_action!(DeleteWord, "Delete word", ActionDefinition::DeleteWord);
+impl_action!(
+    ChangeCurrentLine,
+    "Change current line",
+    ActionDefinition::ChangeCurrentLine
+);
 
 #[derive(Debug, Clone)]
 pub struct Undo;

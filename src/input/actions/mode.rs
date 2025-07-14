@@ -102,12 +102,3 @@ impl Action for EnterMode {
         Box::new(self.clone())
     }
 }
-
-#[derive(Debug, Clone)]
-pub struct EnterPendingOperation(pub Operator);
-
-impl EnterPendingOperation {
-    pub fn new(operator: Operator) -> Self {
-        Self(operator)
-    }
-}
