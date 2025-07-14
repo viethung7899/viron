@@ -3,7 +3,7 @@ use crate::core::message::Message;
 use crate::core::mode::Mode;
 use crate::input::actions::definition::ActionDefinition;
 use crate::input::actions::{
-    Action, ActionContext, ActionResult, Executable, impl_action, movement, system,
+    impl_action, movement, system, Action, ActionContext, ActionResult, Executable,
 };
 use async_trait::async_trait;
 use std::fmt::Debug;
@@ -229,18 +229,13 @@ impl Executable for DeleteCurrentLine {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         let buffer = ctx.buffer_manager.current_buffer_mut();
         let start_point = ctx.cursor.get_point();
-        let Some((deleted, start_byte)) = buffer.delete_line(start_point.row) else {
-            return Ok(());
-        };
-        ctx.cursor.clamp_row(buffer);
-        ctx.cursor.clamp_column(buffer, ctx.mode);
-        let new_point = ctx.cursor.get_point();
+        let (deleted, start_byte) = buffer.delete_line(start_point.row).unwrap();
         let edit = Edit::delete(
             start_byte,
             buffer.point_at_position(start_byte),
             deleted,
             start_point,
-            new_point,
+            start_point,
         );
         after_edit(ctx, &edit)?;
         ctx.buffer_manager.current_mut().history.push(edit);
@@ -255,29 +250,13 @@ impl_action!(
 );
 
 #[derive(Debug, Clone)]
-
 pub struct ChangeCurrentLine;
 
 #[async_trait(?Send)]
 impl Executable for ChangeCurrentLine {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
-        let buffer = ctx.buffer_manager.current_buffer_mut();
-        let start_point = ctx.cursor.get_point();
-        let Some((deleted, start_byte)) = buffer.delete_line(start_point.row) else {
-            return Ok(());
-        };
-        ctx.cursor.clamp_row(buffer);
-        ctx.cursor.clamp_column(buffer, ctx.mode);
-        let new_point = ctx.cursor.get_point();
-        let edit = Edit::delete(
-            start_byte,
-            buffer.point_at_position(start_byte),
-            deleted,
-            start_point,
-            new_point,
-        );
-        after_edit(ctx, &edit)?;
-        ctx.buffer_manager.current_mut().history.push(edit);
+        DeleteCurrentLine.execute(ctx).await?;
+        InsertNewLineAbove.execute(ctx).await?;
         Ok(())
     }
 }

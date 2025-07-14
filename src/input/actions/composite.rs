@@ -163,8 +163,6 @@ impl ComboAction {
             to,
         );
         ctx.cursor.set_point(from, buffer);
-        ctx.cursor.clamp_row(buffer);
-        ctx.cursor.clamp_column(buffer, ctx.mode);
         after_edit(ctx, &edit)?;
         ctx.buffer_manager.current_mut().history.push(edit);
         Ok(())
@@ -181,9 +179,7 @@ impl ComboAction {
             MovementType::Line => {
                 InsertNewLineAbove.execute(ctx).await?;
             }
-            MovementType::Character => {
-                EnterMode::new(Mode::Insert).execute(ctx).await?;
-            }
+            MovementType::Character => {}
         }
         Ok(())
     }
@@ -192,11 +188,17 @@ impl ComboAction {
 #[async_trait(?Send)]
 impl Executable for ComboAction {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
-        EnterMode::new(Mode::Normal).execute(ctx).await?;
+        EnterMode::new(Mode::Insert).execute(ctx).await?;
         match self.operator {
-            Operator::Delete => self.perform_delete(ctx).await,
-            Operator::Change => self.perform_change(ctx).await,
-        }?;
+            Operator::Delete => {
+                self.perform_delete(ctx).await?;
+                EnterMode::new(Mode::Normal).execute(ctx).await?;
+            }
+            Operator::Change => self.perform_change(ctx).await?,
+        };
+        let buffer = ctx.buffer_manager.current_buffer();
+        ctx.cursor.clamp_row(buffer);
+        ctx.cursor.clamp_column(buffer, ctx.mode);
         Ok(())
     }
 }
