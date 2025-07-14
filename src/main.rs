@@ -12,6 +12,7 @@ use crossterm::terminal::ClearType;
 use crossterm::{cursor, terminal};
 use editor::Editor;
 use std::{env, io::stdout, panic};
+use crossterm::cursor::SetCursorStyle;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -44,6 +45,7 @@ async fn main() -> Result<()> {
         _ = crossterm::execute!(
             stdout,
             terminal::Clear(ClearType::All),
+            SetCursorStyle::DefaultUserShape,
             cursor::Show,
             terminal::LeaveAlternateScreen,
         );

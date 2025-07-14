@@ -1,5 +1,5 @@
-use crate::config::Config;
 use crate::config::editor::Gutter;
+use crate::config::Config;
 use crate::constants::{MIN_GUTTER_WIDTH, RESERVED_ROW_COUNT};
 use crate::core::command::{CommandBuffer, SearchBuffer};
 use crate::core::cursor::Cursor;
@@ -9,24 +9,25 @@ use crate::core::{buffer_manager::BufferManager, message::MessageManager};
 use crate::input::actions::Executable;
 use crate::input::keys::KeyEvent as VironKeyEvent;
 use crate::input::{
-    InputState, actions,
-    actions::ActionContext,
+    actions, actions::ActionContext,
     events::{EventHandler, InputEvent},
-    get_default_command_action, get_default_insert_action, get_default_search_action,
+    get_default_command_action,
+    get_default_insert_action, get_default_search_action, InputState,
 };
 use crate::service::LspService;
 use crate::ui::components::{
     CommandLine, ComponentIds, EditorView, MessageArea, PendingKeys, SearchBox, StatusLine,
 };
 use crate::ui::compositor::Compositor;
-use crate::ui::{RenderContext, theme::Theme};
+use crate::ui::{theme::Theme, RenderContext};
 use anyhow::Result;
-use crossterm::{ExecutableCommand, QueueableCommand, style};
+use crossterm::cursor::SetCursorStyle;
 use crossterm::{
     cursor,
     event::KeyEvent,
     terminal::{self, ClearType},
 };
+use crossterm::{style, ExecutableCommand, QueueableCommand};
 use std::io::{self, Stdout, Write};
 use std::path::{Path, PathBuf};
 
@@ -227,8 +228,10 @@ impl Editor {
         self.compositor.render(&mut context, &mut self.stdout)?;
 
         if let Some((row, col)) = self.compositor.get_cursor_position(&context) {
+            let set_cursor_style = self.get_cursor_style();
             self.stdout
                 .queue(cursor::MoveTo(col as u16, row as u16))?
+                .queue(set_cursor_style)?
                 .queue(cursor::Show)?;
         }
 
@@ -303,6 +306,17 @@ impl Editor {
         Ok(action)
     }
 
+    fn get_cursor_style(&self) -> SetCursorStyle {
+        if !self.input_state.is_empty() {
+            return SetCursorStyle::SteadyUnderScore;
+        }
+        match self.mode {
+            Mode::Normal => SetCursorStyle::DefaultUserShape,
+            Mode::Insert | Mode::Command | Mode::Search => SetCursorStyle::BlinkingBar,
+            Mode::OperationPending(_) => SetCursorStyle::SteadyUnderScore,
+        }
+    }
+
     async fn handle_tick(&mut self) -> Result<()> {
         let actions = self.lsp_service.handle_message().await;
         if let Some(action) = actions {
@@ -316,6 +330,7 @@ impl Editor {
         self.stdout
             .execute(style::ResetColor)?
             .execute(cursor::Show)?
+            .execute(SetCursorStyle::DefaultUserShape)?
             .execute(terminal::LeaveAlternateScreen)?;
         terminal::disable_raw_mode()?;
         tokio::spawn(async move { self.lsp_service.shutdown().await });
