@@ -1,22 +1,18 @@
 use crate::config::Config;
-use lsp_types::Diagnostic;
 use crate::core::command::{CommandBuffer, SearchBuffer};
 use crate::core::cursor::Cursor;
+use crate::core::document::Document;
 use crate::core::message::MessageManager;
+use crate::core::mode::Mode;
 use crate::core::viewport::Viewport;
+use crate::input::InputState;
 use crate::ui::render_buffer::RenderBuffer;
+use lsp_types::Diagnostic;
 
 pub(crate) mod components;
 pub mod compositor;
 pub mod render_buffer;
 pub mod theme;
-
-use crate::core::document::Document;
-use crate::core::mode::Mode;
-use crate::input::InputState;
-use crate::service::lsp::types::Diagnostic;
-use crate::input::keymaps::KeySequence;
-pub use components::Component;
 
 pub struct RenderContext<'a> {
     pub viewport: &'a Viewport,

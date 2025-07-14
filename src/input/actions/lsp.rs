@@ -1,12 +1,10 @@
 use crate::core::message::Message;
 use crate::input::actions::Action;
 use crate::input::actions::{
-    ActionContext, ActionDefinition, ActionResult, Executable, impl_action, system,
-    impl_action, system, ActionContext, ActionResult, Executable,
+    impl_action, system, ActionContext, ActionDefinition, ActionResult, Executable,
 };
 use async_trait::async_trait;
 use lsp_types::Diagnostic;
-use crate::input::actions::definition::ActionDefinition;
 
 #[derive(Debug, Clone)]
 pub struct GoToDefinition;
@@ -68,7 +66,7 @@ impl Executable for UpdateDiagnostics {
         {
             if current_path == &self.path {
                 ctx.compositor
-                    .mark_dirty(&ctx.component_ids.buffer_view_id)?;
+                    .mark_dirty(&ctx.component_ids.editor_view_id)?;
             }
         }
         Ok(())

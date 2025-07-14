@@ -24,6 +24,10 @@ impl BufferManager {
         }
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.documents.is_empty()
+    }
+
     // Get the current active document
     pub fn current(&self) -> &Document {
         &self.documents[self.current_index]

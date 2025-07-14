@@ -241,7 +241,7 @@ impl Executable for DeleteCurrentLine {
             start_point,
             start_point,
         );
-        after_edit(ctx, &edit)?;
+        after_edit(ctx, &edit).await?;
         ctx.buffer_manager.current_mut().history.push(edit);
         Ok(())
     }

@@ -1,8 +1,6 @@
-use crate::ui::render_buffer::RenderBuffer;
-use crate::constants::{MIN_GUTTER_WIDTH, RESERVED_ROW_COUNT};
-use crate::service::lsp::types::DiagnosticSeverity;
+use crate::constants::RESERVED_ROW_COUNT;
 use crate::ui::components::gutter::Gutter;
-use crate::service::lsp::types::{Diagnostic, DiagnosticSeverity};
+use crate::ui::render_buffer::RenderBuffer;
 use crate::ui::theme::Style;
 use crate::ui::{Bounds, Drawable, Focusable, RenderContext};
 use anyhow::Result;
@@ -312,10 +310,11 @@ impl EditorView {
                 .skip(viewport.left_column().saturating_sub(column))
                 .collect();
 
-            let style = context
-                .config
-                .theme
-                .get_diagnostic_style(&diagnostic.severity);
+            let style = context.config.theme.get_diagnostic_style(
+                &diagnostic
+                    .severity
+                    .unwrap_or_else(|| DiagnosticSeverity::ERROR),
+            );
 
             render_buffer.set_text(
                 (line - starting_line) as usize,

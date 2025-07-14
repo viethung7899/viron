@@ -7,12 +7,12 @@ use crate::service::lsp::messages::{InboundMessage, OutboundMessage, lsp_receive
 use crate::service::lsp::params::get_initialize_params;
 use anyhow::{Context, Result};
 use lsp_types::notification::{
-    DidCloseTextDocument, DidOpenTextDocument, DidSaveTextDocument, Exit, Initialized, Notification,
+    DidCloseTextDocument, DidOpenTextDocument, DidSaveTextDocument, Exit, Notification,
 };
 use lsp_types::request::{GotoDefinition, Initialize, Request, Shutdown};
 use lsp_types::{
     DidCloseTextDocumentParams, DidOpenTextDocumentParams, DidSaveTextDocumentParams,
-    GotoDefinitionParams, InitializeResult, InitializedParams, MessageType, Position, Range,
+    GotoDefinitionParams, Position, Range,
     ServerCapabilities, TextDocumentIdentifier, TextDocumentItem, TextDocumentPositionParams, Uri,
 };
 use std::collections::HashMap;
@@ -124,24 +124,6 @@ impl LspClient {
         self.send_request::<Initialize>(get_initialize_params(), true)
             .await?;
         Ok(())
-    }
-
-    pub async fn wait_for_initialized(&mut self, timeout_secs: u64) -> Result<bool> {
-        if self.state == LspClientState::Initialized {
-            return Ok(true);
-        }
-
-        let start = std::time::Instant::now();
-        let timeout = std::time::Duration::from_secs(timeout_secs);
-
-        while start.elapsed() < timeout {
-            if self.state == LspClientState::Initialized {
-                return Ok(true);
-            }
-            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-        }
-
-        Ok(false) // Timed out
     }
 
     pub async fn did_open(&mut self, document: &Document) -> Result<()> {
