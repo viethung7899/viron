@@ -38,4 +38,8 @@ impl Mode {
             _ => cursor::SetCursorStyle::SteadyBlock,
         }
     }
+    
+    pub fn is_insert_type(&self) -> bool {
+        matches!(self, Mode::Insert) || matches!(self, Mode::OperationPending(_))
+    }
 }

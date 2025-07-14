@@ -122,11 +122,8 @@ impl ComboAction {
         }
     }
 
-    async fn perform_delete(&self, ctx: &mut ActionContext<'_>) -> ActionResult {
-        let Some(movement_type) = self.motion.get_movement_type() else {
-            return Ok(());
-        };
-
+    async fn perform_delete(&self, ctx: &mut ActionContext<'_>) -> anyhow::Result<bool> {
+        let movement_type = self.motion.get_movement_type().unwrap();
         let before = ctx.cursor.get_point();
         let action = create_action_from_definition(&self.motion);
         for _ in 0..self.repeat {
@@ -152,7 +149,7 @@ impl ComboAction {
         };
 
         let Some((deleted, start_byte)) = result else {
-            return Ok(());
+            return Ok(false);
         };
 
         let edit = Edit::delete(
@@ -165,21 +162,19 @@ impl ComboAction {
         ctx.cursor.set_point(from, buffer);
         after_edit(ctx, &edit)?;
         ctx.buffer_manager.current_mut().history.push(edit);
-        Ok(())
+        Ok(true)
     }
 
     async fn perform_change(&self, ctx: &mut ActionContext<'_>) -> ActionResult {
-        let Some(movement_type) = self.motion.get_movement_type() else {
-            return Ok(());
-        };
-        if self.perform_delete(ctx).await.is_err() {
-            return Ok(());
-        };
+        let movement_type = self.motion.get_movement_type().unwrap();
+        let deleted = self.perform_delete(ctx).await?;
         match movement_type {
-            MovementType::Line => {
+            MovementType::Line if deleted => {
                 InsertNewLineAbove.execute(ctx).await?;
             }
-            MovementType::Character => {}
+            _ => {
+                EnterMode::new(Mode::Insert).execute(ctx).await?;
+            }
         }
         Ok(())
     }
@@ -188,11 +183,13 @@ impl ComboAction {
 #[async_trait(?Send)]
 impl Executable for ComboAction {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
-        EnterMode::new(Mode::Insert).execute(ctx).await?;
+        if !self.motion.is_movement_type() {
+            return Ok(());
+        };
+
         match self.operator {
             Operator::Delete => {
                 self.perform_delete(ctx).await?;
-                EnterMode::new(Mode::Normal).execute(ctx).await?;
             }
             Operator::Change => self.perform_change(ctx).await?,
         };

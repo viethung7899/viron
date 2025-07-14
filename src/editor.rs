@@ -6,7 +6,7 @@ use crate::core::cursor::Cursor;
 use crate::core::mode::Mode;
 use crate::core::viewport::Viewport;
 use crate::core::{buffer_manager::BufferManager, message::MessageManager};
-use crate::input::actions::Executable;
+use crate::input::actions::{EnterMode, Executable};
 use crate::input::keys::KeyEvent as VironKeyEvent;
 use crate::input::{
     actions, actions::ActionContext,
@@ -170,6 +170,9 @@ impl Editor {
                 InputEvent::Key(key) => {
                     if let Some(action) = self.handle_key(key)? {
                         self.execute_action(action.as_ref()).await?;
+                        if self.input_state.is_empty() && matches!(self.mode, Mode::OperationPending(_)) {
+                            self.execute_action(&EnterMode::new(Mode::Normal)).await?;
+                        }
                     }
                 }
                 InputEvent::Resize(width, height) => {
