@@ -2,11 +2,10 @@ use crate::core::history::edit::Edit;
 use crate::core::message::Message;
 use crate::core::mode::Mode;
 use crate::input::actions::definition::ActionDefinition;
-use crate::input::actions::{
-    impl_action, movement, system, Action, ActionContext, ActionResult, Executable,
-};
+use crate::input::actions::{impl_action, movement, system, Action, ActionContext, ActionResult, EnterMode, Executable};
 use async_trait::async_trait;
 use std::fmt::Debug;
+use crate::core::mode;
 
 pub(super) fn after_edit(ctx: &mut ActionContext, edit: &Edit) -> ActionResult {
     let document = ctx.buffer_manager.current_mut();
@@ -227,6 +226,7 @@ pub struct DeleteCurrentLine;
 #[async_trait(?Send)]
 impl Executable for DeleteCurrentLine {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+        EnterMode::new(Mode::Insert).execute(ctx).await?;
         let buffer = ctx.buffer_manager.current_buffer_mut();
         let start_point = ctx.cursor.get_point();
         let (deleted, start_byte) = buffer.delete_line(start_point.row).unwrap();
@@ -239,6 +239,7 @@ impl Executable for DeleteCurrentLine {
         );
         after_edit(ctx, &edit)?;
         ctx.buffer_manager.current_mut().history.push(edit);
+        EnterMode::new(Mode::Normal).execute(ctx).await?;
         Ok(())
     }
 }

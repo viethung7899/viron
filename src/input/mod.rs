@@ -120,6 +120,15 @@ impl InputState {
 
         let repeat = self.get_total_repeat();
 
+        if !definition.is_movement_type() {
+            self.clear();
+            return if repeat > 1 {
+                Some(Box::new(RepeatingAction::new(repeat, definition)))
+            } else {
+                Some(create_action_from_definition(&definition))
+            };
+        }
+
         let executable: Box<dyn Executable> = if let Some(pending) = self.pending_operation.as_ref()
         {
             Box::new(ComboAction::new(pending.operator, repeat, definition))

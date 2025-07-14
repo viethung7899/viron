@@ -170,4 +170,8 @@ impl ActionDefinition {
             _ => None,
         }
     }
+    
+    pub fn is_movement_type(&self) -> bool {
+        self.get_movement_type().is_some()
+    }
 }
