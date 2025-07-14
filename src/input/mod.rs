@@ -14,7 +14,7 @@ pub mod events;
 pub mod keymaps;
 pub mod keys;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct PendingOperation {
     pub operator: Operator,
     pub repeat: Option<usize>,
@@ -120,24 +120,37 @@ impl InputState {
 
         let repeat = self.get_total_repeat();
 
-        if !definition.is_movement_type() {
+        let pending = &self.pending_operation.clone();
+        if let Some(pending) = pending.as_ref() {
             self.clear();
-            return if repeat > 1 {
-                Some(Box::new(RepeatingAction::new(repeat, definition)))
-            } else {
-                Some(create_action_from_definition(&definition))
-            };
+            if definition.is_movement_type() {
+                return Some(Box::new(ComboAction::new(
+                    pending.operator,
+                    repeat,
+                    definition,
+                )));
+            }
         }
 
-        let executable: Box<dyn Executable> = if let Some(pending) = self.pending_operation.as_ref()
-        {
-            Box::new(ComboAction::new(pending.operator, repeat, definition))
-        } else if repeat > 1 {
-            Box::new(RepeatingAction::new(repeat, definition))
+        self.clear();
+
+        let executable: Box<dyn Executable> = if repeat > 1 {
+            match definition {
+                ActionDefinition::DeleteCurrentLine => Box::new(ComboAction::new(
+                    Operator::Delete,
+                    repeat - 1,
+                    ActionDefinition::MoveDown,
+                )),
+                ActionDefinition::ChangeCurrentLine => Box::new(ComboAction::new(
+                    Operator::Change,
+                    repeat - 1,
+                    ActionDefinition::MoveDown,
+                )),
+                _ => Box::new(RepeatingAction::new(repeat, definition)),
+            }
         } else {
             create_action_from_definition(&definition)
         };
-        self.clear();
         Some(executable)
     }
 
