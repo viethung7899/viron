@@ -106,23 +106,14 @@ impl Buffer {
     pub fn get_char(&self, position: usize) -> Option<char> {
         if position >= self.buffer.len_without_gap() {
             return None;
-        }
-
-        let first_byte = *self.buffer.get_range(position..position + 1).next()?;
-
-        let char_len = if first_byte < 0x80 {
-            1
-        } else if first_byte < 0xE0 {
-            2
-        } else if first_byte < 0xF0 {
-            3
-        } else {
-            4
         };
 
-        let char_len = char_len.min(self.buffer.len_without_gap() - position);
-        let bytes: Vec<u8> = self.buffer.get_range(position..position + char_len)
-        .copied().collect();
+        let char_len = usize::min(4, self.buffer.len_without_gap() - position);
+        let bytes = self
+            .buffer
+            .get_range(position..position + char_len)
+            .copied()
+            .collect();
 
         let string = String::from_utf8(bytes).ok()?;
         string.chars().next()

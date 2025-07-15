@@ -129,7 +129,7 @@ impl Executable for Backspace {
         let document = ctx.buffer_manager.current_mut();
         let point = ctx.cursor.get_point();
 
-        if point.column == 0 {
+        if point.column == 0 && self.inline {
             return Ok(());
         }
 
