@@ -282,7 +282,7 @@ impl EditorView {
             let start = &d.range.start;
             start.line >= starting_line
                 && start.line < ending_line
-                && d.severity <= Some(DiagnosticSeverity::WARNING)
+                && d.severity.unwrap_or(DiagnosticSeverity::ERROR) <= DiagnosticSeverity::WARNING
         }) {
             let line = diagnostic.range.start.line;
             match line_diagnostics.get(&line) {

@@ -123,7 +123,7 @@ impl LspClient {
 
     pub async fn initialize(&mut self) -> Result<()> {
         self.state = LspClientState::Initializing;
-        self.send_request::<Initialize>(get_initialize_params(), true)
+        self.send_request::<Initialize>(get_initialize_params()?, true)
             .await?;
         Ok(())
     }
