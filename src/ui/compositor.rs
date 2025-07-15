@@ -1,6 +1,5 @@
 use crate::ui::components::Component;
 use crate::ui::render_buffer::RenderBuffer;
-use crate::ui::theme::Style;
 use crate::ui::{Drawable, Focusable, RenderContext};
 use anyhow::{anyhow, Result};
 use std::rc::Rc;
@@ -8,18 +7,16 @@ use std::{collections::HashMap, io::Write};
 
 pub struct Compositor {
     components: HashMap<String, Component>,
-    editor_style: Style,
     current_buffer: RenderBuffer,
     previous_buffer: Option<RenderBuffer>,
     focused_component: Option<String>,
 }
 
 impl Compositor {
-    pub fn new(width: usize, height: usize, default_style: &Style) -> Self {
+    pub fn new(width: usize, height: usize) -> Self {
         Self {
             components: HashMap::new(),
-            editor_style: default_style.clone(),
-            current_buffer: RenderBuffer::new(width, height, default_style),
+            current_buffer: RenderBuffer::new(width, height),
             previous_buffer: None,
             focused_component: None,
         }
@@ -103,7 +100,7 @@ impl Compositor {
     }
 
     pub fn resize(&mut self, width: usize, height: usize) {
-        self.current_buffer = RenderBuffer::new(width, height, &self.editor_style);
+        self.current_buffer = RenderBuffer::new(width, height);
         // Invalidate previous buffer on resize
         self.previous_buffer = None;
         self.mark_all_dirty();
@@ -141,13 +138,14 @@ impl Compositor {
         }
 
         // If we have a previous buffer, do differential rendering
+        let editor_style = context.config.theme.editor_style();
         if let Some(ref previous) = self.previous_buffer {
             for change in self.current_buffer.diff(previous) {
-                change.flush(writer, &self.editor_style)?
+                change.flush(writer, &editor_style)?
             }
         } else {
             // No previous buffer, do full render
-            self.current_buffer.flush(writer)?;
+            self.current_buffer.flush(writer, &editor_style)?;
         }
 
         // Store current buffer as previous for next diff

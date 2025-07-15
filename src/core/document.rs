@@ -11,6 +11,7 @@ pub struct Document {
     pub modified: bool,
     pub language: Language,
     pub syntax_engine: Option<SyntaxEngine>,
+    pub version: usize,
     pub history: History,
 }
 
@@ -22,6 +23,7 @@ impl Document {
             modified: false,
             language: Language::PlainText,
             syntax_engine: None,
+            version: 1,
             history: History::new(1000),
         }
     }
@@ -38,6 +40,7 @@ impl Document {
             modified: false,
             language,
             syntax_engine,
+            version: 1,
             history: History::new(1000),
         }
     }
@@ -76,26 +79,27 @@ impl Document {
         self.path.as_ref().map(|p| current.join(p))
     }
 
-    pub fn uri(&self) -> Option<String> {
-        self.full_file_path()
-            .and_then(|p| p.to_str().map(|s| s.to_string()))
-            .map(|s| format!("file://{}", s))
+    pub fn full_path_string(&self) -> Option<String> {
+        let full_path = self.full_file_path()?;
+        let path = full_path.to_str()?;
+        Some(path.to_string())
     }
 
-    pub fn undo(&mut self) -> Result<Edit> {
+    pub fn get_uri(&self) -> Option<String> {
+        let path = self.full_path_string()?;
+        Some(format!("file://{}", path))
+    }
+
+    pub fn get_undo(&mut self) -> Result<Edit> {
         if let Some(change) = self.history.undo() {
-            self.mark_modified();
-            self.buffer.apply_edit(&change);
             Ok(change)
         } else {
             Err(anyhow::anyhow!("No changes to undo"))
         }
     }
 
-    pub fn redo(&mut self) -> Result<Edit> {
+    pub fn get_redo(&mut self) -> Result<Edit> {
         if let Some(change) = self.history.redo() {
-            self.mark_modified();
-            self.buffer.apply_edit(&change);
             Ok(change)
         } else {
             Err(anyhow::anyhow!("No changes to redo"))

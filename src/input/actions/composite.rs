@@ -160,7 +160,7 @@ impl ComboAction {
             to,
         );
         ctx.cursor.set_point(from, buffer);
-        after_edit(ctx, &edit)?;
+        after_edit(ctx, &edit).await?;
         ctx.buffer_manager.current_mut().history.push(edit);
         Ok(true)
     }

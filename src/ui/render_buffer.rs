@@ -1,6 +1,6 @@
 use super::theme::Style;
 use anyhow::Result;
-use crossterm::{QueueableCommand, cursor, style};
+use crossterm::{cursor, style, QueueableCommand};
 use std::fmt::{Debug, Write as DebugWrite};
 use std::io::Write;
 
@@ -31,7 +31,6 @@ impl<'a> Change<'a> {
 #[derive(Clone)]
 pub struct RenderBuffer {
     pub(super) cells: Vec<Cell>,
-    pub style: Style,
     pub(super) width: usize,
     pub(super) height: usize,
 }
@@ -53,17 +52,16 @@ impl Debug for RenderBuffer {
 }
 
 impl RenderBuffer {
-    pub(super) fn new(width: usize, height: usize, fallback: &Style) -> Self {
+    pub(super) fn new(width: usize, height: usize) -> Self {
         let cells = vec![
             Cell {
                 c: ' ',
-                style: fallback.clone(),
+                style: Style::default(),
             };
             width * height
         ];
         Self {
             cells,
-            style: fallback.clone(),
             width,
             height,
         }
@@ -111,10 +109,10 @@ impl RenderBuffer {
         changes
     }
 
-    pub(super) fn flush<W: Write>(&self, writer: &mut W) -> Result<()> {
+    pub(super) fn flush<W: Write>(&self, writer: &mut W, editor_style: &Style) -> Result<()> {
         writer.queue(cursor::MoveTo(0, 0))?;
         for cell in self.cells.iter() {
-            let style = cell.style.to_content_style(&self.style);
+            let style = cell.style.to_content_style(editor_style);
             let content = style::StyledContent::new(style, cell.c);
             writer.queue(style::Print(content))?;
         }

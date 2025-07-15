@@ -1,10 +1,10 @@
 use crate::core::message::Message;
 use crate::input::actions::Action;
 use crate::input::actions::{
-    impl_action, system, ActionContext, ActionResult, Executable,
+    impl_action, system, ActionContext, ActionDefinition, ActionResult, Executable,
 };
 use async_trait::async_trait;
-use crate::input::actions::definition::ActionDefinition;
+use lsp_types::Diagnostic;
 
 #[derive(Debug, Clone)]
 pub struct GoToDefinition;
@@ -12,20 +12,15 @@ pub struct GoToDefinition;
 #[async_trait(?Send)]
 impl Executable for GoToDefinition {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
-        let Some(uri) = ctx.buffer_manager.current().uri() else {
-            return system::ShowMessage(Message::error("File are not saved".to_string()))
-                .execute(ctx)
-                .await;
-        };
-
         let Some(lsp) = ctx.lsp_service.get_client_mut() else {
             return system::ShowMessage(Message::error("LSP client is not available".to_string()))
                 .execute(ctx)
                 .await;
         };
 
+        let document = ctx.buffer_manager.current();
         let point = ctx.cursor.get_point();
-        if let Err(err) = lsp.goto_definition(&uri, point.row, point.column).await {
+        if let Err(err) = lsp.goto_definition(document, point.row, point.column).await {
             return system::ShowMessage(Message::error(format!("Error: {}", err)))
                 .execute(ctx)
                 .await;
@@ -34,4 +29,46 @@ impl Executable for GoToDefinition {
     }
 }
 
-impl_action!(GoToDefinition, "Go to definition", ActionDefinition::GoToDefinition);
+impl_action!(
+    GoToDefinition,
+    "Go to definition",
+    ActionDefinition::GoToDefinition
+);
+
+#[derive(Debug, Clone)]
+pub struct UpdateDiagnostics {
+    pub uri: Option<String>,
+    pub diagnostics: Vec<Diagnostic>,
+}
+
+impl UpdateDiagnostics {
+    pub fn new(uri: Option<String>, diagnostics: Vec<Diagnostic>) -> Self {
+        Self { uri, diagnostics }
+    }
+}
+
+#[async_trait(?Send)]
+impl Executable for UpdateDiagnostics {
+    async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+        let document = ctx.buffer_manager.current();
+        let uri = self
+            .uri
+            .as_ref()
+            .cloned()
+            .or_else(|| document.get_uri());
+
+        let Some(uri) = uri else {
+            return Ok(());
+        };
+
+        ctx.lsp_service
+            .update_diagnostics(&uri, self.diagnostics.clone());
+        if let Some(current_uri) = document.get_uri() {
+            if current_uri == uri {
+                ctx.compositor
+                    .mark_dirty(&ctx.component_ids.editor_view_id)?;
+            }
+        }
+        Ok(())
+    }
+}

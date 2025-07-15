@@ -19,7 +19,7 @@ use crate::ui::components::{
     CommandLine, ComponentIds, EditorView, MessageArea, PendingKeys, SearchBox, StatusLine,
 };
 use crate::ui::compositor::Compositor;
-use crate::ui::{theme::Theme, RenderContext};
+use crate::ui::RenderContext;
 use anyhow::Result;
 use crossterm::cursor::SetCursorStyle;
 use crossterm::{
@@ -86,9 +86,7 @@ impl Editor {
         let viewport = Viewport::new(width as usize, height as usize - RESERVED_ROW_COUNT);
 
         // Create UI components
-        let theme = Theme::default();
-        let mut compositor =
-            Compositor::new(width as usize, height as usize, &theme.editor_style());
+        let mut compositor = Compositor::new(width as usize, height as usize);
 
         // Add components to the compositor
         let status_line_id = compositor.add_component("status_line", StatusLine, true)?;
@@ -170,7 +168,9 @@ impl Editor {
                 InputEvent::Key(key) => {
                     if let Some(action) = self.handle_key(key)? {
                         self.execute_action(action.as_ref()).await?;
-                        if self.input_state.is_empty() && matches!(self.mode, Mode::OperationPending(_)) {
+                        if self.input_state.is_empty()
+                            && matches!(self.mode, Mode::OperationPending(_))
+                        {
                             self.execute_action(&EnterMode::new(Mode::Normal)).await?;
                         }
                     }
@@ -212,7 +212,7 @@ impl Editor {
         self.scroll_viewport()?;
 
         let document = self.buffer_manager.current_mut();
-        let uri = document.uri().unwrap_or_default();
+        let uri = document.get_uri().unwrap_or_default();
 
         let mut context = RenderContext {
             config: &self.config,
@@ -321,10 +321,12 @@ impl Editor {
     }
 
     async fn handle_tick(&mut self) -> Result<()> {
-        let actions = self.lsp_service.handle_message().await;
-        if let Some(action) = actions {
+        let Some(client) = self.lsp_service.get_client_mut() else {
+            return Ok(());
+        };
+        if let Some(action) = client.get_lsp_action().await? {
             self.execute_action(action.as_ref()).await?;
-        }
+        };
         Ok(())
     }
 

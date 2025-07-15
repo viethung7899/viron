@@ -1,10 +1,11 @@
-use crate::constants::{MIN_GUTTER_WIDTH, RESERVED_ROW_COUNT};
-use crate::service::lsp::types::DiagnosticSeverity;
+use crate::constants::RESERVED_ROW_COUNT;
 use crate::ui::components::gutter::Gutter;
 use crate::ui::render_buffer::RenderBuffer;
 use crate::ui::theme::Style;
 use crate::ui::{Bounds, Drawable, Focusable, RenderContext};
 use anyhow::Result;
+use lsp_types::{Diagnostic, DiagnosticSeverity};
+use std::collections::HashMap;
 use std::ops::Add;
 use std::str::from_utf8;
 use tree_sitter::Point;
@@ -272,25 +273,36 @@ impl EditorView {
         let bounds = self.get_buffer_bounds(render_buffer, context);
         let buffer = &context.document.buffer;
         let viewport = context.viewport;
-        let starting_line = viewport.top_line();
-        let ending_line = starting_line + bounds.height;
+        let starting_line = viewport.top_line() as u32;
+        let ending_line = starting_line + bounds.height as u32;
 
-        let visible_diagnostics = context
-            .diagnostics
-            .iter()
-            .filter(|d| {
-                let start = &d.range.start;
-                start.line >= starting_line && start.line < ending_line
-            })
-            .filter(|d| d.severity <= DiagnosticSeverity::Warning);
+        let mut line_diagnostics: HashMap<u32, &Diagnostic> = HashMap::new();
 
-        for diagnostic in visible_diagnostics {
+        for diagnostic in context.diagnostics.iter().filter(|d| {
+            let start = &d.range.start;
+            start.line >= starting_line
+                && start.line < ending_line
+                && d.severity.unwrap_or(DiagnosticSeverity::ERROR) <= DiagnosticSeverity::WARNING
+        }) {
+            let line = diagnostic.range.start.line;
+            match line_diagnostics.get(&line) {
+                Some(existing) => {
+                    if diagnostic.severity < existing.severity {
+                        line_diagnostics.insert(line, diagnostic);
+                    }
+                }
+                None => {
+                    line_diagnostics.insert(line, diagnostic);
+                }
+            }
+        }
+
+        for (line, diagnostic) in line_diagnostics {
             let Some(message) = diagnostic.message.lines().next() else {
                 continue;
             };
             let formatted = format!("■  {message}");
-            let line = diagnostic.range.start.line;
-            let line_length = buffer.get_line_length(line);
+            let line_length = buffer.get_line_length(line as usize);
             let column = line_length + DIAGNOSTIC_MARGIN;
 
             let formatted: String = formatted
@@ -298,13 +310,14 @@ impl EditorView {
                 .skip(viewport.left_column().saturating_sub(column))
                 .collect();
 
-            let style = context
-                .config
-                .theme
-                .get_diagnostic_style(&diagnostic.severity);
+            let style = context.config.theme.get_diagnostic_style(
+                &diagnostic
+                    .severity
+                    .unwrap_or_else(|| DiagnosticSeverity::ERROR),
+            );
 
             render_buffer.set_text(
-                line - starting_line,
+                (line - starting_line) as usize,
                 column
                     .saturating_sub(viewport.left_column())
                     .add(bounds.start_col),

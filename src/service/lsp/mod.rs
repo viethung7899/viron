@@ -1,18 +1,17 @@
 mod client;
-pub mod types;
+mod message_handler;
+mod messages;
+mod params;
+mod util;
+mod version;
 
 use std::collections::HashMap;
-use std::path::PathBuf;
-use types::Diagnostic;
 
 use crate::core::language::Language;
-use crate::service::lsp::types::DefinitionResult;
-use crate::{
-    input::actions,
-    service::lsp::client::{InboundMessage, LspClient, NotificationKind},
-};
+use crate::service::lsp::client::LspClientState;
+use crate::{input::actions, service::lsp::client::LspClient};
 use anyhow::Result;
-use serde_json::Value;
+use lsp_types::Diagnostic;
 
 #[derive(Debug, Default)]
 pub struct LspService {
@@ -65,20 +64,24 @@ impl LspService {
             }
         }
 
-        let Ok(mut client) = LspClient::start(language, &[]).await else {
+        let Ok(mut client) = LspClient::new(language, &[]).await else {
             self.shutdown().await?;
             return Ok(None);
         };
 
         client.initialize().await?;
-        log::info!("LSP client initialized");
+
+        while client.state != LspClientState::Initialized {
+            let _ = client.get_lsp_action().await?;
+        }
 
         self.client = Some(client);
         Ok(self.client.as_mut())
     }
 
     pub async fn shutdown(&mut self) -> Result<()> {
-        if let Some(ref mut client) = self.client {
+        let client = std::mem::take(&mut self.client);
+        if let Some(client) = client {
             client.shutdown().await?;
         }
         self.client = None;
@@ -94,107 +97,14 @@ impl LspService {
         self.start_server(language).await
     }
 
-    pub async fn handle_message(&mut self) -> Option<LspAction> {
-        let client = self.client.as_mut()?;
-
-        let Ok(Some((messages, method))) = client.receive_response().await else {
-            return None;
-        };
-        log::info!("Messages: {:#?}", messages);
-        self.process_messages(messages, method).await
-    }
-
-    pub async fn process_messages(
-        &mut self,
-        message: InboundMessage,
-        method: Option<String>,
-    ) -> Option<LspAction> {
-        match message {
-            InboundMessage::Notification(notification) => {
-                return self.handle_notification(notification).await;
-            }
-            InboundMessage::Error(err) => {
-                log::error!("LSP Error: {}", err.message);
-                return None;
-            }
-            InboundMessage::ProcessingError(err) => {
-                log::error!("LSP processing error {}", err);
-            }
-            InboundMessage::Response(response) => {
-                let Some(method) = &method else {
-                    return None;
-                };
-                match self.handle_response(method, response.result) {
-                    Ok(action) => {
-                        return action;
-                    }
-                    Err(_err) => {
-                        log::warn!("Unhandled LSP response for method: {}", method);
-                    }
-                }
-            }
-            _ => {}
-        }
-        None
-    }
-
-    async fn handle_notification(&mut self, notification: NotificationKind) -> Option<LspAction> {
-        match notification {
-            NotificationKind::ShowMessage(msg) => {
-                match msg.type_ {
-                    types::MessageType::Info => log::info!("{}", msg.message),
-                    types::MessageType::Warning => log::warn!("{}", msg.message),
-                    types::MessageType::Error => log::error!("{}", msg.message),
-                    types::MessageType::Log => log::debug!("{}", msg.message),
-                };
-                None
-            }
-            NotificationKind::LogMessage(msg) => {
-                match msg.type_ {
-                    types::MessageType::Error => log::error!("{}", msg.message),
-                    types::MessageType::Info | types::MessageType::Log => {
-                        log::info!("{}", msg.message)
-                    }
-                    types::MessageType::Warning => log::warn!("{}", msg.message),
-                };
-                None
-            }
-            NotificationKind::PublishDiagnostics(diagnostics) => {
-                self.diagnostics
-                    .insert(diagnostics.uri.unwrap_or_default(), diagnostics.diagnostics);
-                Some(Box::new(actions::RefreshBuffer))
-            }
-        }
-    }
-
-    pub fn handle_response(&self, method: &str, result: Value) -> Result<Option<LspAction>> {
-        match method {
-            "textDocument/definition" => {
-                let result = serde_json::from_value::<Option<DefinitionResult>>(result)?;
-                let Some(result) = result else {
-                    return Ok(None);
-                };
-                if let Some(location) = result.get_locations().first() {
-                    let mut action = actions::CompositeExecutable::new();
-                    let file_path = location.uri.strip_prefix("file://").unwrap();
-                    action.add(actions::OpenBuffer::new(PathBuf::from(file_path)));
-                    let position = &location.range.start;
-                    action.add(actions::GoToPosition::new(
-                        position.line,
-                        position.character,
-                    ));
-                    return Ok(Some(Box::new(action)));
-                }
-            }
-            _ => {}
-        }
-        Ok(None)
-    }
-
     pub fn get_diagnostics(&self, uri: &str) -> &[Diagnostic] {
         self.diagnostics
             .get(uri)
             .map(|d| d.as_slice())
             .unwrap_or_default()
+    }
+
+    pub fn update_diagnostics(&mut self, path: &str, diagnostics: Vec<Diagnostic>) {
+        self.diagnostics.insert(path.to_string(), diagnostics);
     }
 }
