@@ -103,6 +103,22 @@ impl Buffer {
         self.line_starts[cursor.row] + cursor.column
     }
 
+    pub fn get_char(&self, position: usize) -> Option<char> {
+        if position >= self.buffer.len_without_gap() {
+            return None;
+        };
+
+        let char_len = usize::min(4, self.buffer.len_without_gap() - position);
+        let bytes = self
+            .buffer
+            .get_range(position..position + char_len)
+            .copied()
+            .collect();
+
+        let string = String::from_utf8(bytes).ok()?;
+        string.chars().next()
+    }
+
     pub fn insert_char(&mut self, position: usize, ch: char) -> usize {
         let mut utf8_bytes = [0; 4];
         let utf8_str = ch.encode_utf8(&mut utf8_bytes);

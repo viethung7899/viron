@@ -119,7 +119,7 @@ impl InputState {
         }
 
         let repeat = self.get_total_repeat();
-        
+
         if let Some(pending) = self.pending_operation.as_ref().cloned() {
             self.clear();
             if definition.is_movement_type() {
@@ -181,10 +181,10 @@ pub fn get_default_insert_action(key_event: &KeyEvent) -> Option<Box<dyn Executa
         (KeyCode::Char(ch), KeyModifiers::NONE | KeyModifiers::SHIFT) => {
             Box::new(actions::InsertChar::new(ch))
         }
-        (KeyCode::Backspace, _) => Box::new(actions::Backspace),
-        (KeyCode::Delete, _) => Box::new(actions::DeleteChar),
-        (KeyCode::Left, _) => Box::new(actions::MoveLeft::new(true)),
-        (KeyCode::Right, _) => Box::new(actions::MoveRight::new(true)),
+        (KeyCode::Backspace, _) => Box::new(actions::Backspace::new(false)),
+        (KeyCode::Delete, _) => Box::new(actions::DeleteChar::new(false)),
+        (KeyCode::Left, _) => Box::new(actions::MoveLeft::new(false)),
+        (KeyCode::Right, _) => Box::new(actions::MoveRight::new(false)),
         (KeyCode::Up, _) => Box::new(actions::MoveUp),
         (KeyCode::Down, _) => Box::new(actions::MoveDown),
         (KeyCode::Enter, _) => Box::new(actions::InsertNewLine),

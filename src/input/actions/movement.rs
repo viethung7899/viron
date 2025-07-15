@@ -5,12 +5,12 @@ use async_trait::async_trait;
 use std::fmt::Debug;
 #[derive(Debug, Clone)]
 pub struct MoveLeft {
-    previous_line: bool,
+    inline: bool,
 }
 
 impl MoveLeft {
-    pub fn new(previous_line: bool) -> Self {
-        Self { previous_line }
+    pub fn new(inline: bool) -> Self {
+        Self { inline }
     }
 }
 
@@ -18,11 +18,8 @@ impl MoveLeft {
 impl Executable for MoveLeft {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         let old_row = ctx.cursor.get_point().row;
-        ctx.cursor.move_left(
-            ctx.buffer_manager.current_buffer(),
-            ctx.mode,
-            self.previous_line,
-        );
+        ctx.cursor
+            .move_left(ctx.buffer_manager.current_buffer(), ctx.mode, self.inline);
         let new_row = ctx.cursor.get_point().row;
         if old_row != new_row && ctx.config.gutter == Gutter::Relative {
             ctx.compositor
@@ -35,17 +32,17 @@ impl Executable for MoveLeft {
 }
 
 impl_action!(MoveLeft, "Move cursor left", self {
-    ActionDefinition::MoveLeft { previous_line: self.previous_line }
+    ActionDefinition::MoveLeft { inline: self.inline }
 });
 
 #[derive(Debug, Clone)]
 pub struct MoveRight {
-    next_line: bool,
+    inline: bool,
 }
 
 impl MoveRight {
-    pub fn new(next_line: bool) -> Self {
-        Self { next_line }
+    pub fn new(inline: bool) -> Self {
+        Self { inline }
     }
 }
 
@@ -53,11 +50,8 @@ impl MoveRight {
 impl Executable for MoveRight {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         let old_row = ctx.cursor.get_point().row;
-        ctx.cursor.move_right(
-            ctx.buffer_manager.current_buffer(),
-            ctx.mode,
-            self.next_line,
-        );
+        ctx.cursor
+            .move_right(ctx.buffer_manager.current_buffer(), ctx.mode, self.inline);
         let new_row = ctx.cursor.get_point().row;
         if old_row != new_row && ctx.config.gutter == Gutter::Relative {
             ctx.compositor
@@ -70,7 +64,7 @@ impl Executable for MoveRight {
 }
 
 impl_action!(MoveRight, "Move cursor right", self {
-    ActionDefinition::MoveRight { next_line: self.next_line }
+    ActionDefinition::MoveRight { inline: self.inline }
 });
 
 #[derive(Debug, Clone)]

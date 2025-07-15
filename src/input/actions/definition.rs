@@ -1,7 +1,12 @@
 use crate::core::mode::Mode;
 use crate::input::actions::composite::CompositeAction;
 use crate::input::actions::{
-    Action, Backspace, ChangeCurrentLine, CloseBuffer, DeleteChar, DeleteCurrentLine, EnterMode, FindNext, FindPrevious, GoToDefinition, GoToLine, InsertChar, InsertNewLine, InsertNewLineAbove, InsertNewLineBelow, MoveDown, MoveLeft, MoveRight, MoveToBottom, MoveToLineEnd, MoveToLineStart, MoveToNextWord, MoveToPreviousWord, MoveToTop, MoveToViewportCenter, MoveUp, NextBuffer, OpenBuffer, PreviousBuffer, Quit, Redo, Undo, WriteBuffer
+    Action, Backspace, ChangeCurrentLine, CloseBuffer, DeleteChar, DeleteCurrentLine, EnterMode,
+    FindNext, FindPrevious, GoToDefinition, GoToLine, InsertChar, InsertNewLine,
+    InsertNewLineAbove, InsertNewLineBelow, MoveDown, MoveLeft, MoveRight, MoveToBottom,
+    MoveToLineEnd, MoveToLineStart, MoveToNextWord, MoveToPreviousWord, MoveToTop,
+    MoveToViewportCenter, MoveUp, NextBuffer, OpenBuffer, PreviousBuffer, Quit, Redo, Undo,
+    WriteBuffer,
 };
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -11,10 +16,10 @@ use std::path::PathBuf;
 pub enum ActionDefinition {
     // Movement actions
     MoveLeft {
-        previous_line: bool,
+        inline: bool,
     },
     MoveRight {
-        next_line: bool,
+        inline: bool,
     },
     MoveUp,
     MoveDown,
@@ -37,8 +42,12 @@ pub enum ActionDefinition {
     InsertNewLineBelow,
     InsertNewLineAbove,
 
-    Backspace,
-    DeleteChar,
+    Backspace {
+        inline: bool,
+    },
+    DeleteChar {
+        inline: bool,
+    },
     DeleteCurrentLine,
     ChangeCurrentLine,
 
@@ -83,8 +92,8 @@ pub enum ActionDefinition {
 pub fn create_action_from_definition(definition: &ActionDefinition) -> Box<dyn Action> {
     match definition {
         // Movement actions
-        ActionDefinition::MoveLeft { previous_line } => Box::new(MoveLeft::new(*previous_line)),
-        ActionDefinition::MoveRight { next_line } => Box::new(MoveRight::new(*next_line)),
+        ActionDefinition::MoveLeft { inline } => Box::new(MoveLeft::new(*inline)),
+        ActionDefinition::MoveRight { inline } => Box::new(MoveRight::new(*inline)),
         ActionDefinition::MoveUp => Box::new(MoveUp),
         ActionDefinition::MoveDown => Box::new(MoveDown),
         ActionDefinition::MoveToLineStart => Box::new(MoveToLineStart),
@@ -98,8 +107,8 @@ pub fn create_action_from_definition(definition: &ActionDefinition) -> Box<dyn A
 
         // Editing actions
         ActionDefinition::InsertChar { ch } => Box::new(InsertChar::new(*ch)),
-        ActionDefinition::DeleteChar => Box::new(DeleteChar),
-        ActionDefinition::Backspace => Box::new(Backspace),
+        ActionDefinition::DeleteChar { inline } => Box::new(DeleteChar::new(*inline)),
+        ActionDefinition::Backspace { inline } => Box::new(Backspace::new(*inline)),
         ActionDefinition::InsertNewLine => Box::new(InsertNewLine),
         ActionDefinition::InsertNewLineBelow => Box::new(InsertNewLineBelow),
         ActionDefinition::InsertNewLineAbove => Box::new(InsertNewLineAbove),
@@ -170,7 +179,7 @@ impl ActionDefinition {
             _ => None,
         }
     }
-    
+
     pub fn is_movement_type(&self) -> bool {
         self.get_movement_type().is_some()
     }

@@ -57,10 +57,10 @@ impl Cursor {
     }
 
     /// Move cursor one character to the left
-    pub fn move_left(&mut self, buffer: &Buffer, mode: &Mode, previous_line: bool) {
+    pub fn move_left(&mut self, buffer: &Buffer, mode: &Mode, inline: bool) {
         if self.char_column > 0 {
             self.char_column -= 1;
-        } else if self.row > 0 && previous_line {
+        } else if self.row > 0 && !inline {
             self.row -= 1;
             self.char_column = buffer.get_line_length(self.row).saturating_sub(1);
             if !mode.is_insert_type() {
@@ -73,7 +73,7 @@ impl Cursor {
     }
 
     /// Move cursor one character to the right
-    pub fn move_right(&mut self, buffer: &Buffer, mode: &Mode, next_line: bool) {
+    pub fn move_right(&mut self, buffer: &Buffer, mode: &Mode, inline: bool) {
         let mut line_length = buffer.get_line_length(self.row).saturating_sub(1);
 
         if !mode.is_insert_type() {
@@ -82,7 +82,7 @@ impl Cursor {
 
         if self.char_column < line_length {
             self.char_column += 1;
-        } else if self.row + 1 < buffer.line_count() && next_line {
+        } else if self.row + 1 < buffer.line_count() && !inline {
             self.row += 1;
             self.char_column = 0;
         }
