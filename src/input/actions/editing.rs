@@ -84,6 +84,14 @@ impl Executable for DeleteChar {
         let point = ctx.cursor.get_point();
         let byte_start = buffer.cursor_position(&point);
 
+        let Some(char) = buffer.get_char(byte_start) else {
+            return Ok(());
+        };
+
+        if self.inline && char == '\n' {
+            return Ok(());
+        }
+
         if let Some((c, _)) = buffer.delete_char(byte_start) {
             ctx.cursor.clamp_column(buffer, ctx.mode);
             let edit = Edit::delete(
@@ -120,8 +128,14 @@ impl Executable for Backspace {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         let document = ctx.buffer_manager.current_mut();
         let point = ctx.cursor.get_point();
+
+        if point.column == 0 {
+            return Ok(());
+        }
+
         let position = document.buffer.cursor_position(&point);
-        ctx.cursor.move_left(&document.buffer, ctx.mode, true);
+        ctx.cursor
+            .move_left(&document.buffer, ctx.mode, self.inline);
         if position > 0 {
             if let Some((c, new_position)) = document.buffer.delete_char(position - 1) {
                 let new_point = document.buffer.point_at_position(new_position);
