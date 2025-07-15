@@ -79,10 +79,9 @@ impl Document {
         self.path.as_ref().map(|p| current.join(p))
     }
 
-    pub fn uri(&self) -> Option<String> {
+    pub fn full_path_string(&self) -> Option<String> {
         self.full_file_path()
             .and_then(|p| p.to_str().map(|s| s.to_string()))
-            .map(|s| format!("file://{}", s))
     }
 
     pub fn get_undo(&mut self) -> Result<Edit> {

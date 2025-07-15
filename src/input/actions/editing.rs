@@ -16,10 +16,6 @@ pub(super) async fn after_edit(ctx: &mut ActionContext<'_>, edit: &Edit) -> Acti
         syntax_engine.apply_edit(&edit)?;
     }
 
-    if let Some(client) = ctx.lsp_service.get_client_mut() {
-        client.did_change(document, edit).await?;
-    }
-
     ctx.compositor
         .mark_dirty(&ctx.component_ids.editor_view_id)?;
     ctx.compositor

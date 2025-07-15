@@ -212,13 +212,13 @@ impl Editor {
         self.scroll_viewport()?;
 
         let document = self.buffer_manager.current_mut();
-        let uri = document.uri().unwrap_or_default();
+        let full_path = document.full_path_string().unwrap_or_default();
 
         let mut context = RenderContext {
             config: &self.config,
             cursor: &self.cursor,
             document,
-            diagnostics: self.lsp_service.get_diagnostics(&uri),
+            diagnostics: self.lsp_service.get_diagnostics(&full_path),
             mode: &self.mode,
             viewport: &self.viewport,
             command_buffer: &self.command_buffer,

@@ -1,5 +1,4 @@
 use crate::core::document::Document;
-use crate::core::history::edit::Edit;
 use crate::core::language::Language;
 use crate::service::lsp::message_handler::{parse_notification, parse_response};
 use crate::service::lsp::messages::{lsp_receive, lsp_send, InboundMessage, OutboundMessage};
@@ -7,15 +6,18 @@ use crate::service::lsp::params::get_initialize_params;
 use crate::service::lsp::LspAction;
 use anyhow::{Context, Result};
 use lsp_types::notification::{
-    DidCloseTextDocument, DidOpenTextDocument, DidSaveTextDocument, Exit, Notification,
+    DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument, DidSaveTextDocument, Exit,
+    Notification,
 };
 use lsp_types::request::{
     DocumentDiagnosticRequest, GotoDefinition, Initialize, Request, Shutdown,
 };
 use lsp_types::{
-    DidCloseTextDocumentParams, DidOpenTextDocumentParams, DidSaveTextDocumentParams,
-    DocumentDiagnosticParams, GotoDefinitionParams, Position, Range, ServerCapabilities,
-    TextDocumentIdentifier, TextDocumentItem, TextDocumentPositionParams, Uri,
+    DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
+    DidSaveTextDocumentParams, DocumentDiagnosticParams, GotoDefinitionParams, Position, Range,
+    ServerCapabilities, TextDocumentContentChangeEvent, TextDocumentIdentifier, TextDocumentItem,
+    TextDocumentPositionParams, TextDocumentSyncCapability, TextDocumentSyncKind, Uri,
+    VersionedTextDocumentIdentifier,
 };
 use std::collections::HashMap;
 use std::str::FromStr;
@@ -26,6 +28,8 @@ use std::{
     sync::atomic::{self},
 };
 
+use crate::service::lsp::util::{calculate_changes, get_uri_from_document};
+use crate::service::lsp::version::VersionedContents;
 use tokio::process::Child;
 use tokio::sync::Mutex;
 use tokio::{
@@ -49,21 +53,19 @@ pub enum LspClientState {
     Initialized,
 }
 
-#[derive(Debug, Clone)]
-pub enum LspCommand {}
-
-#[derive(Debug, Clone)]
-pub enum LspEvent {}
-
 #[derive(Debug)]
 pub struct LspClient {
     pub(super) language: Language,
     pub(super) state: LspClientState,
     pub(super) server_capabilities: Option<ServerCapabilities>,
+
     request_sender: mpsc::Sender<OutboundMessage>,
     response_receiver: mpsc::Receiver<InboundMessage>,
     pending_responses: HashMap<i32, String>,
+
     process: Arc<Mutex<Option<Child>>>,
+
+    versioned_contents: VersionedContents,
 }
 
 impl LspClient {
@@ -116,6 +118,7 @@ impl LspClient {
             server_capabilities: None,
             pending_responses: HashMap::new(),
             process: Arc::new(Mutex::new(Some(child))),
+            versioned_contents: VersionedContents::default(),
         })
     }
 
@@ -127,14 +130,17 @@ impl LspClient {
     }
 
     pub async fn did_open(&mut self, document: &Document) -> Result<()> {
-        let Some(uri) = document.uri() else {
+        let Some(path) = document.full_path_string() else {
             return Ok(());
         };
+
+        self.versioned_contents
+            .update_document(&path, document.buffer.to_string());
 
         self.send_notification::<DidOpenTextDocument>(
             DidOpenTextDocumentParams {
                 text_document: TextDocumentItem {
-                    uri: Uri::from_str(&uri)?,
+                    uri: Uri::from_str(&path)?,
                     version: document.version as i32,
                     text: document.buffer.to_string(),
                     language_id: document.language.to_str().to_string(),
@@ -148,7 +154,7 @@ impl LspClient {
     }
 
     pub async fn did_save(&mut self, document: &Document) -> Result<()> {
-        let Some(uri) = document.uri() else {
+        let Some(path) = document.full_path_string() else {
             return Ok(());
         };
 
@@ -156,7 +162,7 @@ impl LspClient {
             DidSaveTextDocumentParams {
                 text: Some(document.buffer.to_string()),
                 text_document: TextDocumentIdentifier {
-                    uri: Uri::from_str(&uri)?,
+                    uri: Uri::from_str(&path)?,
                 },
             },
             false,
@@ -166,14 +172,14 @@ impl LspClient {
     }
 
     pub async fn did_close(&mut self, document: &Document) -> Result<()> {
-        let Some(uri) = document.uri() else {
+        let Some(path) = document.full_path_string() else {
             return Ok(());
         };
 
         self.send_notification::<DidCloseTextDocument>(
             DidCloseTextDocumentParams {
                 text_document: TextDocumentIdentifier {
-                    uri: Uri::from_str(&uri)?,
+                    uri: Uri::from_str(&path)?,
                 },
             },
             false,
@@ -183,23 +189,75 @@ impl LspClient {
         Ok(())
     }
 
-    pub async fn did_change(&mut self, document: &mut Document, edit: &Edit) -> Result<()> {
+    pub async fn did_change(&mut self, document: &Document) -> Result<()> {
+        let Some(path) = document.full_path_string() else {
+            return Ok(());
+        };
+        self.request_diagnostics(document).await?;
+
+        let content = document.buffer.to_string();
+
+        let sync_kind = self
+            .server_capabilities
+            .as_ref()
+            .and_then(|capabilities| capabilities.text_document_sync.as_ref())
+            .and_then(|sync| match sync {
+                TextDocumentSyncCapability::Kind(kind) => Some(kind),
+                TextDocumentSyncCapability::Options(option) => option.change.as_ref(),
+            })
+            .cloned()
+            .unwrap_or(TextDocumentSyncKind::FULL);
+
+        let content_changes = match sync_kind {
+            TextDocumentSyncKind::FULL => {
+                vec![TextDocumentContentChangeEvent {
+                    range: None,
+                    range_length: None,
+                    text: document.buffer.to_string(),
+                }]
+            }
+            TextDocumentSyncKind::INCREMENTAL => {
+                let old_content = self.versioned_contents.get_content(&path);
+                calculate_changes(old_content, &content)
+            }
+            _ => {
+                return Ok(());
+            }
+        };
+
+        self.versioned_contents.update_document(&path, content);
+        let version = self.versioned_contents.get_version(&path);
+
+        let params = DidChangeTextDocumentParams {
+            text_document: VersionedTextDocumentIdentifier {
+                uri: Uri::from_str(&path)?,
+                version,
+            },
+            content_changes,
+        };
+
+        self.send_notification::<DidChangeTextDocument>(params, false)
+            .await?;
+
         Ok(())
     }
 
     pub async fn goto_definition(
         &mut self,
-        uri: &str,
+        document: &Document,
         line: usize,
         character: usize,
     ) -> Result<()> {
+        let Some(path) = document.full_path_string() else {
+            return Ok(());
+        };
         self.send_request::<GotoDefinition>(
             GotoDefinitionParams {
                 work_done_progress_params: Default::default(),
                 partial_result_params: Default::default(),
                 text_document_position_params: TextDocumentPositionParams {
                     text_document: TextDocumentIdentifier {
-                        uri: Uri::from_str(&uri)?,
+                        uri: Uri::from_str(&path)?,
                     },
                     position: Position {
                         line: line as u32,
@@ -220,14 +278,17 @@ impl LspClient {
             .as_ref()
             .map(|capabilities| capabilities.diagnostic_provider.is_some())
             .unwrap_or(false);
+
         if !can_request_diagnostics {
             return Ok(None);
         }
 
+        let Some(uri) = get_uri_from_document(document) else {
+            return Ok(None);
+        };
+
         let params = DocumentDiagnosticParams {
-            text_document: TextDocumentIdentifier {
-                uri: Uri::from_str(&document.uri().unwrap_or_default())?,
-            },
+            text_document: TextDocumentIdentifier { uri },
             identifier: None,
             previous_result_id: None,
             work_done_progress_params: Default::default(),

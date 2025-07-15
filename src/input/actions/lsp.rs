@@ -12,20 +12,15 @@ pub struct GoToDefinition;
 #[async_trait(?Send)]
 impl Executable for GoToDefinition {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
-        let Some(uri) = ctx.buffer_manager.current().uri() else {
-            return system::ShowMessage(Message::error("File are not saved".to_string()))
-                .execute(ctx)
-                .await;
-        };
-
         let Some(lsp) = ctx.lsp_service.get_client_mut() else {
             return system::ShowMessage(Message::error("LSP client is not available".to_string()))
                 .execute(ctx)
                 .await;
         };
 
+        let document = ctx.buffer_manager.current();
         let point = ctx.cursor.get_point();
-        if let Err(err) = lsp.goto_definition(&uri, point.row, point.column).await {
+        if let Err(err) = lsp.goto_definition(document, point.row, point.column).await {
             return system::ShowMessage(Message::error(format!("Error: {}", err)))
                 .execute(ctx)
                 .await;
