@@ -350,13 +350,13 @@ impl LspClient {
 
         let handler = match message {
             InboundMessage::Response(response) => {
-                let Some(method) = self.pending_responses.get(&response.id) else {
+                let Some(method) = self.pending_responses.remove(&response.id) else {
                     return Ok(None);
                 };
                 let Some(result) = response.result.to_owned() else {
                     return Ok(None);
                 };
-                parse_response(method, result)?
+                parse_response(&method, result)?
             }
             InboundMessage::Notification(notification) => parse_notification(notification)?,
         };

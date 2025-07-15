@@ -85,7 +85,7 @@ pub fn calculate_changes(old_text: &str, new_text: &str) -> Vec<TextDocumentCont
 fn flush_insert(
     old_text: &str,
     changes: &mut Vec<TextDocumentContentChangeEvent>,
-    mut current_change: &mut String,
+    current_change: &mut String,
     start_offset: usize,
 ) {
     if !current_change.is_empty() {
@@ -96,7 +96,7 @@ fn flush_insert(
                 end: start_pos,
             }),
             range_length: None,
-            text: std::mem::take(&mut current_change),
+            text: std::mem::take(current_change),
         });
     }
 }
