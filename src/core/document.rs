@@ -80,8 +80,14 @@ impl Document {
     }
 
     pub fn full_path_string(&self) -> Option<String> {
-        self.full_file_path()
-            .and_then(|p| p.to_str().map(|s| s.to_string()))
+        let full_path = self.full_file_path()?;
+        let path = full_path.to_str()?;
+        Some(path.to_string())
+    }
+
+    pub fn get_uri(&self) -> Option<String> {
+        let path = self.full_path_string()?;
+        Some(format!("file://{}", path))
     }
 
     pub fn get_undo(&mut self) -> Result<Edit> {

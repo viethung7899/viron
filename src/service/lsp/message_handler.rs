@@ -22,7 +22,7 @@ use crate::{
 #[async_trait]
 pub trait LspMessageHandler: Send + Sync {
     async fn handle_client(&self, _client: &mut LspClient) -> Result<()> {
-        return Ok(());
+        Ok(())
     }
 
     fn get_lsp_action(&self) -> Option<LspAction> {

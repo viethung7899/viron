@@ -12,15 +12,19 @@ pub(super) async fn after_edit(ctx: &mut ActionContext<'_>, edit: &Edit) -> Acti
     let document = ctx.buffer_manager.current_mut();
     document.mark_modified();
 
-    if let Some(syntax_engine) = document.syntax_engine.as_mut() {
-        syntax_engine.apply_edit(&edit)?;
-    }
-
     ctx.compositor
         .mark_dirty(&ctx.component_ids.editor_view_id)?;
     ctx.compositor
         .mark_dirty(&ctx.component_ids.status_line_id)?;
     ctx.search_buffer.reset();
+
+    if let Some(syntax_engine) = document.syntax_engine.as_mut() {
+        syntax_engine.apply_edit(&edit)?;
+    }
+
+    if let Some(client) = ctx.lsp_service.get_client_mut() {
+        client.did_change(document).await?;
+    }
     Ok(())
 }
 

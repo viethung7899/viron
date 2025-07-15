@@ -70,8 +70,9 @@ impl LspService {
         };
 
         client.initialize().await?;
+
         while client.state != LspClientState::Initialized {
-            let _ = client.get_lsp_action().await;
+            let _ = client.get_lsp_action().await?;
         }
 
         self.client = Some(client);

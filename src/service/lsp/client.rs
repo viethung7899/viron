@@ -28,7 +28,7 @@ use std::{
     sync::atomic::{self},
 };
 
-use crate::service::lsp::util::{calculate_changes, get_uri_from_document};
+use crate::service::lsp::util::calculate_changes;
 use crate::service::lsp::version::VersionedContents;
 use tokio::process::Child;
 use tokio::sync::Mutex;
@@ -130,17 +130,17 @@ impl LspClient {
     }
 
     pub async fn did_open(&mut self, document: &Document) -> Result<()> {
-        let Some(path) = document.full_path_string() else {
+        let Some(uri) = document.get_uri() else {
             return Ok(());
         };
 
         self.versioned_contents
-            .update_document(&path, document.buffer.to_string());
+            .update_document(&uri, document.buffer.to_string());
 
         self.send_notification::<DidOpenTextDocument>(
             DidOpenTextDocumentParams {
                 text_document: TextDocumentItem {
-                    uri: Uri::from_str(&path)?,
+                    uri: Uri::from_str(&uri)?,
                     version: document.version as i32,
                     text: document.buffer.to_string(),
                     language_id: document.language.to_str().to_string(),
@@ -172,14 +172,14 @@ impl LspClient {
     }
 
     pub async fn did_close(&mut self, document: &Document) -> Result<()> {
-        let Some(path) = document.full_path_string() else {
+        let Some(uri) = document.get_uri() else {
             return Ok(());
         };
 
         self.send_notification::<DidCloseTextDocument>(
             DidCloseTextDocumentParams {
                 text_document: TextDocumentIdentifier {
-                    uri: Uri::from_str(&path)?,
+                    uri: Uri::from_str(&uri)?,
                 },
             },
             false,
@@ -190,7 +190,7 @@ impl LspClient {
     }
 
     pub async fn did_change(&mut self, document: &Document) -> Result<()> {
-        let Some(path) = document.full_path_string() else {
+        let Some(uri) = document.get_uri() else {
             return Ok(());
         };
         self.request_diagnostics(document).await?;
@@ -217,7 +217,7 @@ impl LspClient {
                 }]
             }
             TextDocumentSyncKind::INCREMENTAL => {
-                let old_content = self.versioned_contents.get_content(&path);
+                let old_content = self.versioned_contents.get_content(&uri);
                 calculate_changes(old_content, &content)
             }
             _ => {
@@ -225,12 +225,12 @@ impl LspClient {
             }
         };
 
-        self.versioned_contents.update_document(&path, content);
-        let version = self.versioned_contents.get_version(&path);
+        self.versioned_contents.update_document(&uri, content);
+        let version = self.versioned_contents.get_version(&uri);
 
         let params = DidChangeTextDocumentParams {
             text_document: VersionedTextDocumentIdentifier {
-                uri: Uri::from_str(&path)?,
+                uri: Uri::from_str(&uri)?,
                 version,
             },
             content_changes,
@@ -248,7 +248,7 @@ impl LspClient {
         line: usize,
         character: usize,
     ) -> Result<()> {
-        let Some(path) = document.full_path_string() else {
+        let Some(uri) = document.get_uri() else {
             return Ok(());
         };
         self.send_request::<GotoDefinition>(
@@ -257,7 +257,7 @@ impl LspClient {
                 partial_result_params: Default::default(),
                 text_document_position_params: TextDocumentPositionParams {
                     text_document: TextDocumentIdentifier {
-                        uri: Uri::from_str(&path)?,
+                        uri: Uri::from_str(&uri)?,
                     },
                     position: Position {
                         line: line as u32,
@@ -273,6 +273,10 @@ impl LspClient {
     }
 
     pub async fn request_diagnostics(&mut self, document: &Document) -> Result<Option<i32>> {
+        let Some(uri) = document.get_uri() else {
+            return Ok(None);
+        };
+
         let can_request_diagnostics = self
             .server_capabilities
             .as_ref()
@@ -283,12 +287,10 @@ impl LspClient {
             return Ok(None);
         }
 
-        let Some(uri) = get_uri_from_document(document) else {
-            return Ok(None);
-        };
-
         let params = DocumentDiagnosticParams {
-            text_document: TextDocumentIdentifier { uri },
+            text_document: TextDocumentIdentifier {
+                uri: Uri::from_str(&uri)?,
+            },
             identifier: None,
             previous_result_id: None,
             work_done_progress_params: Default::default(),
@@ -308,14 +310,18 @@ impl LspClient {
         let method = R::METHOD.to_string();
         let params = serde_json::to_value(params)?;
 
+        log::info!("Sending {} request with {:?}", method, params);
+
         self.pending_responses.insert(id, method.to_string());
         self.request_sender
             .send(OutboundMessage {
                 id: Some(id),
-                method,
+                method: method.to_string(),
                 params,
             })
             .await?;
+
+        log::info!("Request {} sent", method);
         Ok(id)
     }
 
@@ -329,13 +335,19 @@ impl LspClient {
         }
         let method = N::METHOD.to_string();
         let params = serde_json::to_value(params)?;
+
+        log::info!("Sending {} notification with {:?}", method, params);
+
         self.request_sender
             .send(OutboundMessage {
                 id: None,
-                method,
+                method: method.to_string(),
                 params,
             })
             .await?;
+
+        log::info!("Notification {} sent", method);
+
         Ok(())
     }
 
@@ -417,15 +429,15 @@ impl LspClient {
     }
 }
 
-fn get_range_from_summary(summary: &InputEdit) -> Range {
-    Range {
-        start: Position {
-            line: summary.start_position.row as u32,
-            character: summary.start_position.column as u32,
-        },
-        end: Position {
-            line: summary.old_end_position.row as u32,
-            character: summary.old_end_position.column as u32,
-        },
+#[cfg(test)]
+mod tests {
+    use lsp_types::Uri;
+    use std::str::FromStr;
+
+    #[test]
+    fn test_uri() {
+        let uri = Uri::from_str("file:///tmp/sample").unwrap();
+        assert!(uri.is_absolute());
+        assert_eq!(uri.to_string(), "file:///tmp/sample");
     }
 }

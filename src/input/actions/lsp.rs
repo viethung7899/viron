@@ -37,13 +37,13 @@ impl_action!(
 
 #[derive(Debug, Clone)]
 pub struct UpdateDiagnostics {
-    pub path: String,
+    pub uri: String,
     pub diagnostics: Vec<Diagnostic>,
 }
 
 impl UpdateDiagnostics {
-    pub fn new(path: String, diagnostics: Vec<Diagnostic>) -> Self {
-        Self { path, diagnostics }
+    pub fn new(uri: String, diagnostics: Vec<Diagnostic>) -> Self {
+        Self { uri, diagnostics }
     }
 }
 
@@ -51,15 +51,14 @@ impl UpdateDiagnostics {
 impl Executable for UpdateDiagnostics {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         ctx.lsp_service
-            .update_diagnostics(self.path.clone(), self.diagnostics.clone());
+            .update_diagnostics(self.uri.clone(), self.diagnostics.clone());
         if let Some(current_path) = ctx
             .buffer_manager
             .current()
-            .full_file_path()
+            .get_uri()
             .as_ref()
-            .and_then(|path| path.to_str())
         {
-            if current_path == &self.path {
+            if current_path == &self.uri {
                 ctx.compositor
                     .mark_dirty(&ctx.component_ids.editor_view_id)?;
             }

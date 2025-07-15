@@ -1,7 +1,5 @@
-use crate::core::document::Document;
-use lsp_types::{Position, Range, TextDocumentContentChangeEvent, Uri};
+use lsp_types::{Position, Range, TextDocumentContentChangeEvent};
 use similar::{Algorithm, DiffOp, TextDiff};
-use std::str::FromStr;
 
 pub fn calculate_changes(old_text: &str, new_text: &str) -> Vec<TextDocumentContentChangeEvent> {
     let diff = TextDiff::configure()
@@ -120,9 +118,4 @@ fn calculate_position(text: &str, offset: usize) -> Position {
     }
 
     Position { line, character }
-}
-
-pub fn get_uri_from_document(document: &Document) -> Option<Uri> {
-    let path = document.full_file_path()?;
-    Uri::from_str(path.to_str()?).ok()
 }
