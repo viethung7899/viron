@@ -67,7 +67,15 @@ impl_action!(InsertChar, "Insert char", self {
 });
 
 #[derive(Debug, Clone)]
-pub struct DeleteChar;
+pub struct DeleteChar {
+    inline: bool,
+}
+
+impl DeleteChar {
+    pub fn new(inline: bool) -> Self {
+        Self { inline }
+    }
+}
 
 #[async_trait(?Send)]
 impl Executable for DeleteChar {
@@ -75,9 +83,16 @@ impl Executable for DeleteChar {
         let buffer = ctx.buffer_manager.current_buffer_mut();
         let point = ctx.cursor.get_point();
         let byte_start = buffer.cursor_position(&point);
+
         if let Some((c, _)) = buffer.delete_char(byte_start) {
-            // Cursor stays in place after deletion
-            let edit = Edit::delete(byte_start, point, c.to_string(), point, point);
+            ctx.cursor.clamp_column(buffer, ctx.mode);
+            let edit = Edit::delete(
+                byte_start,
+                point,
+                c.to_string(),
+                point,
+                ctx.cursor.get_point(),
+            );
             after_edit(ctx, &edit).await?;
             ctx.buffer_manager.current_mut().history.push(edit);
         }
@@ -85,10 +100,20 @@ impl Executable for DeleteChar {
     }
 }
 
-impl_action!(DeleteChar, "Delete character", ActionDefinition::DeleteChar);
+impl_action!(DeleteChar, "Delete character", self {
+    ActionDefinition::DeleteChar { inline: self.inline }
+});
 
 #[derive(Debug, Clone)]
-pub struct Backspace;
+pub struct Backspace {
+    inline: bool,
+}
+
+impl Backspace {
+    pub fn new(inline: bool) -> Self {
+        Self { inline }
+    }
+}
 
 #[async_trait(?Send)]
 impl Executable for Backspace {
@@ -109,7 +134,9 @@ impl Executable for Backspace {
     }
 }
 
-impl_action!(Backspace, "Backspace", ActionDefinition::Backspace);
+impl_action!(Backspace, "Backspace", self {
+    ActionDefinition::Backspace { inline: self.inline }
+});
 
 #[derive(Debug, Clone)]
 pub struct InsertNewLine;

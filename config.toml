@@ -6,17 +6,17 @@ gutter = "relative"
 "<Esc>" = { type = "EnterMode", params = { mode = "Normal" } }
 
 [keymap.movement] # Movement keymap for the editor
-"h" = { type = "MoveLeft", params = { previous_line = false } }
+"h" = { type = "MoveLeft", params = { inline = true } }
 "j" = { type = "MoveDown" }
 "k" = { type = "MoveUp" }
-"l" = { type = "MoveRight", params = { next_line = false } }
+"l" = { type = "MoveRight", params = { inline = true } }
 
-"<Left>" = { type = "MoveLeft", params = { previous_line = false } }
-"<Right>" = { type = "MoveRight", params = { next_line = false } }
+"<Left>" = { type = "MoveLeft", params = { inline = true } }
+"<Right>" = { type = "MoveRight", params = { inline = true } }
 "<Up>" = { type = "MoveUp" }
 "<Down>" = { type = "MoveDown" }
 
-"<Backspace>" = { type = "MoveLeft", params = { previous_line = true } }
+"<Backspace>" = { type = "MoveLeft", params = { inline = false } }
 
 "$" = { type = "MoveToLineEnd" }
 "0" = { type = "MoveToLineStart" }
@@ -32,7 +32,8 @@ gutter = "relative"
 "G" = { type = "MoveToBottom" }
 "zz" = { type = "MoveToViewportCenter" }
 
-"x" = { type = "DeleteChar" }
+"x" = { type = "DeleteChar", params = { inline = true } }
+"X" = { type = "Backspace", params = { inline = true } }
 "d" = { type = "EnterMode", params = { mode = { OperationPending = "Delete" } } }
 "c" = { type = "EnterMode", params = { mode = { OperationPending = "Change" } } }
 
@@ -50,7 +51,7 @@ gutter = "relative"
 
 "a" = { type = "Composite", params = { description = "Insert after the cursor", actions = [
     { type = "EnterMode", params = { mode = "Insert" } },
-    { type = "MoveRight", params = { next_line = true } }
+    { type = "MoveRight", params = { inline = false } }
 ] } }
 
 "A" = { type = "Composite", params = { description = "Insert at the end of the line", actions = [
