@@ -2,20 +2,21 @@ use std::path::PathBuf;
 
 use anyhow::{Ok, Result};
 use async_trait::async_trait;
+use lsp_types::request::DocumentDiagnosticRequest;
 use lsp_types::{
-    GotoDefinitionResponse, InitializeResult, InitializedParams, Location,
+    notification::{Initialized, Notification, PublishDiagnostics}, request::{Initialize, Request}, DocumentDiagnosticReport, GotoDefinitionResponse,
+    InitializeResult, InitializedParams,
+    Location,
     PublishDiagnosticsParams,
-    notification::{Initialized, Notification, PublishDiagnostics},
-    request::{Initialize, Request},
 };
 use serde_json::Value;
 
 use crate::{
     input::actions::{CompositeExecutable, GoToPosition, OpenBuffer, UpdateDiagnostics},
     service::lsp::{
-        LspAction,
         client::{LspClient, LspClientState},
         messages::InboundNotification,
+        LspAction,
     },
 };
 
@@ -26,7 +27,7 @@ pub trait LspMessageHandler: Send + Sync {
     }
 
     fn get_lsp_action(&self) -> Option<LspAction> {
-        return None;
+        None
     }
 }
 
@@ -37,7 +38,16 @@ struct UnknownResponse {
 }
 
 #[async_trait]
-impl LspMessageHandler for UnknownResponse {}
+impl LspMessageHandler for UnknownResponse {
+    fn get_lsp_action(&self) -> Option<LspAction> {
+        log::info!(
+            "Unknown LSP response: \nMethod:{}\nResult:{:?}",
+            self.method,
+            self.result
+        );
+        None
+    }
+}
 
 #[async_trait]
 impl LspMessageHandler for InitializeResult {
@@ -78,9 +88,24 @@ impl LspMessageHandler for GotoDefinitionResponse {
     }
 }
 
+impl LspMessageHandler for DocumentDiagnosticReport {
+    fn get_lsp_action(&self) -> Option<LspAction> {
+        match self {
+            DocumentDiagnosticReport::Full(full) => Some(Box::new(UpdateDiagnostics::new(
+                None,
+                full.full_document_diagnostic_report.items.clone(),
+            ))),
+            _ => None,
+        }
+    }
+}
+
 pub fn parse_response(method: &str, result: Value) -> Result<Box<dyn LspMessageHandler>> {
     let handler: Box<dyn LspMessageHandler> = match method {
         Initialize::METHOD => Box::new(serde_json::from_value::<InitializeResult>(result)?),
+        DocumentDiagnosticRequest::METHOD => {
+            Box::new(serde_json::from_value::<DocumentDiagnosticReport>(result)?)
+        }
         _ => Box::new(UnknownResponse {
             method: method.to_string(),
             result,
@@ -89,14 +114,21 @@ pub fn parse_response(method: &str, result: Value) -> Result<Box<dyn LspMessageH
     Ok(handler)
 }
 
-#[async_trait]
-impl LspMessageHandler for InboundNotification {}
+impl LspMessageHandler for InboundNotification {
+    fn get_lsp_action(&self) -> Option<LspAction> {
+        log::info!(
+            "Unhandled LSP notification: \nMethod: {}\nResult: {:?}",
+            self.method,
+            self.params
+        );
+        None
+    }
+}
 
-#[async_trait]
 impl LspMessageHandler for PublishDiagnosticsParams {
     fn get_lsp_action(&self) -> Option<LspAction> {
         Some(Box::new(UpdateDiagnostics::new(
-            self.uri.as_str().to_string(),
+            Some(self.uri.to_string()),
             self.diagnostics.clone(),
         )))
     }

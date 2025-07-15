@@ -14,7 +14,7 @@ use lsp_types::request::{
 };
 use lsp_types::{
     DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
-    DidSaveTextDocumentParams, DocumentDiagnosticParams, GotoDefinitionParams, Position, Range,
+    DidSaveTextDocumentParams, DocumentDiagnosticParams, GotoDefinitionParams, Position,
     ServerCapabilities, TextDocumentContentChangeEvent, TextDocumentIdentifier, TextDocumentItem,
     TextDocumentPositionParams, TextDocumentSyncCapability, TextDocumentSyncKind, Uri,
     VersionedTextDocumentIdentifier,
@@ -37,7 +37,6 @@ use tokio::{
     process::Command,
     sync::mpsc,
 };
-use tree_sitter::InputEdit;
 
 static ID: AtomicI32 = AtomicI32::new(1);
 const CHANNEL_SIZE: usize = 32;
@@ -310,8 +309,6 @@ impl LspClient {
         let method = R::METHOD.to_string();
         let params = serde_json::to_value(params)?;
 
-        log::info!("Sending {} request with {:?}", method, params);
-
         self.pending_responses.insert(id, method.to_string());
         self.request_sender
             .send(OutboundMessage {
@@ -321,7 +318,6 @@ impl LspClient {
             })
             .await?;
 
-        log::info!("Request {} sent", method);
         Ok(id)
     }
 
@@ -336,8 +332,6 @@ impl LspClient {
         let method = N::METHOD.to_string();
         let params = serde_json::to_value(params)?;
 
-        log::info!("Sending {} notification with {:?}", method, params);
-
         self.request_sender
             .send(OutboundMessage {
                 id: None,
@@ -345,8 +339,6 @@ impl LspClient {
                 params,
             })
             .await?;
-
-        log::info!("Notification {} sent", method);
 
         Ok(())
     }

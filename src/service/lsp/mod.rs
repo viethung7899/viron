@@ -104,7 +104,7 @@ impl LspService {
             .unwrap_or_default()
     }
 
-    pub fn update_diagnostics(&mut self, path: String, diagnostics: Vec<Diagnostic>) {
-        self.diagnostics.insert(path, diagnostics);
+    pub fn update_diagnostics(&mut self, path: &str, diagnostics: Vec<Diagnostic>) {
+        self.diagnostics.insert(path.to_string(), diagnostics);
     }
 }
