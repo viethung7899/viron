@@ -1,24 +1,26 @@
 use crate::core::document::Document;
 use crate::core::history::edit::Edit;
 use crate::core::language::Language;
-use crate::service::lsp::LspAction;
 use crate::service::lsp::message_handler::{parse_notification, parse_response};
-use crate::service::lsp::messages::{InboundMessage, OutboundMessage, lsp_receive, lsp_send};
+use crate::service::lsp::messages::{lsp_receive, lsp_send, InboundMessage, OutboundMessage};
 use crate::service::lsp::params::get_initialize_params;
+use crate::service::lsp::LspAction;
 use anyhow::{Context, Result};
 use lsp_types::notification::{
     DidCloseTextDocument, DidOpenTextDocument, DidSaveTextDocument, Exit, Notification,
 };
-use lsp_types::request::{GotoDefinition, Initialize, Request, Shutdown};
+use lsp_types::request::{
+    DocumentDiagnosticRequest, GotoDefinition, Initialize, Request, Shutdown,
+};
 use lsp_types::{
     DidCloseTextDocumentParams, DidOpenTextDocumentParams, DidSaveTextDocumentParams,
-    GotoDefinitionParams, Position, Range,
-    ServerCapabilities, TextDocumentIdentifier, TextDocumentItem, TextDocumentPositionParams, Uri,
+    DocumentDiagnosticParams, GotoDefinitionParams, Position, Range, ServerCapabilities,
+    TextDocumentIdentifier, TextDocumentItem, TextDocumentPositionParams, Uri,
 };
 use std::collections::HashMap;
 use std::str::FromStr;
-use std::sync::Arc;
 use std::sync::atomic::AtomicI32;
+use std::sync::Arc;
 use std::{
     process::Stdio,
     sync::atomic::{self},
@@ -45,8 +47,6 @@ pub enum LspClientState {
     Uninitialized,
     Initializing,
     Initialized,
-    ShuttingDown,
-    Dead,
 }
 
 #[derive(Debug, Clone)]
@@ -214,6 +214,31 @@ impl LspClient {
         Ok(())
     }
 
+    pub async fn request_diagnostics(&mut self, document: &Document) -> Result<Option<i32>> {
+        let can_request_diagnostics = self
+            .server_capabilities
+            .as_ref()
+            .map(|capabilities| capabilities.diagnostic_provider.is_some())
+            .unwrap_or(false);
+        if !can_request_diagnostics {
+            return Ok(None);
+        }
+
+        let params = DocumentDiagnosticParams {
+            text_document: TextDocumentIdentifier {
+                uri: Uri::from_str(&document.uri().unwrap_or_default())?,
+            },
+            identifier: None,
+            previous_result_id: None,
+            work_done_progress_params: Default::default(),
+            partial_result_params: Default::default(),
+        };
+        let id = self
+            .send_request::<DocumentDiagnosticRequest>(params, false)
+            .await?;
+        Ok(Some(id))
+    }
+
     async fn send_request<R: Request>(&mut self, params: R::Params, force: bool) -> Result<i32> {
         if self.state != LspClientState::Initialized && !force {
             return Err(anyhow::anyhow!("LSP client is not initialized"));
@@ -225,7 +250,7 @@ impl LspClient {
         self.pending_responses.insert(id, method.to_string());
         self.request_sender
             .send(OutboundMessage {
-                id: Some(id as i32),
+                id: Some(id),
                 method,
                 params,
             })
@@ -299,7 +324,7 @@ impl LspClient {
         Ok(())
     }
 
-    pub async fn shutdown(&mut self) -> Result<()> {
+    pub async fn shutdown(mut self) -> Result<()> {
         // Send shutdown request and wait for response
         let shutdown_id = self.send_request::<Shutdown>((), true).await?;
 

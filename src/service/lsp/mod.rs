@@ -79,7 +79,8 @@ impl LspService {
     }
 
     pub async fn shutdown(&mut self) -> Result<()> {
-        if let Some(ref mut client) = self.client {
+        let client = std::mem::take(&mut self.client);
+        if let Some(client) = client {
             client.shutdown().await?;
         }
         self.client = None;
