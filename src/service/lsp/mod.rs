@@ -8,7 +8,7 @@ mod version;
 use std::collections::HashMap;
 
 use crate::core::language::Language;
-use crate::service::lsp::client::LspClient;
+pub(crate) use crate::service::lsp::client::LspClient;
 use crate::service::lsp::client::LspClientState;
 use anyhow::Result;
 use lsp_types::Diagnostic;
