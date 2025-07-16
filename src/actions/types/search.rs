@@ -1,11 +1,9 @@
+use crate::actions::core::{ActionDefinition, Executable, impl_action};
+use crate::actions::types::{mode, movement, system};
+use crate::actions::{ActionContext, ActionResult};
 use crate::core::message::Message;
 use crate::core::mode::Mode;
-use crate::input::actions::{
-    impl_action, mode, movement, system, Action, Executable,
-};
-use crate::input::actions::{ActionContext, ActionResult};
 use async_trait::async_trait;
-use crate::input::actions::definition::ActionDefinition;
 
 #[derive(Debug, Clone)]
 pub struct SearchMoveLeft;

@@ -8,10 +8,11 @@ mod version;
 use std::collections::HashMap;
 
 use crate::core::language::Language;
+use crate::service::lsp::client::LspClient;
 use crate::service::lsp::client::LspClientState;
-use crate::{input::actions, service::lsp::client::LspClient};
 use anyhow::Result;
 use lsp_types::Diagnostic;
+use crate::actions::core::Executable;
 
 #[derive(Debug, Default)]
 pub struct LspService {
@@ -20,7 +21,7 @@ pub struct LspService {
     enabled: bool,
 }
 
-type LspAction = Box<dyn actions::Executable>;
+type LspAction = Box<dyn Executable>;
 
 impl LspService {
     pub fn new() -> Self {

@@ -1,7 +1,6 @@
+use crate::actions::core::{ActionDefinition, Executable, impl_action};
+use crate::actions::{ActionContext, ActionResult};
 use crate::core::message::Message;
-use crate::input::actions::{
-    impl_action, Action, ActionContext, ActionDefinition, ActionResult, Executable,
-};
 use async_trait::async_trait;
 
 #[derive(Debug, Clone)]

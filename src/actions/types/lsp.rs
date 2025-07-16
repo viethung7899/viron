@@ -1,8 +1,7 @@
+use crate::actions::core::{ActionDefinition, Executable, impl_action};
+use crate::actions::types::system;
+use crate::actions::{ActionContext, ActionResult};
 use crate::core::message::Message;
-use crate::input::actions::Action;
-use crate::input::actions::{
-    impl_action, system, ActionContext, ActionDefinition, ActionResult, Executable,
-};
 use async_trait::async_trait;
 use lsp_types::Diagnostic;
 
@@ -51,11 +50,7 @@ impl UpdateDiagnostics {
 impl Executable for UpdateDiagnostics {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         let document = ctx.buffer_manager.current();
-        let uri = self
-            .uri
-            .as_ref()
-            .cloned()
-            .or_else(|| document.get_uri());
+        let uri = self.uri.as_ref().cloned().or_else(|| document.get_uri());
 
         let Some(uri) = uri else {
             return Ok(());

@@ -1,13 +1,6 @@
+use crate::actions::core::{Action, CompositeAction};
+use crate::actions::types::{buffer, editing, lsp, mode, movement, search, system};
 use crate::core::mode::Mode;
-use crate::input::actions::composite::CompositeAction;
-use crate::input::actions::{
-    Action, Backspace, ChangeCurrentLine, CloseBuffer, DeleteChar, DeleteCurrentLine, EnterMode,
-    FindNext, FindPrevious, GoToDefinition, GoToLine, InsertChar, InsertNewLine,
-    InsertNewLineAbove, InsertNewLineBelow, MoveDown, MoveLeft, MoveRight, MoveToBottom,
-    MoveToLineEnd, MoveToLineStart, MoveToNextWord, MoveToPreviousWord, MoveToTop,
-    MoveToViewportCenter, MoveUp, NextBuffer, OpenBuffer, PreviousBuffer, Quit, Redo, Undo,
-    WriteBuffer,
-};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
@@ -92,57 +85,59 @@ pub enum ActionDefinition {
 pub fn create_action_from_definition(definition: &ActionDefinition) -> Box<dyn Action> {
     match definition {
         // Movement actions
-        ActionDefinition::MoveLeft { inline } => Box::new(MoveLeft::new(*inline)),
-        ActionDefinition::MoveRight { inline } => Box::new(MoveRight::new(*inline)),
-        ActionDefinition::MoveUp => Box::new(MoveUp),
-        ActionDefinition::MoveDown => Box::new(MoveDown),
-        ActionDefinition::MoveToLineStart => Box::new(MoveToLineStart),
-        ActionDefinition::MoveToLineEnd => Box::new(MoveToLineEnd),
-        ActionDefinition::MoveToTop => Box::new(MoveToTop),
-        ActionDefinition::MoveToBottom => Box::new(MoveToBottom),
-        ActionDefinition::MoveToViewportCenter => Box::new(MoveToViewportCenter),
-        ActionDefinition::MoveToPreviousWord => Box::new(MoveToPreviousWord),
-        ActionDefinition::MoveToNextWord => Box::new(MoveToNextWord),
-        ActionDefinition::GoToLine { line_number } => Box::new(GoToLine::new(*line_number)),
+        ActionDefinition::MoveLeft { inline } => Box::new(movement::MoveLeft::new(*inline)),
+        ActionDefinition::MoveRight { inline } => Box::new(movement::MoveRight::new(*inline)),
+        ActionDefinition::MoveUp => Box::new(movement::MoveUp),
+        ActionDefinition::MoveDown => Box::new(movement::MoveDown),
+        ActionDefinition::MoveToLineStart => Box::new(movement::MoveToLineStart),
+        ActionDefinition::MoveToLineEnd => Box::new(movement::MoveToLineEnd),
+        ActionDefinition::MoveToTop => Box::new(movement::MoveToTop),
+        ActionDefinition::MoveToBottom => Box::new(movement::MoveToBottom),
+        ActionDefinition::MoveToViewportCenter => Box::new(movement::MoveToViewportCenter),
+        ActionDefinition::MoveToPreviousWord => Box::new(movement::MoveToPreviousWord),
+        ActionDefinition::MoveToNextWord => Box::new(movement::MoveToNextWord),
+        ActionDefinition::GoToLine { line_number } => {
+            Box::new(movement::GoToLine::new(*line_number))
+        }
 
         // Editing actions
-        ActionDefinition::InsertChar { ch } => Box::new(InsertChar::new(*ch)),
-        ActionDefinition::DeleteChar { inline } => Box::new(DeleteChar::new(*inline)),
-        ActionDefinition::Backspace { inline } => Box::new(Backspace::new(*inline)),
-        ActionDefinition::InsertNewLine => Box::new(InsertNewLine),
-        ActionDefinition::InsertNewLineBelow => Box::new(InsertNewLineBelow),
-        ActionDefinition::InsertNewLineAbove => Box::new(InsertNewLineAbove),
-        ActionDefinition::DeleteCurrentLine => Box::new(DeleteCurrentLine),
-        ActionDefinition::ChangeCurrentLine => Box::new(ChangeCurrentLine),
+        ActionDefinition::InsertChar { ch } => Box::new(editing::InsertChar::new(*ch)),
+        ActionDefinition::DeleteChar { inline } => Box::new(editing::DeleteChar::new(*inline)),
+        ActionDefinition::Backspace { inline } => Box::new(editing::Backspace::new(*inline)),
+        ActionDefinition::InsertNewLine => Box::new(editing::InsertNewLine),
+        ActionDefinition::InsertNewLineBelow => Box::new(editing::InsertNewLineBelow),
+        ActionDefinition::InsertNewLineAbove => Box::new(editing::InsertNewLineAbove),
+        ActionDefinition::DeleteCurrentLine => Box::new(editing::DeleteCurrentLine),
+        ActionDefinition::ChangeCurrentLine => Box::new(editing::ChangeCurrentLine),
 
-        ActionDefinition::Undo => Box::new(Undo),
-        ActionDefinition::Redo => Box::new(Redo),
+        ActionDefinition::Undo => Box::new(editing::Undo),
+        ActionDefinition::Redo => Box::new(editing::Redo),
 
         // Search actions
-        ActionDefinition::FindNext => Box::new(FindNext),
-        ActionDefinition::FindPrevious => Box::new(FindPrevious),
+        ActionDefinition::FindNext => Box::new(search::FindNext),
+        ActionDefinition::FindPrevious => Box::new(search::FindPrevious),
 
         // Mode actions
-        ActionDefinition::EnterMode { mode } => Box::new(EnterMode::new(*mode)),
+        ActionDefinition::EnterMode { mode } => Box::new(mode::EnterMode::new(*mode)),
 
         // Buffer actions
-        ActionDefinition::NextBuffer => Box::new(NextBuffer),
-        ActionDefinition::PreviousBuffer => Box::new(PreviousBuffer),
+        ActionDefinition::NextBuffer => Box::new(buffer::NextBuffer),
+        ActionDefinition::PreviousBuffer => Box::new(buffer::PreviousBuffer),
         ActionDefinition::OpenBuffer { path } => {
             let path_buf = PathBuf::from(path);
-            Box::new(OpenBuffer::new(path_buf))
+            Box::new(buffer::OpenBuffer::new(path_buf))
         }
         ActionDefinition::WriteBuffer { path } => {
             let path_buf = path.as_ref().map(PathBuf::from);
-            Box::new(WriteBuffer::new(path_buf))
+            Box::new(buffer::WriteBuffer::new(path_buf))
         }
-        ActionDefinition::CloseBuffer { force } => Box::new(CloseBuffer::force(*force)),
+        ActionDefinition::CloseBuffer { force } => Box::new(buffer::CloseBuffer::force(*force)),
 
         // LSP actions
-        ActionDefinition::GoToDefinition => Box::new(GoToDefinition),
+        ActionDefinition::GoToDefinition => Box::new(lsp::GoToDefinition),
 
         // System actions
-        ActionDefinition::Quit => Box::new(Quit),
+        ActionDefinition::Quit => Box::new(system::Quit),
 
         ActionDefinition::Composite {
             description,

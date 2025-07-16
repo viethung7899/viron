@@ -5,6 +5,7 @@ mod editor;
 mod input;
 mod service;
 mod ui;
+mod actions;
 
 use crate::config::get_config_dir;
 use anyhow::Result;

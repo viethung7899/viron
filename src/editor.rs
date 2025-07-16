@@ -1,33 +1,34 @@
-use crate::config::editor::Gutter;
+use crate::actions;
+use crate::actions::{buffer, mode, ActionContext};
+use crate::actions::core::Executable;
 use crate::config::Config;
+use crate::config::editor::Gutter;
 use crate::constants::{MIN_GUTTER_WIDTH, RESERVED_ROW_COUNT};
 use crate::core::command::{CommandBuffer, SearchBuffer};
 use crate::core::cursor::Cursor;
 use crate::core::mode::Mode;
 use crate::core::viewport::Viewport;
 use crate::core::{buffer_manager::BufferManager, message::MessageManager};
-use crate::input::actions::{EnterMode, Executable};
 use crate::input::keys::KeyEvent as VironKeyEvent;
 use crate::input::{
-    actions, actions::ActionContext,
+    InputState,
     events::{EventHandler, InputEvent},
-    get_default_command_action,
-    get_default_insert_action, get_default_search_action, InputState,
+    get_default_command_action, get_default_insert_action, get_default_search_action,
 };
 use crate::service::LspService;
+use crate::ui::RenderContext;
 use crate::ui::components::{
     CommandLine, ComponentIds, EditorView, MessageArea, PendingKeys, SearchBox, StatusLine,
 };
 use crate::ui::compositor::Compositor;
-use crate::ui::RenderContext;
 use anyhow::Result;
 use crossterm::cursor::SetCursorStyle;
+use crossterm::{ExecutableCommand, QueueableCommand, style};
 use crossterm::{
     cursor,
     event::KeyEvent,
     terminal::{self, ClearType},
 };
-use crossterm::{style, ExecutableCommand, QueueableCommand};
 use std::io::{self, Stdout, Write};
 use std::path::{Path, PathBuf};
 
@@ -145,7 +146,7 @@ impl Editor {
         };
 
         if let Some(file) = file {
-            let action = actions::OpenBuffer::new(PathBuf::from(file.as_ref()));
+            let action = buffer::OpenBuffer::new(PathBuf::from(file.as_ref()));
             editor.execute_action(&action).await?;
         } else {
             editor.buffer_manager.new_buffer();
@@ -171,7 +172,7 @@ impl Editor {
                         if self.input_state.is_empty()
                             && matches!(self.mode, Mode::OperationPending(_))
                         {
-                            self.execute_action(&EnterMode::new(Mode::Normal)).await?;
+                            self.execute_action(&mode::EnterMode::new(Mode::Normal)).await?;
                         }
                     }
                 }

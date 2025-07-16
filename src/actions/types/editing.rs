@@ -1,14 +1,16 @@
+use crate::actions::core::{ActionDefinition, Executable, impl_action};
+use crate::actions::types::{movement, system};
+use crate::actions::{ActionContext, ActionResult};
 use crate::core::history::edit::Edit;
 use crate::core::message::Message;
 use crate::core::mode::Mode;
-use crate::input::actions::definition::ActionDefinition;
-use crate::input::actions::{
-    impl_action, movement, system, Action, ActionContext, ActionResult, Executable,
-};
 use async_trait::async_trait;
 use std::fmt::Debug;
 
-pub(super) async fn after_edit(ctx: &mut ActionContext<'_>, edit: &Edit) -> ActionResult {
+pub(in crate::actions) async fn after_edit(
+    ctx: &mut ActionContext<'_>,
+    edit: &Edit,
+) -> ActionResult {
     let document = ctx.buffer_manager.current_mut();
     document.mark_modified();
 
