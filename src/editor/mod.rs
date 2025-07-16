@@ -1,4 +1,3 @@
-use crate::actions;
 use crate::actions::{buffer, mode, ActionContext};
 use crate::actions::core::Executable;
 use crate::config::Config;
