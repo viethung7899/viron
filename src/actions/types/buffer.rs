@@ -1,13 +1,14 @@
-use crate::actions::core::{ActionDefinition, Executable, impl_action};
+use crate::actions::core::{impl_action, ActionDefinition, Executable};
 use crate::actions::types::system;
-use crate::actions::{ActionContext, ActionResult};
+use crate::actions::ActionResult;
 use crate::core::message::Message;
 use async_trait::async_trait;
 use std::fmt::Debug;
 use std::path::PathBuf;
+use crate::actions::context::ActionContext;
 
 async fn after_buffer_change(ctx: &mut ActionContext<'_>) -> ActionResult {
-    let document = ctx.buffer_manager.current();
+    let document = ctx.editor.buffer_manager.current();
     let language = document.language;
 
     // Update syntax highlighter with the current document's language
@@ -15,7 +16,7 @@ async fn after_buffer_change(ctx: &mut ActionContext<'_>) -> ActionResult {
         client.did_open(&document).await?;
     };
 
-    ctx.compositor.mark_all_dirty();
+    ctx.ui.compositor.mark_all_dirty();
     Ok(())
 }
 
@@ -25,7 +26,7 @@ pub struct NextBuffer;
 #[async_trait(?Send)]
 impl Executable for NextBuffer {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
-        ctx.buffer_manager.next_buffer();
+        ctx.editor.buffer_manager.next_buffer();
         after_buffer_change(ctx).await
     }
 }
@@ -38,7 +39,7 @@ pub struct PreviousBuffer;
 #[async_trait(?Send)]
 impl Executable for PreviousBuffer {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
-        ctx.buffer_manager.previous_buffer();
+        ctx.editor.buffer_manager.previous_buffer();
         after_buffer_change(ctx).await
     }
 }
@@ -63,7 +64,7 @@ impl OpenBuffer {
 #[async_trait(?Send)]
 impl Executable for OpenBuffer {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
-        ctx.buffer_manager.open_file(&self.path);
+        ctx.editor.buffer_manager.open_file(&self.path);
         after_buffer_change(ctx).await
     }
 }
@@ -88,7 +89,7 @@ impl WriteBuffer {
 #[async_trait(?Send)]
 impl Executable for WriteBuffer {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
-        let document = ctx.buffer_manager.current();
+        let document = ctx.editor.buffer_manager.current();
         let path = self.path.clone().or(document.path.clone());
         let Some(path) = path else {
             return system::ShowMessage(Message::error(
@@ -114,7 +115,7 @@ impl Executable for WriteBuffer {
                     line_count,
                     content.len()
                 );
-                ctx.buffer_manager.current_mut().modified = false;
+                ctx.editor.buffer_manager.current_mut().modified = false;
                 system::ShowMessage(Message::info(message))
                     .execute(ctx)
                     .await
@@ -148,7 +149,7 @@ impl CloseBuffer {
 #[async_trait(?Send)]
 impl Executable for CloseBuffer {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
-        if !self.force && ctx.buffer_manager.current().modified {
+        if !self.force && ctx.editor.buffer_manager.current().modified {
             return system::ShowMessage(Message::error(
                 "Buffer has unsaved changes. Use 'force' to close anyway.".to_string(),
             ))
@@ -156,12 +157,12 @@ impl Executable for CloseBuffer {
             .await;
         }
 
-        let document = ctx.buffer_manager.close_current();
+        let document = ctx.editor.buffer_manager.close_current();
         if let Some(client) = ctx.lsp_service.get_client_mut() {
             client.did_close(&document).await?;
         }
 
-        if ctx.buffer_manager.is_empty() {
+        if ctx.editor.buffer_manager.is_empty() {
             *ctx.running = false;
         } else {
             after_buffer_change(ctx).await?;
@@ -180,8 +181,8 @@ pub struct RefreshBuffer;
 #[async_trait(?Send)]
 impl Executable for RefreshBuffer {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
-        ctx.compositor
-            .mark_dirty(&ctx.component_ids.editor_view_id)?;
+        ctx.ui.compositor
+            .mark_dirty(&ctx.ui.component_ids.editor_view_id)?;
         Ok(())
     }
 }

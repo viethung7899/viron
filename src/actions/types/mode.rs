@@ -1,9 +1,10 @@
 use crate::actions::core::{Action, ActionDefinition, Executable};
-use crate::actions::{ActionContext, ActionResult};
+use crate::actions::ActionResult;
 use crate::core::mode::Mode;
 use crate::core::operation::Operator;
 use async_trait::async_trait;
 use std::fmt::Debug;
+use crate::actions::context::ActionContext;
 
 #[derive(Debug, Clone)]
 pub struct EnterMode {
@@ -19,65 +20,65 @@ impl EnterMode {
 #[async_trait(?Send)]
 impl Executable for EnterMode {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
-        match &ctx.mode {
+        match &ctx.editor.mode {
             Mode::Command => {
-                ctx.command_buffer.clear();
-                ctx.compositor
-                    .mark_visible(&ctx.component_ids.command_line_id, false)?;
+                ctx.input.command_buffer.clear();
+                ctx.ui.compositor
+                    .mark_visible(&ctx.ui.component_ids.command_line_id, false)?;
             }
             Mode::Search => {
-                ctx.search_buffer.buffer.clear();
-                ctx.compositor
-                    .mark_visible(&ctx.component_ids.search_box_id, false)?;
+                ctx.input.search_buffer.buffer.clear();
+                ctx.ui.compositor
+                    .mark_visible(&ctx.ui.component_ids.search_box_id, false)?;
             }
             Mode::OperationPending(_) => {
-                ctx.input_state.clear();
-                ctx.compositor
-                    .mark_visible(&ctx.component_ids.pending_keys_id, false)?;
+                ctx.input.input_state.clear();
+                ctx.ui.compositor
+                    .mark_visible(&ctx.ui.component_ids.pending_keys_id, false)?;
             }
             _ => {}
         };
 
         match &self.mode {
             Mode::Command => {
-                ctx.command_buffer.clear();
-                ctx.compositor
-                    .mark_visible(&ctx.component_ids.command_line_id, true)?;
-                ctx.compositor
-                    .set_focus(&ctx.component_ids.command_line_id)?;
+                ctx.input.command_buffer.clear();
+                ctx.ui.compositor
+                    .mark_visible(&ctx.ui.component_ids.command_line_id, true)?;
+                ctx.ui.compositor
+                    .set_focus(&ctx.ui.component_ids.command_line_id)?;
             }
             Mode::Search => {
-                ctx.search_buffer.buffer.clear();
-                ctx.compositor
-                    .mark_visible(&ctx.component_ids.search_box_id, true)?;
-                ctx.compositor.set_focus(&ctx.component_ids.search_box_id)?;
+                ctx.input.search_buffer.buffer.clear();
+                ctx.ui.compositor
+                    .mark_visible(&ctx.ui.component_ids.search_box_id, true)?;
+                ctx.ui.compositor.set_focus(&ctx.ui.component_ids.search_box_id)?;
             }
             Mode::Normal | Mode::Insert => {
-                ctx.command_buffer.clear();
-                ctx.search_buffer.buffer.clear();
-                ctx.compositor
-                    .set_focus(&ctx.component_ids.editor_view_id)?;
-                ctx.input_state.clear();
-                ctx.cursor
-                    .clamp_column(ctx.buffer_manager.current_buffer(), &Mode::Normal);
-                ctx.compositor
-                    .mark_visible(&ctx.component_ids.command_line_id, false)?;
-                ctx.compositor
-                    .mark_visible(&ctx.component_ids.search_box_id, false)?;
-                ctx.compositor
-                    .mark_visible(&ctx.component_ids.pending_keys_id, false)?;
+                ctx.input.command_buffer.clear();
+                ctx.input.search_buffer.buffer.clear();
+                ctx.ui.compositor
+                    .set_focus(&ctx.ui.component_ids.editor_view_id)?;
+                ctx.input.input_state.clear();
+                ctx.editor.cursor
+                    .clamp_column(ctx.editor.buffer_manager.current_buffer(), &Mode::Normal);
+                ctx.ui.compositor
+                    .mark_visible(&ctx.ui.component_ids.command_line_id, false)?;
+                ctx.ui.compositor
+                    .mark_visible(&ctx.ui.component_ids.search_box_id, false)?;
+                ctx.ui.compositor
+                    .mark_visible(&ctx.ui.component_ids.pending_keys_id, false)?;
             }
             Mode::OperationPending(_) => {
-                ctx.compositor
-                    .set_focus(&ctx.component_ids.editor_view_id)?;
-                ctx.compositor
-                    .mark_visible(&ctx.component_ids.pending_keys_id, true)?;
+                ctx.ui.compositor
+                    .set_focus(&ctx.ui.component_ids.editor_view_id)?;
+                ctx.ui.compositor
+                    .mark_visible(&ctx.ui.component_ids.pending_keys_id, true)?;
             }
         };
 
-        *ctx.mode = self.mode.clone();
-        ctx.compositor
-            .mark_dirty(&ctx.component_ids.status_line_id)?;
+        *ctx.editor.mode = self.mode.clone();
+        ctx.ui.compositor
+            .mark_dirty(&ctx.ui.component_ids.status_line_id)?;
         Ok(())
     }
 }

@@ -1,4 +1,4 @@
-use crate::actions::{buffer, mode, ActionContext};
+use crate::actions::{buffer, mode};
 use crate::actions::core::Executable;
 use crate::config::Config;
 use crate::config::editor::Gutter;
@@ -10,9 +10,9 @@ use crate::core::viewport::Viewport;
 use crate::core::{buffer_manager::BufferManager, message::MessageManager};
 use crate::input::keys::KeyEvent as VironKeyEvent;
 use crate::input::{
-    InputState,
     events::{EventHandler, InputEvent},
-    get_default_command_action, get_default_insert_action, get_default_search_action,
+    get_default_command_action,
+    get_default_insert_action, get_default_search_action, InputState,
 };
 use crate::service::LspService;
 use crate::ui::RenderContext;
@@ -22,7 +22,7 @@ use crate::ui::components::{
 use crate::ui::compositor::Compositor;
 use anyhow::Result;
 use crossterm::cursor::SetCursorStyle;
-use crossterm::{ExecutableCommand, QueueableCommand, style};
+use crossterm::{style, ExecutableCommand, QueueableCommand};
 use crossterm::{
     cursor,
     event::KeyEvent,
@@ -30,6 +30,7 @@ use crossterm::{
 };
 use std::io::{self, Stdout, Write};
 use std::path::{Path, PathBuf};
+use crate::actions::context::{ActionContext, EditorContext, InputContext, UIContext};
 
 pub struct Editor {
     // Size
@@ -190,20 +191,32 @@ impl Editor {
     }
 
     async fn execute_action(&mut self, action: &dyn Executable) -> Result<()> {
-        let mut context = ActionContext {
-            mode: &mut self.mode,
+        let editor_ctx = EditorContext {
+            cursor: &mut self.cursor,
             viewport: &mut self.viewport,
+            mode: &mut self.mode,
             buffer_manager: &mut self.buffer_manager,
+        };
+
+        let ui_ctx = UIContext {
+            compositor: &mut self.compositor,
+            component_ids: &self.component_ids,
+        };
+
+        let input_ctx = InputContext {
             command_buffer: &mut self.command_buffer,
             search_buffer: &mut self.search_buffer,
-            config: &self.config,
-            message: &mut self.message_manager,
-            cursor: &mut self.cursor,
-            running: &mut self.running,
-            compositor: &mut self.compositor,
-            component_ids: &mut self.component_ids,
-            lsp_service: &mut self.lsp_service,
             input_state: &mut self.input_state,
+        };
+
+        let mut context = ActionContext {
+            editor: editor_ctx,
+            ui: ui_ctx,
+            input: input_ctx,
+            message: &mut self.message_manager,
+            config: &self.config,
+            running: &mut self.running,
+            lsp_service: &mut self.lsp_service,
         };
         action.execute(&mut context).await
     }

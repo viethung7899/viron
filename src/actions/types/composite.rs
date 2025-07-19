@@ -1,12 +1,13 @@
-use crate::actions::core::definition::{MovementType, create_action_from_definition};
+use crate::actions::core::definition::{create_action_from_definition, MovementType};
 use crate::actions::core::{ActionDefinition, Executable};
 use crate::actions::types::editing::after_edit;
-use crate::actions::types::{editing, mode, movement};
-use crate::actions::{ActionContext, ActionResult};
+use crate::actions::types::{editing, mode};
+use crate::actions::ActionResult;
 use crate::core::history::edit::Edit;
 use crate::core::mode::Mode;
 use crate::core::operation::Operator;
 use async_trait::async_trait;
+use crate::actions::context::ActionContext;
 
 #[derive(Debug, Clone)]
 pub struct RepeatingAction {
@@ -49,17 +50,17 @@ impl ComboAction {
 
     async fn perform_delete(&self, ctx: &mut ActionContext<'_>) -> anyhow::Result<bool> {
         let movement_type = self.motion.get_movement_type().unwrap();
-        let before = ctx.cursor.get_point();
+        let before = ctx.editor.cursor.get_point();
         let action = create_action_from_definition(&self.motion);
         for _ in 0..self.repeat {
             action.execute(ctx).await?;
         }
-        let after = ctx.cursor.get_point();
+        let after = ctx.editor.cursor.get_point();
 
         let from = before.min(after);
         let to = before.max(after);
 
-        let buffer = ctx.buffer_manager.current_buffer_mut();
+        let buffer = ctx.editor.buffer_manager.current_buffer_mut();
         let result = match movement_type {
             MovementType::Line => {
                 let start_line = from.row;
@@ -84,9 +85,9 @@ impl ComboAction {
             from,
             to,
         );
-        ctx.cursor.set_point(from, buffer);
+        ctx.editor.cursor.set_point(from, buffer);
         after_edit(ctx, &edit).await?;
-        ctx.buffer_manager.current_mut().history.push(edit);
+        ctx.editor.buffer_manager.current_mut().history.push(edit);
         Ok(true)
     }
 
@@ -118,9 +119,9 @@ impl Executable for ComboAction {
             }
             Operator::Change => self.perform_change(ctx).await?,
         };
-        let buffer = ctx.buffer_manager.current_buffer();
-        ctx.cursor.clamp_row(buffer);
-        ctx.cursor.clamp_column(buffer, ctx.mode);
+        let buffer = ctx.editor.buffer_manager.current_buffer();
+        ctx.editor.cursor.clamp_row(buffer);
+        ctx.editor.cursor.clamp_column(buffer, ctx.editor.mode);
         Ok(())
     }
 }

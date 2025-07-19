@@ -1,5 +1,6 @@
+use crate::actions::ActionResult;
+use crate::actions::context::ActionContext;
 use crate::actions::core::{ActionDefinition, Executable, impl_action};
-use crate::actions::{ActionContext, ActionResult};
 use crate::core::message::Message;
 use async_trait::async_trait;
 
@@ -24,8 +25,9 @@ pub struct ShowMessage(pub Message);
 impl Executable for ShowMessage {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         ctx.message.show_message(self.0.clone());
-        ctx.compositor
-            .mark_visible(&ctx.component_ids.message_area_id, true)?;
+        ctx.ui
+            .compositor
+            .mark_visible(&ctx.ui.component_ids.message_area_id, true)?;
         Ok(())
     }
 }

@@ -1,5 +1,5 @@
 use crate::actions::core::{ActionDefinition, Executable};
-use crate::actions::{ActionContext, ActionResult};
+use crate::actions::ActionResult;
 use async_trait::async_trait;
 use std::fmt::Debug;
 
@@ -98,3 +98,4 @@ macro_rules! impl_action {
 }
 
 pub(crate) use impl_action;
+use crate::actions::context::ActionContext;
