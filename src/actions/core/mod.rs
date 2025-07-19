@@ -1,7 +1,6 @@
 mod action;
 pub mod definition;
 mod executable;
-pub(crate) mod traits;
 
 pub(crate) use action::impl_action;
 pub use action::{Action, CompositeAction};
