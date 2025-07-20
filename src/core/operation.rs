@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 pub enum Operator {
     Delete,
     Change,
+    Yank,
 }
 
 impl Operator {
@@ -11,6 +12,7 @@ impl Operator {
         match self {
             Operator::Delete => "d".to_string(),
             Operator::Change => "c".to_string(),
+            Operator::Yank => "y".to_string(),
         }
     }
 
@@ -18,6 +20,7 @@ impl Operator {
         match self {
             Operator::Delete => "delete",
             Operator::Change => "change",
+            Operator::Yank => "yank",
         }
     }
 }

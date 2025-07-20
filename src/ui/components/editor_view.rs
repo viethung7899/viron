@@ -61,7 +61,7 @@ impl EditorView {
             let content = if buffer_row >= buffer.line_count() {
                 " ".repeat(visible_width)
             } else {
-                let line = buffer.get_content_line(buffer_row);
+                let line = buffer.get_line_as_string(buffer_row);
                 format!(
                     "{:<visible_width$}",
                     line.chars()

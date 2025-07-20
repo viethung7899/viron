@@ -93,6 +93,7 @@ impl Action for EnterMode {
             Mode::Search => "Enter search mode",
             Mode::OperationPending(Operator::Change) => "Change",
             Mode::OperationPending(Operator::Delete) => "Delete",
+            Mode::OperationPending(Operator::Yank) => "Yank",
         }
     }
 

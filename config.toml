@@ -36,6 +36,7 @@ gutter = "relative"
 "X" = { type = "Backspace", params = { inline = true } }
 "d" = { type = "EnterMode", params = { mode = { OperationPending = "Delete" } } }
 "c" = { type = "EnterMode", params = { mode = { OperationPending = "Change" } } }
+"y" = { type = "EnterMode", params = { mode = { OperationPending = "Yank" } } }
 
 "i" = { type = "EnterMode", params = { mode = "Insert" } }
 ":" = { type = "EnterMode", params = { mode = "Command" } }
@@ -77,3 +78,6 @@ gutter = "relative"
 
 [keymap.pending.change]
 "c" = { type = "ChangeCurrentLine" }
+
+[keymap.pending.yank]
+"y" = { type = "YankCurrentLine" }

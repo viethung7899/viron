@@ -11,7 +11,6 @@ use crate::config::{get_config_dir, Config};
 use anyhow::Result;
 use crossterm::terminal::ClearType;
 use crossterm::{cursor, terminal};
-use editor::Editor;
 use std::{env, io::stdout, panic};
 use crossterm::cursor::SetCursorStyle;
 use crate::editor::EditorBuilder;

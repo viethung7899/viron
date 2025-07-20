@@ -49,6 +49,8 @@ pub enum ActionDefinition {
     PasteBeforeCursor,
     PasteAfterCursor,
 
+    YankCurrentLine,
+
     // Search actions
     FindNext,
     FindPrevious,
@@ -111,6 +113,7 @@ pub fn create_action_from_definition(definition: &ActionDefinition) -> Box<dyn A
         ActionDefinition::InsertNewLineAbove => Box::new(editing::InsertNewLineAbove),
         ActionDefinition::DeleteCurrentLine => Box::new(editing::DeleteCurrentLine),
         ActionDefinition::ChangeCurrentLine => Box::new(editing::ChangeCurrentLine),
+        ActionDefinition::YankCurrentLine => Box::new(editing::YankCurrentLine),
 
         ActionDefinition::Undo => Box::new(editing::Undo),
         ActionDefinition::Redo => Box::new(editing::Redo),
