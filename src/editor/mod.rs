@@ -11,7 +11,6 @@ use crate::actions::core::Executable;
 use crate::actions::{buffer, mode};
 use crate::config::Config;
 use crate::config::editor::Gutter;
-use crate::constants::{MIN_GUTTER_WIDTH};
 use crate::core::message::MessageManager;
 use crate::core::mode::Mode;
 use crate::editor::core::EditorCore;
@@ -70,10 +69,6 @@ impl Editor {
         }
 
         Ok(editor)
-    }
-
-    pub async fn new() -> Result<Self> {
-        Self::from_builder(EditorBuilder::default()).await
     }
 
     pub async fn run(&mut self) -> Result<()> {
@@ -186,16 +181,9 @@ impl Editor {
     }
 
     fn scroll_viewport(&mut self) -> Result<()> {
-        let line_count = self.core.buffer_manager.current_buffer().line_count();
-        let gutter_width = if self.config.gutter == Gutter::None {
-            0
-        } else {
-            (line_count.to_string().len() + 1).max(MIN_GUTTER_WIDTH)
-        };
         if self
             .core
-            .viewport
-            .scroll_to_cursor_with_gutter(&self.core.cursor, gutter_width)
+            .scroll_viewport(self.config.gutter == Gutter::None)
         {
             self.ui
                 .compositor
