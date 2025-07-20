@@ -34,7 +34,7 @@ impl Cursor {
     }
 
     fn byte_to_char_column(&self, buffer: &Buffer) -> usize {
-        let line_bytes = buffer.get_content_line_as_bytes(self.row);
+        let line_bytes = buffer.get_line_as_bytes(self.row);
 
         if self.byte_column >= line_bytes.len() {
             return Utf8CharIterator::new(&line_bytes).count();
@@ -45,7 +45,7 @@ impl Cursor {
     }
 
     fn char_to_byte_column(&self, buffer: &Buffer) -> usize {
-        let line_bytes = buffer.get_content_line_as_bytes(self.row);
+        let line_bytes = buffer.get_line_as_bytes(self.row);
         let mut iter = Utf8CharIterator::new(&line_bytes)
             .skip(self.char_column)
             .peekable();
@@ -114,6 +114,7 @@ impl Cursor {
     pub fn move_to_line_start(&mut self) {
         self.char_column = 0;
         self.preferred_column = 0;
+        self.byte_column = 0;
     }
 
     /// Move to the end of the current line

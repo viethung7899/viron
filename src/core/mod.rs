@@ -11,3 +11,4 @@ pub mod operation;
 pub mod syntax;
 pub mod utf8;
 pub mod viewport;
+pub mod register;

@@ -110,6 +110,7 @@ impl Editor {
             viewport: &mut self.core.viewport,
             mode: &mut self.core.mode,
             buffer_manager: &mut self.core.buffer_manager,
+            register_manager: &mut self.core.register_manager,
         };
 
         let ui_ctx = UIContext {

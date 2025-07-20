@@ -6,12 +6,8 @@ use crate::core::buffer::Buffer;
 use crate::core::document::Document;
 
 pub struct BufferManager {
-    // All open documents
     documents: Vec<Document>,
-    // Index of the currently active document
     current_index: usize,
-
-    // Map from file paths to document indices for quick lookup
     path_to_index: HashMap<PathBuf, usize>,
 }
 

@@ -1,13 +1,14 @@
-use crate::actions::core::definition::{create_action_from_definition, MovementType};
+use crate::actions::ActionResult;
+use crate::actions::context::ActionContext;
+use crate::actions::core::definition::{MovementType, create_action_from_definition};
 use crate::actions::core::{ActionDefinition, Executable};
 use crate::actions::types::editing::after_edit;
 use crate::actions::types::{editing, mode};
-use crate::actions::ActionResult;
 use crate::core::history::edit::Edit;
 use crate::core::mode::Mode;
 use crate::core::operation::Operator;
+use crate::core::register::RegisterType;
 use async_trait::async_trait;
-use crate::actions::context::ActionContext;
 
 #[derive(Debug, Clone)]
 pub struct RepeatingAction {
@@ -48,6 +49,45 @@ impl ComboAction {
         }
     }
 
+    async fn perform_yank(&self, ctx: &mut ActionContext<'_>) -> ActionResult {
+        let movement_type = self.motion.get_movement_type().unwrap();
+        let before = ctx.editor.cursor.get_point();
+        let action = create_action_from_definition(&self.motion);
+        for _ in 0..self.repeat {
+            action.execute(ctx).await?;
+        }
+        let after = ctx.editor.cursor.get_point();
+
+        let from = before.min(after);
+        let to = before.max(after);
+
+        let buffer = ctx.editor.buffer_manager.current_buffer();
+        let content = match movement_type {
+            MovementType::Line => {
+                let start_line = from.row;
+                let end_line = to.row;
+                buffer.get_lines(start_line, end_line)
+            }
+            MovementType::Character => {
+                let start = buffer.cursor_position(&from);
+                let end = buffer.cursor_position(&to);
+                buffer.get_string(start, end - start)
+            }
+        };
+        if content.is_empty() {
+            return Ok(());
+        }
+        let register_type = match movement_type {
+            MovementType::Line => RegisterType::Line,
+            MovementType::Character => RegisterType::Character,
+        };
+        ctx.editor.cursor.set_point(before, buffer);
+        ctx.editor
+            .register_manager
+            .on_yank(content, register_type);
+        Ok(())
+    }
+
     async fn perform_delete(&self, ctx: &mut ActionContext<'_>) -> anyhow::Result<bool> {
         let movement_type = self.motion.get_movement_type().unwrap();
         let before = ctx.editor.cursor.get_point();
@@ -81,13 +121,21 @@ impl ComboAction {
         let edit = Edit::delete(
             start_byte,
             buffer.point_at_position(start_byte),
-            deleted,
+            deleted.clone(),
             from,
             to,
         );
         ctx.editor.cursor.set_point(from, buffer);
         after_edit(ctx, &edit).await?;
+
         ctx.editor.buffer_manager.current_mut().history.push(edit);
+        let register_type = match movement_type {
+            MovementType::Line => RegisterType::Line,
+            MovementType::Character => RegisterType::Character,
+        };
+        ctx.editor
+            .register_manager
+            .on_delete(deleted, register_type);
         Ok(true)
     }
 
@@ -114,6 +162,9 @@ impl Executable for ComboAction {
         };
 
         match self.operator {
+            Operator::Yank => {
+                self.perform_yank(ctx).await?;
+            }
             Operator::Delete => {
                 self.perform_delete(ctx).await?;
             }

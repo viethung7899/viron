@@ -4,6 +4,7 @@ use crate::core::command::{CommandBuffer, SearchBuffer};
 use crate::core::cursor::Cursor;
 use crate::core::message::MessageManager;
 use crate::core::mode::Mode;
+use crate::core::register::RegisterManager;
 use crate::core::viewport::Viewport;
 use crate::input::InputState;
 use crate::service::LspService;
@@ -15,6 +16,7 @@ pub struct EditorContext<'a> {
     pub viewport: &'a mut Viewport,
     pub mode: &'a mut Mode,
     pub buffer_manager: &'a mut BufferManager,
+    pub register_manager: &'a mut RegisterManager,
 }
 
 pub struct UIContext<'a> {

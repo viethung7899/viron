@@ -1,10 +1,9 @@
-use tree_sitter::Point;
-
 use crate::core::utf8::Utf8CharIterator;
 use crate::core::{
     buffer::gap_buffer::GapBuffer,
     history::edit::{Delete, Edit, Insert},
 };
+use tree_sitter::Point;
 
 pub mod gap_buffer;
 
@@ -57,7 +56,7 @@ impl Buffer {
         }
     }
 
-    pub fn get_content_line_as_bytes(&self, line: usize) -> Vec<u8> {
+    pub fn get_line_as_bytes(&self, line: usize) -> Vec<u8> {
         if line >= self.line_count() {
             return Vec::new();
         }
@@ -73,8 +72,22 @@ impl Buffer {
             .collect()
     }
 
-    pub fn get_content_line(&self, line: usize) -> String {
-        let bytes = self.get_content_line_as_bytes(line);
+    pub fn get_lines(&self, start_line: usize, end_line: usize) -> String {
+        if start_line >= self.line_count() || end_line >= self.line_count() || start_line > end_line
+        {
+            return String::new();
+        }
+        let line_start = self.line_starts[start_line];
+        let line_end = if end_line + 1 < self.line_starts.len() {
+            self.line_starts[end_line + 1]
+        } else {
+            self.buffer.len_without_gap()
+        };
+        self.get_string(line_start, line_end - line_start)
+    }
+
+    pub fn get_line_as_string(&self, line: usize) -> String {
+        let bytes = self.get_line_as_bytes(line);
         String::from_utf8_lossy(&bytes).to_string()
     }
 
@@ -83,7 +96,7 @@ impl Buffer {
             return 0;
         }
 
-        let line_content = self.get_content_line(line);
+        let line_content = self.get_line_as_string(line);
         line_content.chars().count()
     }
 
@@ -117,6 +130,24 @@ impl Buffer {
 
         let string = String::from_utf8(bytes).ok()?;
         string.chars().next()
+    }
+
+    pub fn get_bytes(&self, position: usize, byte_count: usize) -> Vec<u8> {
+        if position >= self.buffer.len_without_gap()
+            || position + byte_count > self.buffer.len_without_gap()
+            || byte_count == 0
+        {
+            return Vec::new();
+        }
+        self.buffer
+            .get_range(position..position + byte_count)
+            .cloned()
+            .collect()
+    }
+
+    pub fn get_string(&self, position: usize, byte_count: usize) -> String {
+        let bytes = self.get_bytes(position, byte_count);
+        String::from_utf8_lossy(&bytes).to_string()
     }
 
     pub fn insert_char(&mut self, position: usize, ch: char) -> usize {
@@ -159,11 +190,6 @@ impl Buffer {
     }
 
     pub fn insert_string(&mut self, position: usize, string: &str) -> usize {
-        // let mut position = position;
-        // for ch in string.chars() {
-        //     position = self.insert_char(position, ch);
-        // }
-        // position
         self.insert_bytes(position, string.as_bytes())
     }
 
@@ -224,18 +250,7 @@ impl Buffer {
     }
 
     pub fn delete_string(&mut self, position: usize, byte_count: usize) -> Option<(String, usize)> {
-        if position >= self.buffer.len_without_gap()
-            || position + byte_count > self.buffer.len_without_gap()
-            || byte_count == 0
-        {
-            return None;
-        }
-
-        let bytes = self
-            .buffer
-            .get_range(position..position + byte_count)
-            .cloned()
-            .collect::<Vec<_>>();
+        let bytes = self.get_bytes(position, byte_count);
 
         let char_count = Utf8CharIterator::new(bytes.as_slice()).count();
         let mut deleted_string = String::new();

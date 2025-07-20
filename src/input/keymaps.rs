@@ -18,6 +18,7 @@ pub struct KeyMap {
 pub struct PendingKeyMap {
     pub delete: HashMap<KeySequence, ActionDefinition>,
     pub change: HashMap<KeySequence, ActionDefinition>,
+    pub yank: HashMap<KeySequence, ActionDefinition>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Default)]
@@ -37,6 +38,8 @@ pub struct PendingKeyMapConfig {
     pub delete: HashMap<String, ActionDefinition>,
     #[serde(default)]
     pub change: HashMap<String, ActionDefinition>,
+    #[serde(default)]
+    pub yank: HashMap<String, ActionDefinition>,
 }
 
 impl KeyMap {
@@ -58,6 +61,10 @@ impl KeyMap {
                 .movement
                 .get(sequence)
                 .or_else(|| self.pending.change.get(sequence)),
+            Mode::OperationPending(Operator::Yank) => self
+                .movement
+                .get(sequence)
+                .or_else(|| self.pending.yank.get(sequence)),
             _ => None,
         };
         definition.or_else(|| self.default.get(sequence))
@@ -107,6 +114,11 @@ impl KeyMap {
         for (key_str, action_def) in &config.pending.change {
             let sequence = KeySequence::from_string(key_str)?;
             keymap.pending.change.insert(sequence, action_def.clone());
+        }
+        
+        for (key_str, action_def) in &config.pending.yank {
+            let sequence = KeySequence::from_string(key_str)?;
+            keymap.pending.yank.insert(sequence, action_def.clone());
         }
 
         Ok(keymap)
