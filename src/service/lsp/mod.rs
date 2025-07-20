@@ -8,11 +8,12 @@ mod version;
 use std::collections::HashMap;
 
 use crate::core::language::Language;
-pub(crate) use crate::service::lsp::client::LspClient;
 use crate::service::lsp::client::LspClientState;
 use anyhow::Result;
 use lsp_types::Diagnostic;
 use crate::actions::core::Executable;
+
+pub(crate) use crate::service::lsp::client::LspClient;
 
 #[derive(Debug, Default)]
 pub struct LspService {

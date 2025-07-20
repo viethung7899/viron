@@ -9,7 +9,7 @@ use std::fmt::Debug;
 use crate::actions::context::ActionContext;
 use crate::constants::components::{EDITOR_VIEW, STATUS_LINE};
 
-pub(in crate::actions) async fn after_edit(
+pub(super) async fn after_edit(
     ctx: &mut ActionContext<'_>,
     edit: &Edit,
 ) -> ActionResult {

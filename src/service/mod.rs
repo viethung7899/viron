@@ -1,2 +1,2 @@
 pub mod lsp;
-pub use lsp::{LspService};
+pub use lsp::LspService;
