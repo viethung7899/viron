@@ -19,10 +19,7 @@ use crate::editor::input::InputSystem;
 use crate::editor::terminal::TerminalContext;
 use crate::editor::ui::UISystem;
 use crate::input::keys::KeyEvent as VironKeyEvent;
-use crate::input::{
-    events::InputEvent, get_default_command_action, get_default_insert_action,
-    get_default_search_action,
-};
+use crate::input::{events::InputEvent, get_default_input_action};
 use crate::service::LspService;
 use crate::ui::context::{
     DiagnosticRenderContext, EditorRenderContext, InputRenderContext, RenderContext,
@@ -206,12 +203,7 @@ impl Editor {
         // Convert to our key event type
         let key_event = VironKeyEvent::from(key);
 
-        let default_action = match &self.core.mode {
-            Mode::Insert => get_default_insert_action(&key_event),
-            Mode::Command => get_default_command_action(&key_event),
-            Mode::Search => get_default_search_action(&key_event),
-            _ => None,
-        };
+        let default_action = get_default_input_action(&key_event, &self.core.mode);
 
         if default_action.is_some() {
             return Ok(default_action);

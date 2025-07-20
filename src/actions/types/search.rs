@@ -1,11 +1,11 @@
-use crate::actions::core::{impl_action, ActionDefinition, Executable};
-use crate::actions::types::{mode, movement, system};
 use crate::actions::ActionResult;
+use crate::actions::context::ActionContext;
+use crate::actions::core::{ActionDefinition, Executable, impl_action};
+use crate::actions::types::{mode, movement, system};
+use crate::constants::components::SEARCH_BOX;
 use crate::core::message::Message;
 use crate::core::mode::Mode;
 use async_trait::async_trait;
-use crate::actions::context::ActionContext;
-use crate::constants::components::SEARCH_BOX;
 
 #[derive(Debug, Clone)]
 pub struct SearchMoveLeft;
@@ -18,6 +18,12 @@ impl Executable for SearchMoveLeft {
     }
 }
 
+impl_action!(
+    SearchMoveLeft,
+    "Move cursor left",
+    ActionDefinition::SearchMoveLeft
+);
+
 #[derive(Debug, Clone)]
 pub struct SearchMoveRight;
 
@@ -28,6 +34,12 @@ impl Executable for SearchMoveRight {
         Ok(())
     }
 }
+
+impl_action!(
+    SearchMoveRight,
+    "Move cursor right",
+    ActionDefinition::SearchMoveRight
+);
 
 #[derive(Debug, Clone)]
 pub struct SearchInsertChar {
@@ -44,8 +56,7 @@ impl SearchInsertChar {
 impl Executable for SearchInsertChar {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         ctx.input.search_buffer.buffer.insert_char(self.ch);
-        ctx.ui.compositor
-            .mark_dirty(SEARCH_BOX)?;
+        ctx.ui.compositor.mark_dirty(SEARCH_BOX)?;
         Ok(())
     }
 }
@@ -59,11 +70,16 @@ impl Executable for SearchDeleteChar {
         if !ctx.input.search_buffer.buffer.delete_char() {
             mode::EnterMode::new(Mode::Normal).execute(ctx).await?;
         }
-        ctx.ui.compositor
-            .mark_dirty(SEARCH_BOX)?;
+        ctx.ui.compositor.mark_dirty(SEARCH_BOX)?;
         Ok(())
     }
 }
+
+impl_action!(
+    SearchDeleteChar,
+    "Delete character in search box",
+    ActionDefinition::SearchDeleteChar
+);
 
 #[derive(Debug, Clone)]
 pub struct SearchBackspace;
@@ -73,11 +89,16 @@ impl Executable for SearchBackspace {
         if !ctx.input.search_buffer.buffer.backspace() {
             mode::EnterMode::new(Mode::Normal).execute(ctx).await?;
         }
-        ctx.ui.compositor
-            .mark_dirty(SEARCH_BOX)?;
+        ctx.ui.compositor.mark_dirty(SEARCH_BOX)?;
         Ok(())
     }
 }
+
+impl_action!(
+    SearchBackspace,
+    "Backspace in search box",
+    ActionDefinition::SearchBackspace
+);
 
 #[derive(Debug, Clone)]
 pub struct SearchSubmit;
@@ -94,26 +115,36 @@ impl Executable for SearchSubmit {
             .execute(ctx)
             .await;
         }
-        let result = ctx.input.search_buffer
+        let result = ctx
+            .input
+            .search_buffer
             .search(&pattern, &ctx.editor.buffer_manager.current_buffer());
         if let Err(e) = result {
             system::ShowMessage(Message::error(format!("E: {e}")))
                 .execute(ctx)
                 .await?;
         }
-        if let Some(point) = ctx.input.search_buffer.find_first(&ctx.editor.cursor.get_point()) {
+        if let Some(point) = ctx
+            .input
+            .search_buffer
+            .find_first(&ctx.editor.cursor.get_point())
+        {
             movement::GoToPosition::new(point.row, point.column)
                 .execute(ctx)
                 .await?;
         }
         mode::EnterMode::new(Mode::Normal).execute(ctx).await?;
-        ctx.ui.compositor
-            .mark_visible(SEARCH_BOX, true)?;
-        ctx.ui.compositor
-            .mark_dirty(SEARCH_BOX)?;
+        ctx.ui.compositor.mark_visible(SEARCH_BOX, true)?;
+        ctx.ui.compositor.mark_dirty(SEARCH_BOX)?;
         Ok(())
     }
 }
+
+impl_action!(
+    SearchSubmit,
+    "Submit search",
+    ActionDefinition::SearchSubmit
+);
 
 #[derive(Debug, Clone)]
 pub struct FindNext;
@@ -121,15 +152,17 @@ pub struct FindNext;
 #[async_trait(?Send)]
 impl Executable for FindNext {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
-        if let Some(point) = ctx.input.search_buffer.find_next(&ctx.editor.cursor.get_point()) {
+        if let Some(point) = ctx
+            .input
+            .search_buffer
+            .find_next(&ctx.editor.cursor.get_point())
+        {
             movement::GoToPosition::new(point.row, point.column)
                 .execute(ctx)
                 .await?;
         }
-        ctx.ui.compositor
-            .mark_visible(SEARCH_BOX, true)?;
-        ctx.ui.compositor
-            .mark_dirty(SEARCH_BOX)?;
+        ctx.ui.compositor.mark_visible(SEARCH_BOX, true)?;
+        ctx.ui.compositor.mark_dirty(SEARCH_BOX)?;
         Ok(())
     }
 }
@@ -142,15 +175,17 @@ pub struct FindPrevious;
 #[async_trait(?Send)]
 impl Executable for FindPrevious {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
-        if let Some(point) = ctx.input.search_buffer.find_previous(&ctx.editor.cursor.get_point()) {
+        if let Some(point) = ctx
+            .input
+            .search_buffer
+            .find_previous(&ctx.editor.cursor.get_point())
+        {
             movement::GoToPosition::new(point.row, point.column)
                 .execute(ctx)
                 .await?;
         }
-        ctx.ui.compositor
-            .mark_visible(SEARCH_BOX, true)?;
-        ctx.ui.compositor
-            .mark_dirty(SEARCH_BOX)?;
+        ctx.ui.compositor.mark_visible(SEARCH_BOX, true)?;
+        ctx.ui.compositor.mark_dirty(SEARCH_BOX)?;
         Ok(())
     }
 }
