@@ -11,6 +11,7 @@ use crate::actions::core::Executable;
 use crate::actions::{buffer, mode};
 use crate::config::Config;
 use crate::config::editor::Gutter;
+use crate::constants::components::{EDITOR_VIEW, PENDING_KEYS, STATUS_LINE};
 use crate::core::message::MessageManager;
 use crate::core::mode::Mode;
 use crate::editor::core::EditorCore;
@@ -19,17 +20,18 @@ use crate::editor::terminal::TerminalContext;
 use crate::editor::ui::UISystem;
 use crate::input::keys::KeyEvent as VironKeyEvent;
 use crate::input::{
-    events::{InputEvent},
-    get_default_command_action, get_default_insert_action, get_default_search_action,
+    events::InputEvent, get_default_command_action, get_default_insert_action,
+    get_default_search_action,
 };
 use crate::service::LspService;
-use crate::ui::RenderContext;
+use crate::ui::context::{
+    DiagnosticRenderContext, EditorRenderContext, InputRenderContext, RenderContext,
+};
 use anyhow::Result;
+use crossterm::QueueableCommand;
 use crossterm::cursor::SetCursorStyle;
-use crossterm::{QueueableCommand};
 use crossterm::{cursor, event::KeyEvent};
-use std::io::{Write};
-use crate::constants::components::{EDITOR_VIEW, PENDING_KEYS, STATUS_LINE};
+use std::io::Write;
 
 pub struct Editor {
     core: EditorCore,
@@ -138,17 +140,29 @@ impl Editor {
         let document = self.core.buffer_manager.current_mut();
         let uri = document.get_uri().unwrap_or_default();
 
-        let mut context = RenderContext {
-            config: &self.config,
-            cursor: &self.core.cursor,
-            document,
-            diagnostics: self.lsp_service.get_diagnostics(&uri),
-            mode: &self.core.mode,
+        let editor = EditorRenderContext {
             viewport: &self.core.viewport,
+            document,
+            cursor: &self.core.cursor,
+            mode: &self.core.mode,
+        };
+
+        let input = InputRenderContext {
             command_buffer: &self.input.command_buffer,
             search_buffer: &self.input.search_buffer,
-            message_manager: &self.message_manager,
             input_state: &self.input.input_state,
+        };
+
+        let diagnostics = DiagnosticRenderContext {
+            diagnostics: self.lsp_service.get_diagnostics(&uri),
+            message_manager: &self.message_manager,
+        };
+
+        let mut context = RenderContext {
+            editor,
+            input,
+            diagnostics,
+            config: &self.config
         };
 
         self.terminal.stdout.queue(cursor::Hide)?;
@@ -203,21 +217,15 @@ impl Editor {
         };
 
         self.input.input_state.add_key(key_event);
-        self.ui
-            .compositor
-            .mark_visible(PENDING_KEYS, true)?;
-        self.ui
-            .compositor
-            .mark_dirty(PENDING_KEYS)?;
+        self.ui.compositor.mark_visible(PENDING_KEYS, true)?;
+        self.ui.compositor.mark_dirty(PENDING_KEYS)?;
 
         let action = self
             .input
             .input_state
             .get_executable(&self.core.mode, &self.config.keymap);
         if self.input.input_state.is_empty() {
-            self.ui
-                .compositor
-                .mark_visible(PENDING_KEYS, false)?;
+            self.ui.compositor.mark_visible(PENDING_KEYS, false)?;
         }
         Ok(action)
     }

@@ -1,7 +1,8 @@
 use crate::core::message::MessageType;
 use crate::ui::render_buffer::RenderBuffer;
 use crate::ui::theme::Style;
-use crate::ui::{Bounds, Drawable, RenderContext};
+use crate::ui::{Bounds, Drawable};
+use crate::ui::context::RenderContext;
 
 pub struct MessageArea;
 
@@ -10,7 +11,7 @@ impl Drawable for MessageArea {
         let Bounds {
             start_row, width, ..
         } = self.bounds(buffer, context);
-        let Some(message) = context.message_manager.current_message() else {
+        let Some(message) = context.diagnostics.message_manager.current_message() else {
             self.clear(buffer, context)?;
             return Ok(());
         };

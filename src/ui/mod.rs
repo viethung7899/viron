@@ -1,31 +1,11 @@
-use crate::config::Config;
-use crate::core::command::{CommandBuffer, SearchBuffer};
-use crate::core::cursor::Cursor;
-use crate::core::document::Document;
-use crate::core::message::MessageManager;
-use crate::core::mode::Mode;
-use crate::core::viewport::Viewport;
-use crate::input::InputState;
 use crate::ui::render_buffer::RenderBuffer;
-use lsp_types::Diagnostic;
+use context::RenderContext;
 
 pub(crate) mod components;
 pub mod compositor;
 pub mod render_buffer;
 pub mod theme;
-
-pub struct RenderContext<'a> {
-    pub viewport: &'a Viewport,
-    pub document: &'a mut Document,
-    pub diagnostics: &'a [Diagnostic],
-    pub cursor: &'a Cursor,
-    pub mode: &'a Mode,
-    pub config: &'a Config,
-    pub command_buffer: &'a CommandBuffer,
-    pub search_buffer: &'a SearchBuffer,
-    pub message_manager: &'a MessageManager,
-    pub input_state: &'a InputState,
-}
+pub mod context;
 
 pub struct Bounds {
     pub start_row: usize,

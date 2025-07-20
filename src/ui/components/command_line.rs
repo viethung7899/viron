@@ -1,5 +1,6 @@
 use crate::ui::render_buffer::RenderBuffer;
-use crate::ui::{Bounds, Drawable, Focusable, RenderContext};
+use crate::ui::{Bounds, Drawable, Focusable};
+use crate::ui::context::RenderContext;
 
 pub struct CommandLine;
 
@@ -8,7 +9,7 @@ impl Drawable for CommandLine {
         let Bounds {
             start_row, width, ..
         } = self.bounds(buffer, context);
-        let command = context.command_buffer.content();
+        let command = context.input.command_buffer.content();
         let formatted = format!(":{command:<width$}");
         buffer.set_text(start_row, 0, &formatted, &context.config.theme.editor_style());
         Ok(())
@@ -26,7 +27,7 @@ impl Drawable for CommandLine {
 
 impl Focusable for CommandLine {
     fn get_display_cursor(&self, buffer: &RenderBuffer, context: &RenderContext) -> (usize, usize) {
-        let command = context.command_buffer;
+        let command = context.input.command_buffer;
         let cursor_col = command.cursor_position() + 1;
         (buffer.height - 1, cursor_col)
     }

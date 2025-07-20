@@ -1,8 +1,9 @@
 use crate::constants::RESERVED_ROW_COUNT;
 use crate::ui::components::gutter::Gutter;
+use crate::ui::context::RenderContext;
 use crate::ui::render_buffer::RenderBuffer;
 use crate::ui::theme::Style;
-use crate::ui::{Bounds, Drawable, Focusable, RenderContext};
+use crate::ui::{Bounds, Drawable, Focusable};
 use anyhow::Result;
 use lsp_types::{Diagnostic, DiagnosticSeverity};
 use std::collections::HashMap;
@@ -46,8 +47,8 @@ impl EditorView {
             height: visible_height,
             ..
         } = self.get_buffer_bounds(render_buffer, context);
-        let viewport = context.viewport;
-        let buffer = &context.document.buffer;
+        let viewport = context.editor.viewport;
+        let buffer = &context.editor.document.buffer;
         let theme = &context.config.theme;
 
         let top_line = viewport.top_line();
@@ -88,12 +89,12 @@ impl EditorView {
             ..
         } = self.get_buffer_bounds(render_buffer, context);
 
-        let Some(ref mut syntax_engine) = context.document.syntax_engine else {
+        let Some(ref mut syntax_engine) = context.editor.document.syntax_engine else {
             return Err(anyhow::anyhow!("Syntax highlighter is not available"));
         };
 
-        let viewport = context.viewport;
-        let buffer = &context.document.buffer;
+        let viewport = context.editor.viewport;
+        let buffer = &context.editor.document.buffer;
         let theme = &context.config.theme;
         let editor_style = theme.editor_style();
 
@@ -229,7 +230,7 @@ impl EditorView {
             height,
             ..
         } = self.get_buffer_bounds(render_buffer, context);
-        let left_column = context.viewport.left_column();
+        let left_column = context.editor.viewport.left_column();
 
         let mut lines = bytes.split(|&c| c == b'\n').peekable();
 
@@ -271,14 +272,14 @@ impl EditorView {
         context: &mut RenderContext,
     ) -> Result<()> {
         let bounds = self.get_buffer_bounds(render_buffer, context);
-        let buffer = &context.document.buffer;
-        let viewport = context.viewport;
+        let buffer = &context.editor.document.buffer;
+        let viewport = context.editor.viewport;
         let starting_line = viewport.top_line() as u32;
         let ending_line = starting_line + bounds.height as u32;
 
         let mut line_diagnostics: HashMap<u32, &Diagnostic> = HashMap::new();
 
-        for diagnostic in context.diagnostics.iter().filter(|d| {
+        for diagnostic in context.diagnostics.diagnostics.iter().filter(|d| {
             let start = &d.range.start;
             start.line >= starting_line
                 && start.line < ending_line
@@ -333,7 +334,7 @@ impl EditorView {
         render_buffer: &mut RenderBuffer,
         context: &mut RenderContext,
     ) -> Result<()> {
-        if context.document.language.is_plain_text() {
+        if context.editor.document.language.is_plain_text() {
             return self.render_plain_text(render_buffer, context);
         }
 
@@ -367,8 +368,8 @@ impl Drawable for EditorView {
 
 impl Focusable for EditorView {
     fn get_display_cursor(&self, _: &RenderBuffer, context: &RenderContext) -> (usize, usize) {
-        let viewport = context.viewport;
-        let (row, column) = context.cursor.get_display_cursor();
+        let viewport = context.editor.viewport;
+        let (row, column) = context.editor.cursor.get_display_cursor();
         let gutter_width = self.gutter.get_width(context);
         let screen_row = row - viewport.top_line();
         let screen_col = column - viewport.left_column();

@@ -1,9 +1,10 @@
 use crate::ui::components::Component;
 use crate::ui::render_buffer::RenderBuffer;
-use crate::ui::{Drawable, Focusable, RenderContext};
+use crate::ui::{Drawable, Focusable};
 use anyhow::{anyhow, Result};
 use std::rc::Rc;
 use std::{collections::HashMap, io::Write};
+use crate::ui::context::RenderContext;
 
 pub struct Compositor {
     components: HashMap<String, Component>,
