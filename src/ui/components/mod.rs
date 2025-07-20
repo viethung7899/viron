@@ -17,16 +17,6 @@ pub use status_line::StatusLine;
 
 use crate::ui::{Drawable, Focusable};
 
-pub struct ComponentIds {
-    pub status_line_id: String,
-    pub editor_view_id: String,
-
-    pub pending_keys_id: String,
-    pub command_line_id: String,
-    pub message_area_id: String,
-    pub search_box_id: String,
-}
-
 pub struct Component {
     pub dirty: bool,
     pub visible: bool,

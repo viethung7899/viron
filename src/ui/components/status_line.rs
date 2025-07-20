@@ -1,8 +1,9 @@
 use crate::constants::RESERVED_ROW_COUNT;
 use crate::core::mode::Mode;
+use crate::ui::context::RenderContext;
 use crate::ui::render_buffer::RenderBuffer;
 use crate::ui::theme::Style;
-use crate::ui::{Bounds, Drawable, RenderContext};
+use crate::ui::{Bounds, Drawable};
 use anyhow::Ok;
 
 pub struct StatusLine;
@@ -12,12 +13,12 @@ impl Drawable for StatusLine {
         let Bounds {
             start_row, width, ..
         } = self.bounds(buffer, context);
-        let document = &context.document;
+        let document = &context.editor.document;
         let theme = &context.config.theme;
 
-        let left = format!(" {} ", context.mode.to_name().to_uppercase());
+        let left = format!(" {} ", context.editor.mode.to_name().to_uppercase());
 
-        let (row, column) = context.cursor.get_display_cursor();
+        let (row, column) = context.editor.cursor.get_display_cursor();
         let right = format!(" {}:{} ", row + 1, column + 1);
 
         let file = format!(
@@ -28,7 +29,7 @@ impl Drawable for StatusLine {
         let center_width = width - left.len() - right.len();
         let center = format!("{file:<center_width$}");
 
-        let colors = match context.mode {
+        let colors = match context.editor.mode {
             Mode::Normal => theme.colors.status.normal,
             Mode::Insert => theme.colors.status.insert,
             Mode::Command => theme.colors.status.command,

@@ -1,11 +1,10 @@
+use crate::actions::core::ActionDefinition;
+use crate::core::mode::Mode;
+use crate::core::operation::Operator;
+use crate::input::keys::KeySequence;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-
-use crate::core::mode::Mode;
-use crate::core::operation::Operator;
-use crate::input::actions::definition::ActionDefinition;
-use crate::input::keys::KeySequence;
 
 #[derive(Debug, Default)]
 pub struct KeyMap {

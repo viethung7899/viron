@@ -1,7 +1,8 @@
 use crate::core::mode::Mode;
+use crate::ui::context::RenderContext;
 use crate::ui::render_buffer::RenderBuffer;
 use crate::ui::theme::Style;
-use crate::ui::{Bounds, Drawable, Focusable, RenderContext};
+use crate::ui::{Bounds, Drawable, Focusable};
 
 pub struct SearchBox;
 
@@ -11,14 +12,14 @@ impl Drawable for SearchBox {
         let Bounds {
             start_row, width, ..
         } = self.bounds(buffer, context);
-        let search_buffer = context.search_buffer;
+        let search_buffer = context.input.search_buffer;
         let error_style = Style {
             foreground: theme.colors.diagnostic.error.foreground,
             background: theme.colors.editor.background,
             ..Default::default()
         };
 
-        match context.mode {
+        match context.editor.mode {
             Mode::Search => {
                 let search = search_buffer.buffer.content();
                 let formatted = format!("/{search:<width$}");
@@ -69,8 +70,8 @@ impl Drawable for SearchBox {
 
 impl Focusable for SearchBox {
     fn get_display_cursor(&self, buffer: &RenderBuffer, context: &RenderContext) -> (usize, usize) {
-        let search_buffer = context.search_buffer;
-        let cursor_col = if context.mode == &Mode::Search {
+        let search_buffer = context.input.search_buffer;
+        let cursor_col = if context.editor.mode == &Mode::Search {
             search_buffer.buffer.cursor_position() + 1
         } else {
             search_buffer.last_search.len() + 1

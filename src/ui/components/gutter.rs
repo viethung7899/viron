@@ -2,8 +2,9 @@ use crate::config::editor::Gutter as GutterConfig;
 use crate::constants::{MIN_GUTTER_WIDTH, RESERVED_ROW_COUNT};
 use crate::ui::render_buffer::RenderBuffer;
 use crate::ui::theme::Style;
-use crate::ui::{Bounds, Drawable, RenderContext};
+use crate::ui::{Bounds, Drawable};
 use anyhow::Result;
+use crate::ui::context::RenderContext;
 
 pub struct Gutter;
 
@@ -12,7 +13,7 @@ impl Gutter {
         if context.config.gutter == GutterConfig::None {
             return 0;
         }
-        let line_count = context.document.buffer.line_count();
+        let line_count = context.editor.document.buffer.line_count();
         let digits = line_count.to_string().len();
         (digits + 1).max(MIN_GUTTER_WIDTH)
     }
@@ -46,10 +47,10 @@ impl Drawable for Gutter {
             height,
             ..
         } = self.bounds(buffer, context);
-        let top_line = context.viewport.top_line();
-        let line_count = context.document.buffer.line_count();
+        let top_line = context.editor.viewport.top_line();
+        let line_count = context.editor.document.buffer.line_count();
         let style = Style::from(context.config.theme.colors.gutter);
-        let (current_line, _) = context.cursor.get_display_cursor();
+        let (current_line, _) = context.editor.cursor.get_display_cursor();
 
         for i in 0..height {
             let line = top_line + i;

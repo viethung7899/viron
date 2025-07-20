@@ -1,22 +1,26 @@
+use crate::actions::core::{impl_action, ActionDefinition, Executable};
+use crate::actions::types::{movement, system};
+use crate::actions::ActionResult;
 use crate::core::history::edit::Edit;
 use crate::core::message::Message;
 use crate::core::mode::Mode;
-use crate::input::actions::definition::ActionDefinition;
-use crate::input::actions::{
-    impl_action, movement, system, Action, ActionContext, ActionResult, Executable,
-};
 use async_trait::async_trait;
 use std::fmt::Debug;
+use crate::actions::context::ActionContext;
+use crate::constants::components::{EDITOR_VIEW, STATUS_LINE};
 
-pub(super) async fn after_edit(ctx: &mut ActionContext<'_>, edit: &Edit) -> ActionResult {
-    let document = ctx.buffer_manager.current_mut();
+pub(super) async fn after_edit(
+    ctx: &mut ActionContext<'_>,
+    edit: &Edit,
+) -> ActionResult {
+    let document = ctx.editor.buffer_manager.current_mut();
     document.mark_modified();
 
-    ctx.compositor
-        .mark_dirty(&ctx.component_ids.editor_view_id)?;
-    ctx.compositor
-        .mark_dirty(&ctx.component_ids.status_line_id)?;
-    ctx.search_buffer.reset();
+    ctx.ui.compositor
+        .mark_dirty(EDITOR_VIEW)?;
+    ctx.ui.compositor
+        .mark_dirty(STATUS_LINE)?;
+    ctx.input.search_buffer.reset();
 
     if let Some(syntax_engine) = document.syntax_engine.as_mut() {
         syntax_engine.apply_edit(&edit)?;
@@ -40,15 +44,15 @@ impl InsertChar {
 #[async_trait(?Send)]
 impl Executable for InsertChar {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
-        let current_point = ctx.cursor.get_point();
+        let current_point = ctx.editor.cursor.get_point();
 
-        let buffer = ctx.buffer_manager.current_buffer_mut();
+        let buffer = ctx.editor.buffer_manager.current_buffer_mut();
         let byte_start = buffer.cursor_position(&current_point);
 
         let new_position = buffer.insert_char(byte_start, self.0);
         let new_point = buffer.point_at_position(new_position);
 
-        ctx.cursor.set_point(new_point, buffer);
+        ctx.editor.cursor.set_point(new_point, buffer);
 
         let edit = Edit::insert(
             byte_start,
@@ -58,7 +62,7 @@ impl Executable for InsertChar {
             new_point,
         );
         after_edit(ctx, &edit).await?;
-        ctx.buffer_manager.current_mut().history.push(edit);
+        ctx.editor.buffer_manager.current_mut().history.push(edit);
         Ok(())
     }
 }
@@ -80,8 +84,8 @@ impl DeleteChar {
 #[async_trait(?Send)]
 impl Executable for DeleteChar {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
-        let buffer = ctx.buffer_manager.current_buffer_mut();
-        let point = ctx.cursor.get_point();
+        let buffer = ctx.editor.buffer_manager.current_buffer_mut();
+        let point = ctx.editor.cursor.get_point();
         let byte_start = buffer.cursor_position(&point);
 
         let Some(char) = buffer.get_char(byte_start) else {
@@ -93,16 +97,16 @@ impl Executable for DeleteChar {
         }
 
         if let Some((c, _)) = buffer.delete_char(byte_start) {
-            ctx.cursor.clamp_column(buffer, ctx.mode);
+            ctx.editor.cursor.clamp_column(buffer, ctx.editor.mode);
             let edit = Edit::delete(
                 byte_start,
                 point,
                 c.to_string(),
                 point,
-                ctx.cursor.get_point(),
+                ctx.editor.cursor.get_point(),
             );
             after_edit(ctx, &edit).await?;
-            ctx.buffer_manager.current_mut().history.push(edit);
+            ctx.editor.buffer_manager.current_mut().history.push(edit);
         }
         Ok(())
     }
@@ -126,22 +130,22 @@ impl Backspace {
 #[async_trait(?Send)]
 impl Executable for Backspace {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
-        let document = ctx.buffer_manager.current_mut();
-        let point = ctx.cursor.get_point();
+        let document = ctx.editor.buffer_manager.current_mut();
+        let point = ctx.editor.cursor.get_point();
 
         if point.column == 0 && self.inline {
             return Ok(());
         }
 
         let position = document.buffer.cursor_position(&point);
-        ctx.cursor
-            .move_left(&document.buffer, ctx.mode, self.inline);
+        ctx.editor.cursor
+            .move_left(&document.buffer, ctx.editor.mode, self.inline);
         if position > 0 {
             if let Some((c, new_position)) = document.buffer.delete_char(position - 1) {
                 let new_point = document.buffer.point_at_position(new_position);
                 let edit = Edit::delete(position - 1, point, c.to_string(), point, new_point);
                 after_edit(ctx, &edit).await?;
-                ctx.buffer_manager.current_mut().history.push(edit);
+                ctx.editor.buffer_manager.current_mut().history.push(edit);
             }
         }
         Ok(())
@@ -158,15 +162,15 @@ pub struct InsertNewLine;
 #[async_trait(?Send)]
 impl Executable for InsertNewLine {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
-        let buffer = ctx.buffer_manager.current_buffer_mut();
-        let point = ctx.cursor.get_point();
+        let buffer = ctx.editor.buffer_manager.current_buffer_mut();
+        let point = ctx.editor.cursor.get_point();
         let byte_start = buffer.cursor_position(&point);
         let new_position = buffer.insert_char(byte_start, '\n');
         let new_point = buffer.point_at_position(new_position);
-        ctx.cursor.set_point(new_point, &buffer);
+        ctx.editor.cursor.set_point(new_point, &buffer);
         let edit = Edit::insert(byte_start, point, "\n".to_string(), point, new_point);
         after_edit(ctx, &edit).await?;
-        ctx.buffer_manager.current_mut().history.push(edit);
+        ctx.editor.buffer_manager.current_mut().history.push(edit);
         Ok(())
     }
 }
@@ -183,8 +187,8 @@ pub struct InsertNewLineBelow;
 #[async_trait(?Send)]
 impl Executable for InsertNewLineBelow {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
-        let buffer = ctx.buffer_manager.current_buffer_mut();
-        let point = ctx.cursor.get_point();
+        let buffer = ctx.editor.buffer_manager.current_buffer_mut();
+        let point = ctx.editor.cursor.get_point();
 
         // Get the indentation of the current line
         let current_line = buffer.get_content_line(point.row);
@@ -194,8 +198,8 @@ impl Executable for InsertNewLineBelow {
             .collect::<String>();
 
         // Move cursor to end of the current line
-        ctx.cursor.move_to_line_end(&buffer, &Mode::Insert);
-        let byte_start = buffer.cursor_position(&ctx.cursor.get_point());
+        ctx.editor.cursor.move_to_line_end(&buffer, &Mode::Insert);
+        let byte_start = buffer.cursor_position(&ctx.editor.cursor.get_point());
         let start_point = buffer.point_at_position(byte_start);
 
         // Insert newline at end of current line followed by indentation
@@ -207,10 +211,10 @@ impl Executable for InsertNewLineBelow {
         new_point.row += 1;
         new_point.column = indentation.len();
 
-        ctx.cursor.set_point(new_point, &buffer);
+        ctx.editor.cursor.set_point(new_point, &buffer);
         let edit = Edit::insert(byte_start, start_point, insert_text, point, new_point);
         after_edit(ctx, &edit).await?;
-        ctx.buffer_manager.current_mut().history.push(edit);
+        ctx.editor.buffer_manager.current_mut().history.push(edit);
         Ok(())
     }
 }
@@ -227,8 +231,8 @@ pub struct InsertNewLineAbove;
 #[async_trait(?Send)]
 impl Executable for InsertNewLineAbove {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
-        let buffer = ctx.buffer_manager.current_buffer_mut();
-        let point = ctx.cursor.get_point();
+        let buffer = ctx.editor.buffer_manager.current_buffer_mut();
+        let point = ctx.editor.cursor.get_point();
 
         // Get the indentation of the current line
         let current_line = buffer.get_content_line(point.row);
@@ -250,11 +254,11 @@ impl Executable for InsertNewLineAbove {
         // Position cursor at end of the new line (after indentation)
         new_point.column = indentation.len();
 
-        ctx.cursor.set_point(new_point, &buffer);
+        ctx.editor.cursor.set_point(new_point, &buffer);
         let edit = Edit::insert(start_byte, start_point, insert_text, point, new_point);
 
         after_edit(ctx, &edit).await?;
-        ctx.buffer_manager.current_mut().history.push(edit);
+        ctx.editor.buffer_manager.current_mut().history.push(edit);
         Ok(())
     }
 }
@@ -272,8 +276,8 @@ pub struct DeleteCurrentLine;
 #[async_trait(?Send)]
 impl Executable for DeleteCurrentLine {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
-        let buffer = ctx.buffer_manager.current_buffer_mut();
-        let start_point = ctx.cursor.get_point();
+        let buffer = ctx.editor.buffer_manager.current_buffer_mut();
+        let start_point = ctx.editor.cursor.get_point();
         let (deleted, start_byte) = buffer.delete_line(start_point.row).unwrap();
         let edit = Edit::delete(
             start_byte,
@@ -283,7 +287,7 @@ impl Executable for DeleteCurrentLine {
             start_point,
         );
         after_edit(ctx, &edit).await?;
-        ctx.buffer_manager.current_mut().history.push(edit);
+        ctx.editor.buffer_manager.current_mut().history.push(edit);
         Ok(())
     }
 }
@@ -318,12 +322,12 @@ pub struct Undo;
 #[async_trait(?Send)]
 impl Executable for Undo {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
-        match ctx.buffer_manager.current_mut().get_undo() {
+        match ctx.editor.buffer_manager.current_mut().get_undo() {
             Ok(edit) => {
-                ctx.buffer_manager.current_buffer_mut().apply_edit(&edit);
-                ctx.cursor
-                    .set_point(edit.point_after(), ctx.buffer_manager.current_buffer());
-                let (row, column) = ctx.cursor.get_display_cursor();
+                ctx.editor.buffer_manager.current_buffer_mut().apply_edit(&edit);
+                ctx.editor.cursor
+                    .set_point(edit.point_after(), ctx.editor.buffer_manager.current_buffer());
+                let (row, column) = ctx.editor.cursor.get_display_cursor();
                 movement::GoToPosition::new(row, column)
                     .execute(ctx)
                     .await?;
@@ -346,12 +350,12 @@ pub struct Redo;
 #[async_trait(?Send)]
 impl Executable for Redo {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
-        match ctx.buffer_manager.current_mut().get_redo() {
+        match ctx.editor.buffer_manager.current_mut().get_redo() {
             Ok(edit) => {
-                ctx.buffer_manager.current_buffer_mut().apply_edit(&edit);
-                ctx.cursor
-                    .set_point(edit.point_after(), ctx.buffer_manager.current_buffer());
-                let (row, column) = ctx.cursor.get_display_cursor();
+                ctx.editor.buffer_manager.current_buffer_mut().apply_edit(&edit);
+                ctx.editor.cursor
+                    .set_point(edit.point_after(), ctx.editor.buffer_manager.current_buffer());
+                let (row, column) = ctx.editor.cursor.get_display_cursor();
                 movement::GoToPosition::new(row, column)
                     .execute(ctx)
                     .await?;

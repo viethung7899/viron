@@ -1,10 +1,12 @@
-use async_trait::async_trait;
-
+use crate::actions::command_parser::parse_command;
+use crate::actions::core::Executable;
+use crate::actions::types::{mode, system};
+use crate::actions::ActionResult;
 use crate::core::message::Message;
 use crate::core::mode::Mode;
-use crate::input::actions::{mode, system, Executable};
-use crate::input::actions::{ActionContext, ActionResult};
-use crate::input::command_parser::parse_command;
+use async_trait::async_trait;
+use crate::actions::context::ActionContext;
+use crate::constants::components::COMMAND_LINE;
 
 #[derive(Debug, Clone)]
 pub struct CommandMoveLeft;
@@ -12,7 +14,7 @@ pub struct CommandMoveLeft;
 #[async_trait(?Send)]
 impl Executable for CommandMoveLeft {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
-        ctx.command_buffer.move_cursor_left();
+        ctx.input.command_buffer.move_cursor_left();
         Ok(())
     }
 }
@@ -23,7 +25,7 @@ pub struct CommandMoveRight;
 #[async_trait(?Send)]
 impl Executable for CommandMoveRight {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
-        ctx.command_buffer.move_cursor_right();
+        ctx.input.command_buffer.move_cursor_right();
         Ok(())
     }
 }
@@ -42,9 +44,9 @@ impl CommandInsertChar {
 #[async_trait(?Send)]
 impl Executable for CommandInsertChar {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
-        ctx.command_buffer.insert_char(self.ch);
-        ctx.compositor
-            .mark_dirty(&ctx.component_ids.command_line_id)?;
+        ctx.input.command_buffer.insert_char(self.ch);
+        ctx.ui.compositor
+            .mark_dirty(COMMAND_LINE)?;
         Ok(())
     }
 }
@@ -55,11 +57,11 @@ pub struct CommandDeleteChar;
 #[async_trait(?Send)]
 impl Executable for CommandDeleteChar {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
-        if !ctx.command_buffer.delete_char() {
+        if !ctx.input.command_buffer.delete_char() {
             Executable::execute(&mode::EnterMode::new(Mode::Normal), ctx).await?;
         }
-        ctx.compositor
-            .mark_dirty(&ctx.component_ids.command_line_id)?;
+        ctx.ui.compositor
+            .mark_dirty(COMMAND_LINE)?;
         Ok(())
     }
 }
@@ -70,11 +72,11 @@ pub struct CommandBackspace;
 #[async_trait(?Send)]
 impl Executable for CommandBackspace {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
-        if !ctx.command_buffer.backspace() {
+        if !ctx.input.command_buffer.backspace() {
             Executable::execute(&mode::EnterMode::new(Mode::Normal), ctx).await?;
         }
-        ctx.compositor
-            .mark_dirty(&ctx.component_ids.command_line_id)?;
+        ctx.ui.compositor
+            .mark_dirty(COMMAND_LINE)?;
         Ok(())
     }
 }
@@ -85,15 +87,15 @@ pub struct CommandExecute;
 #[async_trait(?Send)]
 impl Executable for CommandExecute {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
-        let input = ctx.command_buffer.content();
+        let input = ctx.input.command_buffer.content();
         Executable::execute(&mode::EnterMode::new(Mode::Normal), ctx).await?;
 
         match parse_command(&input) {
             Ok(action) => match action.as_ref().execute(ctx).await {
                 Ok(_) => {
-                    ctx.command_buffer.clear();
-                    ctx.compositor
-                        .mark_visible(&ctx.component_ids.command_line_id, false)?;
+                    ctx.input.command_buffer.clear();
+                    ctx.ui.compositor
+                        .mark_visible(COMMAND_LINE, false)?;
                 }
                 Err(err) => {
                     system::ShowMessage(Message::error(format!("E: {err}")))

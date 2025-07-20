@@ -5,14 +5,16 @@ mod editor;
 mod input;
 mod service;
 mod ui;
+mod actions;
 
-use crate::config::get_config_dir;
+use crate::config::{get_config_dir, Config};
 use anyhow::Result;
 use crossterm::terminal::ClearType;
 use crossterm::{cursor, terminal};
 use editor::Editor;
 use std::{env, io::stdout, panic};
 use crossterm::cursor::SetCursorStyle;
+use crate::editor::EditorBuilder;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -26,11 +28,17 @@ async fn main() -> Result<()> {
     let args: Vec<String> = env::args().collect();
     let file_name = args.get(1);
 
-    let mut editor = Editor::new(file_name).await?;
-
-    // Load the config
     let config_path = get_config_dir().join("config.toml");
-    editor.load_config(config_path)?;
+    let config = Config::load_from_file(config_path)?;
+
+    // Build the editor
+    let mut builder = EditorBuilder::new()
+        .with_config(config);
+
+    if let Some(file) = file_name {
+        builder = builder.with_file(file);
+    }
+    let mut editor = builder.build().await?;
 
     // Set up error handling for the editor's run method
     let result = editor.run().await;

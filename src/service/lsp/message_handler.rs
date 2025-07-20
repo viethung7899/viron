@@ -12,13 +12,14 @@ use lsp_types::{
 use serde_json::Value;
 
 use crate::{
-    input::actions::{CompositeExecutable, GoToPosition, OpenBuffer, UpdateDiagnostics},
     service::lsp::{
         client::{LspClient, LspClientState},
         messages::InboundNotification,
         LspAction,
     },
 };
+use crate::actions::{buffer, lsp, movement};
+use crate::actions::core::CompositeExecutable;
 
 #[async_trait]
 pub trait LspMessageHandler: Send + Sync {
@@ -76,10 +77,10 @@ impl LspMessageHandler for GotoDefinitionResponse {
 
         let mut action = CompositeExecutable::new();
 
-        action.add(OpenBuffer::new(PathBuf::from(location.uri.as_str())));
+        action.add(buffer::OpenBuffer::new(PathBuf::from(location.uri.as_str())));
 
         let position = location.range.start;
-        action.add(GoToPosition::new(
+        action.add(movement::GoToPosition::new(
             position.line as usize,
             position.character as usize,
         ));
@@ -91,7 +92,7 @@ impl LspMessageHandler for GotoDefinitionResponse {
 impl LspMessageHandler for DocumentDiagnosticReport {
     fn get_lsp_action(&self) -> Option<LspAction> {
         match self {
-            DocumentDiagnosticReport::Full(full) => Some(Box::new(UpdateDiagnostics::new(
+            DocumentDiagnosticReport::Full(full) => Some(Box::new(lsp::UpdateDiagnostics::new(
                 None,
                 full.full_document_diagnostic_report.items.clone(),
             ))),
@@ -127,7 +128,7 @@ impl LspMessageHandler for InboundNotification {
 
 impl LspMessageHandler for PublishDiagnosticsParams {
     fn get_lsp_action(&self) -> Option<LspAction> {
-        Some(Box::new(UpdateDiagnostics::new(
+        Some(Box::new(lsp::UpdateDiagnostics::new(
             Some(self.uri.to_string()),
             self.diagnostics.clone(),
         )))

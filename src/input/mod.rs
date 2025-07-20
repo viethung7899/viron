@@ -1,15 +1,13 @@
-use crate::core::mode;
+use crate::actions::composite::{ComboAction, RepeatingAction};
+use crate::actions::core::definition::create_action_from_definition;
+use crate::actions::core::{ActionDefinition, Executable};
+use crate::actions::{command, editing, mode, movement, search};
 use crate::core::mode::Mode;
 use crate::core::operation::Operator;
-use crate::input::actions::{ComboAction, RepeatingAction};
 use crate::input::keymaps::KeyMap;
 use crate::input::keys::{KeyEvent, KeySequence};
-use actions::definition::{create_action_from_definition, ActionDefinition};
-use actions::Executable;
 use crossterm::event::{KeyCode, KeyModifiers};
 
-pub mod actions;
-mod command_parser;
 pub mod events;
 pub mod keymaps;
 pub mod keys;
@@ -177,19 +175,19 @@ impl InputState {
 
 pub fn get_default_insert_action(key_event: &KeyEvent) -> Option<Box<dyn Executable>> {
     let executable: Box<dyn Executable> = match (key_event.code, key_event.modifiers) {
-        (KeyCode::Esc, _) => Box::new(actions::EnterMode::new(mode::Mode::Normal)),
+        (KeyCode::Esc, _) => Box::new(mode::EnterMode::new(Mode::Normal)),
         (KeyCode::Char(ch), KeyModifiers::NONE | KeyModifiers::SHIFT) => {
-            Box::new(actions::InsertChar::new(ch))
+            Box::new(editing::InsertChar::new(ch))
         }
-        (KeyCode::Backspace, _) => Box::new(actions::Backspace::new(false)),
-        (KeyCode::Delete, _) => Box::new(actions::DeleteChar::new(false)),
-        (KeyCode::Left, _) => Box::new(actions::MoveLeft::new(false)),
-        (KeyCode::Right, _) => Box::new(actions::MoveRight::new(false)),
-        (KeyCode::Up, _) => Box::new(actions::MoveUp),
-        (KeyCode::Down, _) => Box::new(actions::MoveDown),
-        (KeyCode::Enter, _) => Box::new(actions::InsertNewLine),
-        (KeyCode::Home, _) => Box::new(actions::MoveToLineStart),
-        (KeyCode::End, _) => Box::new(actions::MoveToLineEnd),
+        (KeyCode::Enter, _) => Box::new(editing::InsertNewLine),
+        (KeyCode::Backspace, _) => Box::new(editing::Backspace::new(false)),
+        (KeyCode::Delete, _) => Box::new(editing::DeleteChar::new(false)),
+        (KeyCode::Left, _) => Box::new(movement::MoveLeft::new(false)),
+        (KeyCode::Right, _) => Box::new(movement::MoveRight::new(false)),
+        (KeyCode::Up, _) => Box::new(movement::MoveUp),
+        (KeyCode::Down, _) => Box::new(movement::MoveDown),
+        (KeyCode::Home, _) => Box::new(movement::MoveToLineStart),
+        (KeyCode::End, _) => Box::new(movement::MoveToLineEnd),
         _ => return None,
     };
     Some(executable)
@@ -197,15 +195,15 @@ pub fn get_default_insert_action(key_event: &KeyEvent) -> Option<Box<dyn Executa
 
 pub fn get_default_command_action(key_event: &KeyEvent) -> Option<Box<dyn Executable>> {
     let executable: Box<dyn Executable> = match (key_event.code, key_event.modifiers) {
-        (KeyCode::Esc, _) => Box::new(actions::EnterMode::new(mode::Mode::Normal)),
+        (KeyCode::Esc, _) => Box::new(mode::EnterMode::new(Mode::Normal)),
         (KeyCode::Char(ch), KeyModifiers::NONE | KeyModifiers::SHIFT) => {
-            Box::new(actions::CommandInsertChar::new(ch))
+            Box::new(command::CommandInsertChar::new(ch))
         }
-        (KeyCode::Enter, _) => Box::new(actions::CommandExecute),
-        (KeyCode::Left, _) => Box::new(actions::CommandMoveLeft),
-        (KeyCode::Right, _) => Box::new(actions::CommandMoveRight),
-        (KeyCode::Backspace, _) => Box::new(actions::CommandBackspace),
-        (KeyCode::Delete, _) => Box::new(actions::CommandDeleteChar),
+        (KeyCode::Enter, _) => Box::new(command::CommandExecute),
+        (KeyCode::Left, _) => Box::new(command::CommandMoveLeft),
+        (KeyCode::Right, _) => Box::new(command::CommandMoveRight),
+        (KeyCode::Backspace, _) => Box::new(command::CommandBackspace),
+        (KeyCode::Delete, _) => Box::new(command::CommandDeleteChar),
         _ => {
             return None;
         }
@@ -216,13 +214,13 @@ pub fn get_default_command_action(key_event: &KeyEvent) -> Option<Box<dyn Execut
 pub fn get_default_search_action(key_event: &KeyEvent) -> Option<Box<dyn Executable>> {
     match (key_event.code, key_event.modifiers) {
         (KeyCode::Char(ch), KeyModifiers::NONE | KeyModifiers::SHIFT) => {
-            Some(Box::new(actions::SearchInsertChar::new(ch)))
+            Some(Box::new(search::SearchInsertChar::new(ch)))
         }
-        (KeyCode::Enter, _) => Some(Box::new(actions::SearchSubmit)),
-        (KeyCode::Left, _) => Some(Box::new(actions::SearchMoveLeft)),
-        (KeyCode::Right, _) => Some(Box::new(actions::SearchMoveRight)),
-        (KeyCode::Backspace, _) => Some(Box::new(actions::SearchBackspace)),
-        (KeyCode::Delete, _) => Some(Box::new(actions::SearchDeleteChar)),
+        (KeyCode::Enter, _) => Some(Box::new(search::SearchSubmit)),
+        (KeyCode::Left, _) => Some(Box::new(search::SearchMoveLeft)),
+        (KeyCode::Right, _) => Some(Box::new(search::SearchMoveRight)),
+        (KeyCode::Backspace, _) => Some(Box::new(search::SearchBackspace)),
+        (KeyCode::Delete, _) => Some(Box::new(search::SearchDeleteChar)),
         _ => None,
     }
 }

@@ -1,5 +1,6 @@
 use crate::ui::render_buffer::RenderBuffer;
-use crate::ui::{Bounds, Drawable, RenderContext};
+use crate::ui::{Bounds, Drawable};
+use crate::ui::context::RenderContext;
 
 const WIDTH: usize = 10;
 pub struct PendingKeys;
@@ -13,7 +14,7 @@ impl Drawable for PendingKeys {
             ..
         } = self.bounds(buffer, context);
 
-        let pending_keys = context.input_state.display();
+        let pending_keys = context.input.input_state.display();
         if pending_keys.is_empty() {
             return self.clear(buffer, context);
         }

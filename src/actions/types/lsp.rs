@@ -1,10 +1,11 @@
+use crate::actions::ActionResult;
+use crate::actions::context::ActionContext;
+use crate::actions::core::{ActionDefinition, Executable, impl_action};
+use crate::actions::types::system;
 use crate::core::message::Message;
-use crate::input::actions::Action;
-use crate::input::actions::{
-    impl_action, system, ActionContext, ActionDefinition, ActionResult, Executable,
-};
 use async_trait::async_trait;
 use lsp_types::Diagnostic;
+use crate::constants::components::EDITOR_VIEW;
 
 #[derive(Debug, Clone)]
 pub struct GoToDefinition;
@@ -18,8 +19,8 @@ impl Executable for GoToDefinition {
                 .await;
         };
 
-        let document = ctx.buffer_manager.current();
-        let point = ctx.cursor.get_point();
+        let document = ctx.editor.buffer_manager.current();
+        let point = ctx.editor.cursor.get_point();
         if let Err(err) = lsp.goto_definition(document, point.row, point.column).await {
             return system::ShowMessage(Message::error(format!("Error: {}", err)))
                 .execute(ctx)
@@ -50,12 +51,8 @@ impl UpdateDiagnostics {
 #[async_trait(?Send)]
 impl Executable for UpdateDiagnostics {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
-        let document = ctx.buffer_manager.current();
-        let uri = self
-            .uri
-            .as_ref()
-            .cloned()
-            .or_else(|| document.get_uri());
+        let document = ctx.editor.buffer_manager.current();
+        let uri = self.uri.as_ref().cloned().or_else(|| document.get_uri());
 
         let Some(uri) = uri else {
             return Ok(());
@@ -65,8 +62,9 @@ impl Executable for UpdateDiagnostics {
             .update_diagnostics(&uri, self.diagnostics.clone());
         if let Some(current_uri) = document.get_uri() {
             if current_uri == uri {
-                ctx.compositor
-                    .mark_dirty(&ctx.component_ids.editor_view_id)?;
+                ctx.ui
+                    .compositor
+                    .mark_dirty(EDITOR_VIEW)?;
             }
         }
         Ok(())
