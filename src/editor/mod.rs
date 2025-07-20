@@ -29,6 +29,7 @@ use crossterm::cursor::SetCursorStyle;
 use crossterm::{QueueableCommand};
 use crossterm::{cursor, event::KeyEvent};
 use std::io::{Write};
+use crate::constants::components::{EDITOR_VIEW, PENDING_KEYS, STATUS_LINE};
 
 pub struct Editor {
     core: EditorCore,
@@ -90,7 +91,6 @@ impl Editor {
                 }
                 InputEvent::Resize(width, height) => {
                     self.handle_resize(width as usize, height as usize)?;
-                    self.post_render_cleanup()?;
                 }
                 InputEvent::Tick => {
                     self.handle_tick().await?;
@@ -112,7 +112,6 @@ impl Editor {
 
         let ui_ctx = UIContext {
             compositor: &mut self.ui.compositor,
-            component_ids: &self.ui.component_ids,
         };
 
         let input_ctx = InputContext {
@@ -171,26 +170,12 @@ impl Editor {
         Ok(())
     }
 
-    fn post_render_cleanup(&mut self) -> Result<()> {
-        // Clear the message area after rendering
-        self.message_manager.clear_message();
-        self.ui
-            .compositor
-            .mark_visible(&self.ui.component_ids.message_area_id, false)?;
-        Ok(())
-    }
-
     fn scroll_viewport(&mut self) -> Result<()> {
         if self
             .core
             .scroll_viewport(self.config.gutter == Gutter::None)
         {
-            self.ui
-                .compositor
-                .mark_dirty(&self.ui.component_ids.editor_view_id)?;
-            self.ui
-                .compositor
-                .mark_dirty(&self.ui.component_ids.status_line_id)?;
+            self.ui.mark_dirty([STATUS_LINE, EDITOR_VIEW])?;
         }
         Ok(())
     }
@@ -220,10 +205,10 @@ impl Editor {
         self.input.input_state.add_key(key_event);
         self.ui
             .compositor
-            .mark_visible(&self.ui.component_ids.pending_keys_id, true)?;
+            .mark_visible(PENDING_KEYS, true)?;
         self.ui
             .compositor
-            .mark_dirty(&self.ui.component_ids.pending_keys_id)?;
+            .mark_dirty(PENDING_KEYS)?;
 
         let action = self
             .input
@@ -232,7 +217,7 @@ impl Editor {
         if self.input.input_state.is_empty() {
             self.ui
                 .compositor
-                .mark_visible(&self.ui.component_ids.pending_keys_id, false)?;
+                .mark_visible(PENDING_KEYS, false)?;
         }
         Ok(action)
     }

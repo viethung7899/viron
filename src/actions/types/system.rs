@@ -3,6 +3,7 @@ use crate::actions::context::ActionContext;
 use crate::actions::core::{ActionDefinition, Executable, impl_action};
 use crate::core::message::Message;
 use async_trait::async_trait;
+use crate::constants::components::MESSAGE_AREA;
 
 #[derive(Debug, Clone)]
 pub struct Quit;
@@ -27,7 +28,7 @@ impl Executable for ShowMessage {
         ctx.message.show_message(self.0.clone());
         ctx.ui
             .compositor
-            .mark_visible(&ctx.ui.component_ids.message_area_id, true)?;
+            .mark_visible(MESSAGE_AREA, true)?;
         Ok(())
     }
 }

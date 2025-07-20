@@ -7,7 +7,6 @@ use crate::core::mode::Mode;
 use crate::core::viewport::Viewport;
 use crate::input::InputState;
 use crate::service::LspService;
-use crate::ui::components::ComponentIds;
 use crate::ui::compositor::Compositor;
 
 // Context passed to actions when they execute
@@ -20,7 +19,6 @@ pub struct EditorContext<'a> {
 
 pub struct UIContext<'a> {
     pub compositor: &'a mut Compositor,
-    pub component_ids: &'a ComponentIds,
 }
 
 pub struct InputContext<'a> {

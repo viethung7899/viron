@@ -5,6 +5,7 @@ use crate::actions::types::system;
 use crate::core::message::Message;
 use async_trait::async_trait;
 use lsp_types::Diagnostic;
+use crate::constants::components::EDITOR_VIEW;
 
 #[derive(Debug, Clone)]
 pub struct GoToDefinition;
@@ -63,7 +64,7 @@ impl Executable for UpdateDiagnostics {
             if current_uri == uri {
                 ctx.ui
                     .compositor
-                    .mark_dirty(&ctx.ui.component_ids.editor_view_id)?;
+                    .mark_dirty(EDITOR_VIEW)?;
             }
         }
         Ok(())

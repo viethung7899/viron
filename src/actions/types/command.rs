@@ -6,6 +6,7 @@ use crate::core::message::Message;
 use crate::core::mode::Mode;
 use async_trait::async_trait;
 use crate::actions::context::ActionContext;
+use crate::constants::components::COMMAND_LINE;
 
 #[derive(Debug, Clone)]
 pub struct CommandMoveLeft;
@@ -45,7 +46,7 @@ impl Executable for CommandInsertChar {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         ctx.input.command_buffer.insert_char(self.ch);
         ctx.ui.compositor
-            .mark_dirty(&ctx.ui.component_ids.command_line_id)?;
+            .mark_dirty(COMMAND_LINE)?;
         Ok(())
     }
 }
@@ -60,7 +61,7 @@ impl Executable for CommandDeleteChar {
             Executable::execute(&mode::EnterMode::new(Mode::Normal), ctx).await?;
         }
         ctx.ui.compositor
-            .mark_dirty(&ctx.ui.component_ids.command_line_id)?;
+            .mark_dirty(COMMAND_LINE)?;
         Ok(())
     }
 }
@@ -75,7 +76,7 @@ impl Executable for CommandBackspace {
             Executable::execute(&mode::EnterMode::new(Mode::Normal), ctx).await?;
         }
         ctx.ui.compositor
-            .mark_dirty(&ctx.ui.component_ids.command_line_id)?;
+            .mark_dirty(COMMAND_LINE)?;
         Ok(())
     }
 }
@@ -94,7 +95,7 @@ impl Executable for CommandExecute {
                 Ok(_) => {
                     ctx.input.command_buffer.clear();
                     ctx.ui.compositor
-                        .mark_visible(&ctx.ui.component_ids.command_line_id, false)?;
+                        .mark_visible(COMMAND_LINE, false)?;
                 }
                 Err(err) => {
                     system::ShowMessage(Message::error(format!("E: {err}")))

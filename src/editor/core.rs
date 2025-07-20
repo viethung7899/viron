@@ -1,4 +1,3 @@
-use crate::config::editor::Gutter;
 use crate::constants::{MIN_GUTTER_WIDTH, RESERVED_ROW_COUNT};
 use crate::core::buffer_manager::BufferManager;
 use crate::core::cursor::Cursor;

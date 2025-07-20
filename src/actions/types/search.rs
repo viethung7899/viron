@@ -5,6 +5,7 @@ use crate::core::message::Message;
 use crate::core::mode::Mode;
 use async_trait::async_trait;
 use crate::actions::context::ActionContext;
+use crate::constants::components::SEARCH_BOX;
 
 #[derive(Debug, Clone)]
 pub struct SearchMoveLeft;
@@ -44,7 +45,7 @@ impl Executable for SearchInsertChar {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         ctx.input.search_buffer.buffer.insert_char(self.ch);
         ctx.ui.compositor
-            .mark_dirty(&ctx.ui.component_ids.search_box_id)?;
+            .mark_dirty(SEARCH_BOX)?;
         Ok(())
     }
 }
@@ -59,7 +60,7 @@ impl Executable for SearchDeleteChar {
             mode::EnterMode::new(Mode::Normal).execute(ctx).await?;
         }
         ctx.ui.compositor
-            .mark_dirty(&ctx.ui.component_ids.search_box_id)?;
+            .mark_dirty(SEARCH_BOX)?;
         Ok(())
     }
 }
@@ -73,7 +74,7 @@ impl Executable for SearchBackspace {
             mode::EnterMode::new(Mode::Normal).execute(ctx).await?;
         }
         ctx.ui.compositor
-            .mark_dirty(&ctx.ui.component_ids.search_box_id)?;
+            .mark_dirty(SEARCH_BOX)?;
         Ok(())
     }
 }
@@ -107,9 +108,9 @@ impl Executable for SearchSubmit {
         }
         mode::EnterMode::new(Mode::Normal).execute(ctx).await?;
         ctx.ui.compositor
-            .mark_visible(&ctx.ui.component_ids.search_box_id, true)?;
+            .mark_visible(SEARCH_BOX, true)?;
         ctx.ui.compositor
-            .mark_dirty(&ctx.ui.component_ids.search_box_id)?;
+            .mark_dirty(SEARCH_BOX)?;
         Ok(())
     }
 }
@@ -126,9 +127,9 @@ impl Executable for FindNext {
                 .await?;
         }
         ctx.ui.compositor
-            .mark_visible(&ctx.ui.component_ids.search_box_id, true)?;
+            .mark_visible(SEARCH_BOX, true)?;
         ctx.ui.compositor
-            .mark_dirty(&ctx.ui.component_ids.search_box_id)?;
+            .mark_dirty(SEARCH_BOX)?;
         Ok(())
     }
 }
@@ -147,9 +148,9 @@ impl Executable for FindPrevious {
                 .await?;
         }
         ctx.ui.compositor
-            .mark_visible(&ctx.ui.component_ids.search_box_id, true)?;
+            .mark_visible(SEARCH_BOX, true)?;
         ctx.ui.compositor
-            .mark_dirty(&ctx.ui.component_ids.search_box_id)?;
+            .mark_dirty(SEARCH_BOX)?;
         Ok(())
     }
 }

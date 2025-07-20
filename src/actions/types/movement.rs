@@ -4,6 +4,7 @@ use crate::config::editor::Gutter;
 use async_trait::async_trait;
 use std::fmt::Debug;
 use crate::actions::context::ActionContext;
+use crate::constants::components::{EDITOR_VIEW, STATUS_LINE};
 
 #[derive(Debug, Clone)]
 pub struct MoveLeft {
@@ -25,10 +26,10 @@ impl Executable for MoveLeft {
         let new_row = ctx.editor.cursor.get_point().row;
         if old_row != new_row && ctx.config.gutter == Gutter::Relative {
             ctx.ui.compositor
-                .mark_dirty(&ctx.ui.component_ids.editor_view_id)?;
+                .mark_dirty(EDITOR_VIEW)?;
         }
         ctx.ui.compositor
-            .mark_dirty(&ctx.ui.component_ids.status_line_id)?;
+            .mark_dirty(STATUS_LINE)?;
         Ok(())
     }
 }
@@ -57,10 +58,10 @@ impl Executable for MoveRight {
         let new_row = ctx.editor.cursor.get_point().row;
         if old_row != new_row && ctx.config.gutter == Gutter::Relative {
             ctx.ui.compositor
-                .mark_dirty(&ctx.ui.component_ids.editor_view_id)?;
+                .mark_dirty(EDITOR_VIEW)?;
         }
         ctx.ui.compositor
-            .mark_dirty(&ctx.ui.component_ids.status_line_id)?;
+            .mark_dirty(STATUS_LINE)?;
         Ok(())
     }
 }
@@ -79,10 +80,10 @@ impl Executable for MoveUp {
             .move_up(ctx.editor.buffer_manager.current_buffer(), ctx.editor.mode);
         if ctx.config.gutter == Gutter::Relative {
             ctx.ui.compositor
-                .mark_dirty(&ctx.ui.component_ids.editor_view_id)?;
+                .mark_dirty(EDITOR_VIEW)?;
         }
         ctx.ui.compositor
-            .mark_dirty(&ctx.ui.component_ids.status_line_id)?;
+            .mark_dirty(STATUS_LINE)?;
         Ok(())
     }
 }
@@ -99,10 +100,10 @@ impl Executable for MoveDown {
             .move_down(ctx.editor.buffer_manager.current_buffer(), ctx.editor.mode);
         if ctx.config.gutter == Gutter::Relative {
             ctx.ui.compositor
-                .mark_dirty(&ctx.ui.component_ids.editor_view_id)?;
+                .mark_dirty(EDITOR_VIEW)?;
         }
         ctx.ui.compositor
-            .mark_dirty(&ctx.ui.component_ids.status_line_id)?;
+            .mark_dirty(STATUS_LINE)?;
         Ok(())
     }
 }
@@ -119,7 +120,7 @@ impl Executable for MoveToLineStart {
         ctx.editor.cursor
             .find_next_word(ctx.editor.buffer_manager.current_buffer());
         ctx.ui.compositor
-            .mark_dirty(&ctx.ui.component_ids.status_line_id)?;
+            .mark_dirty(STATUS_LINE)?;
         Ok(())
     }
 }
@@ -139,7 +140,7 @@ impl Executable for MoveToLineEnd {
         ctx.editor.cursor
             .move_to_line_end(ctx.editor.buffer_manager.current_buffer(), ctx.editor.mode);
         ctx.ui.compositor
-            .mark_dirty(&ctx.ui.component_ids.status_line_id)?;
+            .mark_dirty(STATUS_LINE)?;
         Ok(())
     }
 }
@@ -196,7 +197,7 @@ impl Executable for MoveToViewportCenter {
             ctx.editor.buffer_manager.current_buffer(),
         );
         ctx.ui.compositor
-            .mark_dirty(&ctx.ui.component_ids.editor_view_id)?;
+            .mark_dirty(EDITOR_VIEW)?;
         Ok(())
     }
 }
@@ -218,11 +219,11 @@ impl Executable for MoveToNextWord {
         let cursor = ctx.editor.cursor.find_next_word(buffer);
         if cursor.get_point().row != old_row && ctx.config.gutter == Gutter::Relative {
             ctx.ui.compositor
-                .mark_dirty(&ctx.ui.component_ids.editor_view_id)?;
+                .mark_dirty(EDITOR_VIEW)?;
         }
         ctx.editor.cursor.set_point(cursor.get_point(), buffer);
         ctx.ui.compositor
-            .mark_dirty(&ctx.ui.component_ids.status_line_id)?;
+            .mark_dirty(STATUS_LINE)?;
         Ok(())
     }
 }
@@ -244,11 +245,11 @@ impl Executable for MoveToPreviousWord {
         let cursor = ctx.editor.cursor.find_previous_word(buffer);
         if cursor.get_point().row != old_row && ctx.config.gutter == Gutter::Relative {
             ctx.ui.compositor
-                .mark_dirty(&ctx.ui.component_ids.editor_view_id)?;
+                .mark_dirty(EDITOR_VIEW)?;
         }
         ctx.editor.cursor.set_point(cursor.get_point(), buffer);
         ctx.ui.compositor
-            .mark_dirty(&ctx.ui.component_ids.status_line_id)?;
+            .mark_dirty(STATUS_LINE)?;
         Ok(())
     }
 }
@@ -282,10 +283,10 @@ impl Executable for GoToLine {
             MoveToViewportCenter.execute(ctx).await?;
         } else if old_line != new_line && ctx.config.gutter == Gutter::Relative {
             ctx.ui.compositor
-                .mark_dirty(&ctx.ui.component_ids.editor_view_id)?;
+                .mark_dirty(EDITOR_VIEW)?;
         }
         ctx.ui.compositor
-            .mark_dirty(&ctx.ui.component_ids.status_line_id)?;
+            .mark_dirty(STATUS_LINE)?;
         Ok(())
     }
 }
@@ -312,7 +313,7 @@ impl Executable for GoToPosition {
         let buffer = ctx.editor.buffer_manager.current_buffer();
         ctx.editor.cursor.go_to_column(self.column, buffer, ctx.editor.mode);
         ctx.ui.compositor
-            .mark_dirty(&ctx.ui.component_ids.status_line_id)?;
+            .mark_dirty(STATUS_LINE)?;
         Ok(())
     }
 }

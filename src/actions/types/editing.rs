@@ -7,6 +7,7 @@ use crate::core::mode::Mode;
 use async_trait::async_trait;
 use std::fmt::Debug;
 use crate::actions::context::ActionContext;
+use crate::constants::components::{EDITOR_VIEW, STATUS_LINE};
 
 pub(in crate::actions) async fn after_edit(
     ctx: &mut ActionContext<'_>,
@@ -16,9 +17,9 @@ pub(in crate::actions) async fn after_edit(
     document.mark_modified();
 
     ctx.ui.compositor
-        .mark_dirty(&ctx.ui.component_ids.editor_view_id)?;
+        .mark_dirty(EDITOR_VIEW)?;
     ctx.ui.compositor
-        .mark_dirty(&ctx.ui.component_ids.status_line_id)?;
+        .mark_dirty(STATUS_LINE)?;
     ctx.input.search_buffer.reset();
 
     if let Some(syntax_engine) = document.syntax_engine.as_mut() {

@@ -6,6 +6,7 @@ use async_trait::async_trait;
 use std::fmt::Debug;
 use std::path::PathBuf;
 use crate::actions::context::ActionContext;
+use crate::constants::components::EDITOR_VIEW;
 
 async fn after_buffer_change(ctx: &mut ActionContext<'_>) -> ActionResult {
     let document = ctx.editor.buffer_manager.current();
@@ -182,7 +183,7 @@ pub struct RefreshBuffer;
 impl Executable for RefreshBuffer {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         ctx.ui.compositor
-            .mark_dirty(&ctx.ui.component_ids.editor_view_id)?;
+            .mark_dirty(EDITOR_VIEW)?;
         Ok(())
     }
 }
