@@ -143,7 +143,7 @@ impl InputState {
                     repeat - 1,
                     ActionDefinition::MoveDown,
                 )),
-                ActionDefinition::DeleteChar { inline} => Box::new(ComboAction::new(
+                ActionDefinition::DeleteChar { inline } => Box::new(ComboAction::new(
                     Operator::Delete,
                     repeat,
                     ActionDefinition::MoveRight { inline },

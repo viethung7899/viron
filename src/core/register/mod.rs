@@ -100,8 +100,8 @@ impl RegisterManager {
 
     fn shift_numbered_registers(&mut self, register: Register) {
         // Shift "1 -> "8 to "2 to "9, new content on "1
-        for i in (1..9).rev() {
-            self.numbered[i + 1] = self.numbered[i - 1].clone();
+        for i in (1..=8).rev() {
+            self.numbered[i + 1] = self.numbered[i].clone();
         }
         self.numbered[1] = register;
     }
