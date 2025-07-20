@@ -8,6 +8,7 @@ use async_trait::async_trait;
 use std::fmt::Debug;
 use crate::actions::context::ActionContext;
 use crate::constants::components::{EDITOR_VIEW, STATUS_LINE};
+use crate::core::register::RegisterType;
 
 pub(super) async fn after_edit(
     ctx: &mut ActionContext<'_>,
@@ -106,6 +107,7 @@ impl Executable for DeleteChar {
                 ctx.editor.cursor.get_point(),
             );
             after_edit(ctx, &edit).await?;
+            ctx.editor.buffer_manager.register_manager.on_delete(c.to_string(), RegisterType::Character);
             ctx.editor.buffer_manager.current_mut().history.push(edit);
         }
         Ok(())

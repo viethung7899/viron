@@ -4,15 +4,13 @@ use std::path::{Path, PathBuf};
 
 use crate::core::buffer::Buffer;
 use crate::core::document::Document;
+use crate::core::register::RegisterManager;
 
 pub struct BufferManager {
-    // All open documents
     documents: Vec<Document>,
-    // Index of the currently active document
     current_index: usize,
-
-    // Map from file paths to document indices for quick lookup
     path_to_index: HashMap<PathBuf, usize>,
+    pub register_manager: RegisterManager
 }
 
 impl BufferManager {
@@ -21,6 +19,7 @@ impl BufferManager {
             documents: Vec::new(),
             current_index: 0,
             path_to_index: HashMap::new(),
+            register_manager: RegisterManager::new()
         }
     }
 
