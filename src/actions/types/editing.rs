@@ -6,7 +6,10 @@ use crate::core::message::Message;
 use crate::core::mode::Mode;
 use async_trait::async_trait;
 use std::fmt::Debug;
+use crossterm::ExecutableCommand;
 use crate::actions::context::ActionContext;
+use crate::actions::core::ActionDefinition::{MoveRight, MoveToLineEnd};
+use crate::actions::movement::MoveToLineStart;
 use crate::constants::components::{EDITOR_VIEW, STATUS_LINE};
 use crate::core::register::RegisterType;
 
@@ -284,12 +287,13 @@ impl Executable for DeleteCurrentLine {
         let edit = Edit::delete(
             start_byte,
             buffer.point_at_position(start_byte),
-            deleted,
+            deleted.clone(),
             start_point,
             start_point,
         );
         after_edit(ctx, &edit).await?;
         ctx.editor.buffer_manager.current_mut().history.push(edit);
+        ctx.editor.buffer_manager.register_manager.on_delete(deleted, RegisterType::Line);
         Ok(())
     }
 }
@@ -373,3 +377,116 @@ impl Executable for Redo {
 }
 
 impl_action!(Redo, "Redo", ActionDefinition::Redo);
+
+#[derive(Debug, Clone)]
+pub struct Paste {
+    after_cursor: bool,
+}
+
+impl Paste {
+    pub fn new(after_cursor: bool) -> Self {
+        Self { after_cursor }
+    }
+}
+
+#[async_trait(?Send)]
+impl Executable for Paste {
+    async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+        let Some(register) = ctx.editor.buffer_manager.register_manager.get_register('"').cloned() else {
+            return Ok(());
+        };
+
+        log::info!("Paste: {:?}", register);
+
+        if register.is_empty() {
+            return Ok(());
+        }
+
+        let mut cursor = ctx.editor.cursor.clone();
+        let buffer = ctx.editor.buffer_manager.current_buffer_mut();
+
+        // Move the cursor to the correct position based on the register type
+        log::info!("Before cursor: {:?}", cursor);
+        match (self.after_cursor, &register.register_type) {
+            (true, RegisterType::Character) => {
+                cursor.move_right(buffer, &Mode::Insert, false);
+            }
+            (false, RegisterType::Line) => {
+                cursor.move_to_line_start();
+            }
+            (true, RegisterType::Line) => {
+                cursor.move_down(buffer, &Mode::Insert);
+                cursor.move_to_line_start();
+            }
+            _ => {}
+        }
+
+        // Insert pasted text
+        log::info!("After cursor: {:?}", cursor);
+        let point = cursor.get_point();
+        let byte_start = buffer.cursor_position(&point);
+        let new_position = buffer.insert_string(byte_start, &register.content);
+
+        let old_point = ctx.editor.cursor.get_point();
+
+        match register.register_type {
+            RegisterType::Character => {
+                ctx.editor.cursor.set_point(
+                    buffer.point_at_position(new_position),
+                    buffer,
+                );
+            }
+            RegisterType::Line => {
+                ctx.editor.cursor.set_point(
+                    cursor.get_point(),
+                    buffer
+                );
+            }
+        }
+
+        let new_point = ctx.editor.cursor.get_point();
+
+        let edit = Edit::insert(
+            byte_start,
+            point,
+            register.content.to_string(),
+            old_point,
+            new_point,
+        );
+        after_edit(ctx, &edit).await?;
+        ctx.editor.buffer_manager.current_mut().history.push(edit);
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct PasteBeforeCursor;
+
+#[async_trait(?Send)]
+impl Executable for PasteBeforeCursor {
+    async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+        Paste::new(false).execute(ctx).await
+    }
+}
+
+impl_action!(
+    PasteBeforeCursor,
+    "Paste before cursor",
+    ActionDefinition::PasteBeforeCursor
+);
+
+#[derive(Debug, Clone)]
+pub struct PasteAfterCursor;
+
+#[async_trait(?Send)]
+impl Executable for PasteAfterCursor {
+    async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+        Paste::new(true).execute(ctx).await
+    }
+}
+
+impl_action!(
+    PasteAfterCursor,
+    "Paste after cursor",
+    ActionDefinition::PasteAfterCursor
+);

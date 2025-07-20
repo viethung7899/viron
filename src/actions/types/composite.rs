@@ -8,6 +8,7 @@ use crate::core::mode::Mode;
 use crate::core::operation::Operator;
 use async_trait::async_trait;
 use crate::actions::context::ActionContext;
+use crate::core::register::RegisterType;
 
 #[derive(Debug, Clone)]
 pub struct RepeatingAction {
@@ -81,13 +82,19 @@ impl ComboAction {
         let edit = Edit::delete(
             start_byte,
             buffer.point_at_position(start_byte),
-            deleted,
+            deleted.clone(),
             from,
             to,
         );
         ctx.editor.cursor.set_point(from, buffer);
         after_edit(ctx, &edit).await?;
+
         ctx.editor.buffer_manager.current_mut().history.push(edit);
+        let register_type = match movement_type {
+            MovementType::Line => RegisterType::Line,
+            MovementType::Character => RegisterType::Character,
+        };
+        ctx.editor.buffer_manager.register_manager.on_delete(deleted, register_type);
         Ok(true)
     }
 

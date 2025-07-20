@@ -69,6 +69,9 @@ gutter = "relative"
     { type = "EnterMode", params = { mode = "Insert" } }
 ] } }
 
+"P" = { type = "PasteBeforeCursor" }
+"p" = { type = "PasteAfterCursor" }
+
 [keymap.pending.delete]
 "d" = { type = "DeleteCurrentLine" }
 

@@ -46,6 +46,8 @@ pub enum ActionDefinition {
 
     Undo,
     Redo,
+    PasteBeforeCursor,
+    PasteAfterCursor,
 
     // Search actions
     FindNext,
@@ -112,6 +114,9 @@ pub fn create_action_from_definition(definition: &ActionDefinition) -> Box<dyn A
 
         ActionDefinition::Undo => Box::new(editing::Undo),
         ActionDefinition::Redo => Box::new(editing::Redo),
+
+        ActionDefinition::PasteBeforeCursor => Box::new(editing::PasteBeforeCursor),
+        ActionDefinition::PasteAfterCursor => Box::new(editing::PasteAfterCursor),
 
         // Search actions
         ActionDefinition::FindNext => Box::new(search::FindNext),

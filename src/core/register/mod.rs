@@ -1,4 +1,4 @@
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, PartialEq)]
 pub enum RegisterType {
     #[default]
     Character,
@@ -19,6 +19,10 @@ impl Register {
         }
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.content.is_empty()
+    }
+
     fn character(content: String) -> Register {
         Self {
             content,
@@ -37,6 +41,7 @@ impl Register {
             register_type: RegisterType::Line,
         }
     }
+
 }
 
 #[derive(Debug, Default)]
@@ -83,11 +88,12 @@ impl RegisterManager {
 
     pub fn on_delete(&mut self, content: String, register_type: RegisterType) {
         let register = Register::new(content, register_type);
+        log::info!("RegisterManager::on_delete: {:?}", register);
+        self.unnamed = register.clone();
 
         if register.content.len() < 50 && !register.content.contains('\n') {
             self.small_delete = register;
         } else {
-            self.unnamed = register.clone();
             self.shift_numbered_registers(register);
         }
     }

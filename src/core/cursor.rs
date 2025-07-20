@@ -114,6 +114,7 @@ impl Cursor {
     pub fn move_to_line_start(&mut self) {
         self.char_column = 0;
         self.preferred_column = 0;
+        self.byte_column = 0;
     }
 
     /// Move to the end of the current line
