@@ -1,7 +1,7 @@
 use crossterm::event::{KeyCode, KeyModifiers};
 use nom::{multi, branch, IResult, Parser};
 use nom::bytes::tag;
-use nom::character::anychar;
+use nom::character::satisfy;
 use anyhow::{anyhow, Result};
 use nom::combinator::complete;
 use crate::input::keys::KeyEvent;
@@ -24,7 +24,7 @@ fn keycode(input: &str) -> IResult<&str, KeyCode> {
         tag("<Esc>").map(|_| KeyCode::Esc),
         tag("<lt>").map(|_| KeyCode::Char('<')),
         tag("<gt>").map(|_| KeyCode::Char('>')),
-        anychar.map(|c| KeyCode::Char(c))
+        satisfy(|c| c != '<' && c != '>').map(|c| KeyCode::Char(c))
     )).parse(input)
 }
 
@@ -42,7 +42,13 @@ fn key_event_with_modifiers(input: &str) -> IResult<&str, KeyEvent> {
 fn key_event(input: &str) -> IResult<&str, KeyEvent> {
     branch::alt((
         key_event_with_modifiers,
-        keycode.map(|code| KeyEvent { code, modifiers: KeyModifiers::NONE }),
+        keycode.map(|code| {
+            let modifiers = match code {
+                KeyCode::Char(c) if c.is_uppercase() => KeyModifiers::SHIFT,
+                _ => KeyModifiers::NONE
+            };
+            KeyEvent { code, modifiers }
+        }),
     )).parse(input)
 }
 
