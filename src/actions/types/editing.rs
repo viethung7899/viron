@@ -103,7 +103,6 @@ impl Executable for DeleteChar {
             );
             after_edit(ctx, &edit).await?;
             ctx.editor
-                .buffer_manager
                 .register_manager
                 .on_delete(c.to_string(), RegisterType::Character);
             ctx.editor.buffer_manager.current_mut().history.push(edit);
@@ -290,7 +289,6 @@ impl Executable for DeleteCurrentLine {
         after_edit(ctx, &edit).await?;
         ctx.editor.buffer_manager.current_mut().history.push(edit);
         ctx.editor
-            .buffer_manager
             .register_manager
             .on_delete(deleted, RegisterType::Line);
         Ok(())
@@ -331,7 +329,6 @@ impl Executable for YankCurrentLine {
         let point = ctx.editor.cursor.get_point();
         let line_content = buffer.get_line_as_string(point.row);
         ctx.editor
-            .buffer_manager
             .register_manager
             .on_yank(line_content, RegisterType::Line);
         Ok(())
@@ -424,13 +421,7 @@ impl Paste {
 #[async_trait(?Send)]
 impl Executable for Paste {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
-        let Some(register) = ctx
-            .editor
-            .buffer_manager
-            .register_manager
-            .get_register('"')
-            .cloned()
-        else {
+        let Some(register) = ctx.editor.register_manager.get_register('"').cloned() else {
             return Ok(());
         };
 

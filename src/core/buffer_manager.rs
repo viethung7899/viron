@@ -4,13 +4,11 @@ use std::path::{Path, PathBuf};
 
 use crate::core::buffer::Buffer;
 use crate::core::document::Document;
-use crate::core::register::RegisterManager;
 
 pub struct BufferManager {
     documents: Vec<Document>,
     current_index: usize,
     path_to_index: HashMap<PathBuf, usize>,
-    pub register_manager: RegisterManager
 }
 
 impl BufferManager {
@@ -19,7 +17,6 @@ impl BufferManager {
             documents: Vec::new(),
             current_index: 0,
             path_to_index: HashMap::new(),
-            register_manager: RegisterManager::new()
         }
     }
 

@@ -83,7 +83,6 @@ impl ComboAction {
         };
         ctx.editor.cursor.set_point(before, buffer);
         ctx.editor
-            .buffer_manager
             .register_manager
             .on_yank(content, register_type);
         Ok(())
@@ -135,7 +134,6 @@ impl ComboAction {
             MovementType::Character => RegisterType::Character,
         };
         ctx.editor
-            .buffer_manager
             .register_manager
             .on_delete(deleted, register_type);
         Ok(true)
