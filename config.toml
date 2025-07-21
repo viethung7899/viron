@@ -46,7 +46,7 @@ gutter = "relative"
 "N" = { type = "FindPrevious" }
 
 "u" = { type = "Undo" }
-"<CONTROL-r>" = { type = "Redo" }
+"<C-r>" = { type = "Redo" }
 
 "gd" = { type = "GoToDefinition" }
 
@@ -81,3 +81,27 @@ gutter = "relative"
 
 [keymap.pending.yank]
 "y" = { type = "YankCurrentLine" }
+
+[keymap.insert]
+"<Left>" = { type = "MoveLeft", params = { inline = false } }
+"<Right>" = { type = "MoveRight", params = { inline = false } }
+"<Up>" = { type = "MoveUp" }
+"<Down>" = { type = "MoveDown" }
+"<Backspace>" = { type = "Backspace", params = { inline = false } }
+"<Delete>" = { type = "DeleteChar", params = { inline = false } }
+"<Home>" = { type = "MoveToLineStart" }
+"<End>" = { type = "MoveToLineEnd" }
+
+[keymap.command]
+"<Enter>" = { type = "CommandExecute" }
+"<Left>" = { type = "CommandMoveLeft" }
+"<Right>" = { type = "CommandMoveRight" }
+"<Backspace>" = { type = "CommandBackspace" }
+"<Delete>" = { type = "CommandDeleteChar" }
+
+[keymap.search]
+"<Enter>" = { type = "SearchSubmit" }
+"<Left>" = { type = "SearchMoveLeft" }
+"<Right>" = { type = "SearchMoveRight" }
+"<Backspace>" = { type = "SearchBackspace" }
+"<Delete>" = { type = "SearchDeleteChar" }

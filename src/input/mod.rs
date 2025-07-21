@@ -1,12 +1,13 @@
 use crate::actions::composite::{ComboAction, RepeatingAction};
 use crate::actions::core::definition::create_action_from_definition;
 use crate::actions::core::{ActionDefinition, Executable};
-use crate::actions::{command, editing, mode, movement, search};
+use crate::actions::{command, editing, search};
 use crate::core::mode::Mode;
 use crate::core::operation::Operator;
 use crate::input::keymaps::KeyMap;
-use crate::input::keys::{KeyEvent, KeySequence};
+use crate::input::keys::{KeyEncoder, KeyEvent};
 use crossterm::event::{KeyCode, KeyModifiers};
+use keys::sequence::KeySequence;
 
 pub mod events;
 pub mod keymaps;
@@ -63,7 +64,7 @@ impl InputState {
         if let Some(repeat) = self.repeat {
             result.push_str(&repeat.to_string());
         };
-        result.push_str(&self.sequence.to_string());
+        result.push_str(&self.sequence.encode().unwrap_or_default());
         result
     }
 
@@ -183,54 +184,23 @@ impl InputState {
     }
 }
 
-pub fn get_default_insert_action(key_event: &KeyEvent) -> Option<Box<dyn Executable>> {
-    let executable: Box<dyn Executable> = match (key_event.code, key_event.modifiers) {
-        (KeyCode::Esc, _) => Box::new(mode::EnterMode::new(Mode::Normal)),
-        (KeyCode::Char(ch), KeyModifiers::NONE | KeyModifiers::SHIFT) => {
-            Box::new(editing::InsertChar::new(ch))
-        }
-        (KeyCode::Enter, _) => Box::new(editing::InsertNewLine),
-        (KeyCode::Backspace, _) => Box::new(editing::Backspace::new(false)),
-        (KeyCode::Delete, _) => Box::new(editing::DeleteChar::new(false)),
-        (KeyCode::Left, _) => Box::new(movement::MoveLeft::new(false)),
-        (KeyCode::Right, _) => Box::new(movement::MoveRight::new(false)),
-        (KeyCode::Up, _) => Box::new(movement::MoveUp),
-        (KeyCode::Down, _) => Box::new(movement::MoveDown),
-        (KeyCode::Home, _) => Box::new(movement::MoveToLineStart),
-        (KeyCode::End, _) => Box::new(movement::MoveToLineEnd),
-        _ => return None,
+pub fn get_default_input_action(key_event: &KeyEvent, mode: &Mode) -> Option<Box<dyn Executable>> {
+    let KeyEvent { code: KeyCode::Char(c), modifiers, .. } = key_event else {
+        return None;
     };
-    Some(executable)
-}
 
-pub fn get_default_command_action(key_event: &KeyEvent) -> Option<Box<dyn Executable>> {
-    let executable: Box<dyn Executable> = match (key_event.code, key_event.modifiers) {
-        (KeyCode::Esc, _) => Box::new(mode::EnterMode::new(Mode::Normal)),
-        (KeyCode::Char(ch), KeyModifiers::NONE | KeyModifiers::SHIFT) => {
-            Box::new(command::CommandInsertChar::new(ch))
-        }
-        (KeyCode::Enter, _) => Box::new(command::CommandExecute),
-        (KeyCode::Left, _) => Box::new(command::CommandMoveLeft),
-        (KeyCode::Right, _) => Box::new(command::CommandMoveRight),
-        (KeyCode::Backspace, _) => Box::new(command::CommandBackspace),
-        (KeyCode::Delete, _) => Box::new(command::CommandDeleteChar),
+    if *modifiers != KeyModifiers::NONE && *modifiers != KeyModifiers::SHIFT {
+        return None;
+    };
+
+    let executable: Box<dyn Executable> = match mode {
+        Mode::Insert => Box::new(editing::InsertChar::new(*c)),
+        Mode::Command => Box::new(command::CommandInsertChar::new(*c)),
+        Mode::Search => Box::new(search::SearchInsertChar::new(*c)),
         _ => {
             return None;
         }
     };
-    Some(executable)
-}
 
-pub fn get_default_search_action(key_event: &KeyEvent) -> Option<Box<dyn Executable>> {
-    match (key_event.code, key_event.modifiers) {
-        (KeyCode::Char(ch), KeyModifiers::NONE | KeyModifiers::SHIFT) => {
-            Some(Box::new(search::SearchInsertChar::new(ch)))
-        }
-        (KeyCode::Enter, _) => Some(Box::new(search::SearchSubmit)),
-        (KeyCode::Left, _) => Some(Box::new(search::SearchMoveLeft)),
-        (KeyCode::Right, _) => Some(Box::new(search::SearchMoveRight)),
-        (KeyCode::Backspace, _) => Some(Box::new(search::SearchBackspace)),
-        (KeyCode::Delete, _) => Some(Box::new(search::SearchDeleteChar)),
-        _ => None,
-    }
+    Some(executable)
 }

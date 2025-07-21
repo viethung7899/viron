@@ -3,6 +3,7 @@ use crate::actions::types::{buffer, editing, lsp, mode, movement, search, system
 use crate::core::mode::Mode;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+use crate::actions::command;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", content = "params")]
@@ -50,8 +51,20 @@ pub enum ActionDefinition {
     PasteAfterCursor,
 
     YankCurrentLine,
+    
+    // Command actions
+    CommandMoveLeft,
+    CommandMoveRight,
+    CommandBackspace,
+    CommandDeleteChar,
+    CommandExecute,
 
     // Search actions
+    SearchMoveLeft,
+    SearchMoveRight,
+    SearchDeleteChar,
+    SearchBackspace,
+    SearchSubmit,
     FindNext,
     FindPrevious,
 
@@ -120,8 +133,20 @@ pub fn create_action_from_definition(definition: &ActionDefinition) -> Box<dyn A
 
         ActionDefinition::PasteBeforeCursor => Box::new(editing::PasteBeforeCursor),
         ActionDefinition::PasteAfterCursor => Box::new(editing::PasteAfterCursor),
+        
+        // Command actions
+        ActionDefinition::CommandMoveLeft => Box::new(command::CommandMoveLeft),
+        ActionDefinition::CommandMoveRight => Box::new(command::CommandMoveRight),
+        ActionDefinition::CommandBackspace => Box::new(command::CommandBackspace),
+        ActionDefinition::CommandDeleteChar => Box::new(command::CommandDeleteChar),
+        ActionDefinition::CommandExecute => Box::new(command::CommandExecute),
 
         // Search actions
+        ActionDefinition::SearchMoveLeft => Box::new(search::SearchMoveLeft),
+        ActionDefinition::SearchMoveRight => Box::new(search::SearchMoveRight),
+        ActionDefinition::SearchDeleteChar => Box::new(search::SearchDeleteChar),
+        ActionDefinition::SearchBackspace => Box::new(search::SearchBackspace),
+        ActionDefinition::SearchSubmit => Box::new(search::SearchSubmit),
         ActionDefinition::FindNext => Box::new(search::FindNext),
         ActionDefinition::FindPrevious => Box::new(search::FindPrevious),
 

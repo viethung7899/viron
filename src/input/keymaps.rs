@@ -1,45 +1,29 @@
 use crate::actions::core::ActionDefinition;
 use crate::core::mode::Mode;
 use crate::core::operation::Operator;
-use crate::input::keys::KeySequence;
-use anyhow::Result;
+use crate::input::keys::sequence::KeySequence;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-#[derive(Debug, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+struct KeyMapItem(pub HashMap<KeySequence, ActionDefinition>);
+
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct KeyMap {
-    pub default: HashMap<KeySequence, ActionDefinition>,
-    pub movement: HashMap<KeySequence, ActionDefinition>,
-    pub normal: HashMap<KeySequence, ActionDefinition>,
-    pub pending: PendingKeyMap,
+    default: KeyMapItem,
+    movement: KeyMapItem,
+    normal: KeyMapItem,
+    insert: KeyMapItem,
+    search: KeyMapItem,
+    command: KeyMapItem,
+    pending: PendingKeyMap,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct PendingKeyMap {
-    pub delete: HashMap<KeySequence, ActionDefinition>,
-    pub change: HashMap<KeySequence, ActionDefinition>,
-    pub yank: HashMap<KeySequence, ActionDefinition>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Default)]
-pub struct KeyMapConfig {
-    #[serde(default)]
-    pub default: HashMap<String, ActionDefinition>,
-    #[serde(default)]
-    pub movement: HashMap<String, ActionDefinition>,
-    #[serde(default)]
-    pub normal: HashMap<String, ActionDefinition>,
-    pub pending: PendingKeyMapConfig,
-}
-
-#[derive(Debug, Serialize, Deserialize, Default)]
-pub struct PendingKeyMapConfig {
-    #[serde(default)]
-    pub delete: HashMap<String, ActionDefinition>,
-    #[serde(default)]
-    pub change: HashMap<String, ActionDefinition>,
-    #[serde(default)]
-    pub yank: HashMap<String, ActionDefinition>,
+    delete: KeyMapItem,
+    change: KeyMapItem,
+    yank: KeyMapItem,
 }
 
 impl KeyMap {
@@ -51,29 +35,44 @@ impl KeyMap {
         let definition = match mode {
             Mode::Normal => self
                 .normal
+                .0
                 .get(sequence)
-                .or_else(|| self.movement.get(sequence)),
+                .or_else(|| self.movement.0.get(sequence)),
+            Mode::Insert => self
+                .insert
+                .0
+                .get(sequence),
+            Mode::Search => self
+                .search
+                .0
+                .get(sequence),
+            Mode::Command => self
+                .command
+                .0
+                .get(sequence),
             Mode::OperationPending(Operator::Delete) => self
                 .movement
+                .0
                 .get(sequence)
-                .or_else(|| self.pending.delete.get(sequence)),
+                .or_else(|| self.pending.delete.0.get(sequence)),
             Mode::OperationPending(Operator::Change) => self
                 .movement
+                .0
                 .get(sequence)
-                .or_else(|| self.pending.change.get(sequence)),
+                .or_else(|| self.pending.change.0.get(sequence)),
             Mode::OperationPending(Operator::Yank) => self
                 .movement
+                .0
                 .get(sequence)
-                .or_else(|| self.pending.yank.get(sequence)),
-            _ => None,
+                .or_else(|| self.pending.yank.0.get(sequence)),
         };
-        definition.or_else(|| self.default.get(sequence))
+        definition.or_else(|| self.default.0.get(sequence))
     }
 
     pub fn is_partial_match(&self, mode: &Mode, sequence: &KeySequence) -> bool {
         let keys: Box<dyn Iterator<Item = &KeySequence>> = match mode {
-            Mode::Normal => Box::new(self.movement.keys().chain(self.normal.keys())),
-            Mode::OperationPending(_) => Box::new(self.movement.keys()),
+            Mode::Normal => Box::new(self.movement.0.keys().chain(self.normal.0.keys())),
+            Mode::OperationPending(_) => Box::new(self.movement.0.keys()),
             _ => {
                 return false; // No partial matches in other modes
             }
@@ -86,41 +85,5 @@ impl KeyMap {
         }
 
         false
-    }
-
-    pub fn load_from_config(config: &KeyMapConfig) -> Result<Self> {
-        let mut keymap = Self::new();
-
-        for (key_str, action_def) in &config.normal {
-            let sequence = KeySequence::from_string(key_str)?;
-            keymap.normal.insert(sequence, action_def.clone());
-        }
-
-        for (key_str, action_def) in &config.default {
-            let sequence = KeySequence::from_string(key_str)?;
-            keymap.default.insert(sequence, action_def.clone());
-        }
-
-        for (key_str, action_def) in &config.movement {
-            let sequence = KeySequence::from_string(key_str)?;
-            keymap.movement.insert(sequence, action_def.clone());
-        }
-
-        for (key_str, action_def) in &config.pending.delete {
-            let sequence = KeySequence::from_string(key_str)?;
-            keymap.pending.delete.insert(sequence, action_def.clone());
-        }
-
-        for (key_str, action_def) in &config.pending.change {
-            let sequence = KeySequence::from_string(key_str)?;
-            keymap.pending.change.insert(sequence, action_def.clone());
-        }
-        
-        for (key_str, action_def) in &config.pending.yank {
-            let sequence = KeySequence::from_string(key_str)?;
-            keymap.pending.yank.insert(sequence, action_def.clone());
-        }
-
-        Ok(keymap)
     }
 }

@@ -1,5 +1,5 @@
 use crate::actions::command_parser::parse_command;
-use crate::actions::core::Executable;
+use crate::actions::core::{impl_action, ActionDefinition, Executable};
 use crate::actions::types::{mode, system};
 use crate::actions::ActionResult;
 use crate::core::message::Message;
@@ -19,6 +19,8 @@ impl Executable for CommandMoveLeft {
     }
 }
 
+impl_action!(CommandMoveLeft, "Move cursor left", ActionDefinition::CommandMoveLeft);
+
 #[derive(Debug, Clone)]
 pub struct CommandMoveRight;
 
@@ -29,6 +31,8 @@ impl Executable for CommandMoveRight {
         Ok(())
     }
 }
+
+impl_action!(CommandMoveRight, "Move cursor right", ActionDefinition::CommandMoveRight);
 
 #[derive(Debug, Clone)]
 pub struct CommandInsertChar {
@@ -66,6 +70,8 @@ impl Executable for CommandDeleteChar {
     }
 }
 
+impl_action!(CommandDeleteChar, "Command delete char", ActionDefinition::CommandDeleteChar);
+
 #[derive(Debug, Clone)]
 pub struct CommandBackspace;
 
@@ -80,6 +86,8 @@ impl Executable for CommandBackspace {
         Ok(())
     }
 }
+
+impl_action!(CommandBackspace, "Command backspace", ActionDefinition::CommandBackspace);
 
 #[derive(Debug, Clone)]
 pub struct CommandExecute;
@@ -113,3 +121,5 @@ impl Executable for CommandExecute {
         Ok(())
     }
 }
+
+impl_action!(CommandExecute, "Execute command", ActionDefinition::CommandExecute);

@@ -1,7 +1,7 @@
 pub mod editor;
 
 use crate::config::editor::Gutter;
-use crate::input::keymaps::{KeyMap, KeyMapConfig};
+use crate::input::keymaps::{KeyMap};
 use crate::ui::theme::Theme;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
@@ -13,7 +13,7 @@ pub struct FileConfig {
     pub theme: String,
     #[serde(default)]
     pub gutter: Gutter,
-    pub keymap: KeyMapConfig,
+    pub keymap: KeyMap,
 }
 
 impl FileConfig {
@@ -42,10 +42,9 @@ impl TryFrom<FileConfig> for Config {
     fn try_from(file_config: FileConfig) -> Result<Self, Self::Error> {
         let theme_path = get_config_dir().join(format!("themes/{}.json", file_config.theme));
         let theme = Theme::load_from_file(&theme_path)?;
-        let keymap = KeyMap::load_from_config(&file_config.keymap)?;
         Ok(Self {
             theme,
-            keymap,
+            keymap: file_config.keymap,
             gutter: file_config.gutter,
         })
     }
