@@ -65,7 +65,6 @@ impl KeyMap {
                 .0
                 .get(sequence)
                 .or_else(|| self.pending.yank.0.get(sequence)),
-            _ => None,
         };
         definition.or_else(|| self.default.0.get(sequence))
     }
