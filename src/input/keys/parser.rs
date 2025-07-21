@@ -65,6 +65,6 @@ pub fn parse_key_sequence(input: &str) -> Result<KeySequence> {
         } else {
             Err(anyhow!("Unexpected input after key sequence: '{}'", remain))
         },
-        _ => Err(anyhow!("Failed to parse key sequence")),
+        Err(err) => Err(anyhow!("Failed to parse key sequence {}", err)),
     }
 }

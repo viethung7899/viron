@@ -185,7 +185,7 @@ impl InputState {
 }
 
 pub fn get_default_input_action(key_event: &KeyEvent, mode: &Mode) -> Option<Box<dyn Executable>> {
-    let KeyEvent { code: KeyCode::Char(c) , modifiers, .. } = key_event else {
+    let KeyEvent { code: KeyCode::Char(c), modifiers, .. } = key_event else {
         return None;
     };
 
