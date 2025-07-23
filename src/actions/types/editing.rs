@@ -6,7 +6,7 @@ use crate::constants::components::{EDITOR_VIEW, STATUS_LINE};
 use crate::core::history::edit::Edit;
 use crate::core::message::Message;
 use crate::core::mode::Mode;
-use crate::core::register::RegisterType;
+use crate::core::register::{Register, RegisterKind, RegisterName};
 use async_trait::async_trait;
 use std::fmt::Debug;
 
@@ -103,8 +103,8 @@ impl Executable for DeleteChar {
             );
             after_edit(ctx, &edit).await?;
             ctx.editor
-                .register_manager
-                .on_delete(c.to_string(), RegisterType::Character);
+                .register_system
+                .on_delete(Register::new(c.to_string(), RegisterKind::Character));
             ctx.editor.buffer_manager.current_mut().history.push(edit);
         }
         Ok(())
@@ -289,8 +289,8 @@ impl Executable for DeleteCurrentLine {
         after_edit(ctx, &edit).await?;
         ctx.editor.buffer_manager.current_mut().history.push(edit);
         ctx.editor
-            .register_manager
-            .on_delete(deleted, RegisterType::Line);
+            .register_system
+            .on_delete(Register::new(deleted, RegisterKind::Line));
         Ok(())
     }
 }
@@ -327,10 +327,10 @@ impl Executable for YankCurrentLine {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         let buffer = ctx.editor.buffer_manager.current_buffer_mut();
         let point = ctx.editor.cursor.get_point();
-        let line_content = buffer.get_line_as_string(point.row);
+        let yanked = buffer.get_line_as_string(point.row);
         ctx.editor
-            .register_manager
-            .on_yank(line_content, RegisterType::Line);
+            .register_system
+            .on_yank(Register::new(yanked, RegisterKind::Line));
         Ok(())
     }
 }
@@ -421,7 +421,7 @@ impl Paste {
 #[async_trait(?Send)]
 impl Executable for Paste {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
-        let Some(register) = ctx.editor.register_manager.get_register('"').cloned() else {
+        let Some(register) = ctx.editor.register_system.get(&RegisterName::Unnamed).cloned() else {
             return Ok(());
         };
 
@@ -436,14 +436,14 @@ impl Executable for Paste {
 
         // Move the cursor to the correct position based on the register type
         log::info!("Before cursor: {:?}", cursor);
-        match (self.after_cursor, &register.register_type) {
-            (true, RegisterType::Character) => {
+        match (self.after_cursor, &register.kind) {
+            (true, RegisterKind::Character) => {
                 cursor.move_right(buffer, &Mode::Insert, false);
             }
-            (false, RegisterType::Line) => {
+            (false, RegisterKind::Line) => {
                 cursor.move_to_line_start();
             }
-            (true, RegisterType::Line) => {
+            (true, RegisterKind::Line) => {
                 cursor.move_down(buffer, &Mode::Insert);
                 cursor.move_to_line_start();
             }
@@ -458,13 +458,13 @@ impl Executable for Paste {
 
         let old_point = ctx.editor.cursor.get_point();
 
-        match register.register_type {
-            RegisterType::Character => {
+        match register.kind {
+            RegisterKind::Character => {
                 ctx.editor
                     .cursor
                     .set_point(buffer.point_at_position(new_position - 1), buffer);
             }
-            RegisterType::Line => {
+            RegisterKind::Line => {
                 ctx.editor.cursor.set_point(cursor.get_point(), buffer);
             }
         }
