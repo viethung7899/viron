@@ -1,14 +1,13 @@
-use nom::Parser;
 use crate::actions::core::{ActionDefinition, Executable};
 use crate::actions::{command, editing, search};
 use crate::core::mode::Mode;
 use crate::core::operation::Operator;
 use crate::input::keymaps::KeyMap;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use nom::combinator::opt;
 use crate::actions::buffer::SetRegister;
 use crate::actions::composite::{ComboAction, RepeatingAction};
 use crate::actions::core::definition::create_action_from_definition;
+use crate::core::register::RegisterName;
 use crate::input::keys::KeyEncoder;
 use crate::input::state::{InputState};
 use crate::input::state::internal::RepeatState;
@@ -19,15 +18,11 @@ pub mod keymaps;
 pub mod keys;
 pub mod state;
 
-#[derive(Debug, Clone)]
-pub struct PendingOperation {
-    pub operator: Operator,
-    pub repeat: Option<usize>,
-}
-
 #[derive(Debug)]
 pub struct InputProcessor {
     state: InputState,
+
+    // Internal states for processing input
     repeats: RepeatState,
 }
 
@@ -45,6 +40,7 @@ impl InputProcessor {
 
     pub fn add_key(&mut self, key_event: KeyEvent) {
         let encoded = key_event.encode().unwrap_or_default();
+        log::info!("Adding key to input: {}", encoded);
         self.state.add_string(&encoded);
     }
 
@@ -59,16 +55,24 @@ impl InputProcessor {
 
     pub fn get_executable(&mut self, mode: &Mode, keymap: &KeyMap) -> Option<Box<dyn Executable>> {
         // Get the register if it exists
-        let result = opt(register).parse(self.state.get_input());
+        let result = register(self.state.get_input());
         match result {
-            Ok((_, Some(ParserResult { result: name, length }))) => {
+            Ok((_, ParserResult { result, length })) => {
                 self.state.advance(length);
-                return Some(Box::new(SetRegister::new(name)));
+                return Some(Box::new(SetRegister::new(result)));
             }
-            Err(nom::Err::Failure(_)) | Err(nom::Err::Error(_)) => {
+            Err(nom::Err::Incomplete(_)) => {
+                return None;
+            }
+            Err(nom::Err::Error(e)) if e.code == nom::error::ErrorKind::Eof => {
+                return None;
+            }
+            Err(nom::Err::Error(e)) if e.code == nom::error::ErrorKind::Tag => {
+            }
+            _ => {
+                // Invalid register input, clear the state
                 self.clear();
             }
-            _ => {}
         }
 
         // Get the repeat and action definition
