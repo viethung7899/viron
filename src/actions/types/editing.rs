@@ -421,7 +421,7 @@ impl Paste {
 #[async_trait(?Send)]
 impl Executable for Paste {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
-        let Some(register) = ctx.editor.register_system.get(&RegisterName::Unnamed).cloned() else {
+        let Some(register) = ctx.editor.register_system.on_paste() else {
             return Ok(());
         };
 

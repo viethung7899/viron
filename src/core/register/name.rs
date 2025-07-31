@@ -1,7 +1,8 @@
 use anyhow::{anyhow, Result};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum RegisterName {
+    #[default]
     Unnamed,
     Numbered(u8),
     SmallDelete

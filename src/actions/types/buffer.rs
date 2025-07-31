@@ -203,6 +203,7 @@ impl SetRegister {
 #[async_trait(?Send)]
 impl Executable for SetRegister {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
+        ctx.editor.register_system.set_current_target(self.name);
         Ok(())
     }
 }
