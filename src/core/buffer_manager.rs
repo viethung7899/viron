@@ -166,7 +166,7 @@ impl BufferManager {
     }
 }
 
-/// Information about a buffer for display purposes
+/// Information about a buffer for display_input purposes
 pub struct BufferInfo {
     pub index: usize,
     pub name: String,

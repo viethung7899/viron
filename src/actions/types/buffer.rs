@@ -7,6 +7,7 @@ use std::fmt::Debug;
 use std::path::PathBuf;
 use crate::actions::context::ActionContext;
 use crate::constants::components::EDITOR_VIEW;
+use crate::core::register::RegisterName;
 
 async fn after_buffer_change(ctx: &mut ActionContext<'_>) -> ActionResult {
     let document = ctx.editor.buffer_manager.current();
@@ -184,6 +185,24 @@ impl Executable for RefreshBuffer {
     async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         ctx.ui.compositor
             .mark_dirty(EDITOR_VIEW)?;
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct SetRegister {
+    name: RegisterName,
+}
+
+impl SetRegister {
+    pub fn new(name: RegisterName) -> Self {
+        Self { name }
+    }
+}
+
+#[async_trait(?Send)]
+impl Executable for SetRegister {
+    async fn execute(&self, ctx: &mut ActionContext) -> ActionResult {
         Ok(())
     }
 }

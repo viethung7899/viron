@@ -1,7 +1,5 @@
 use anyhow::{anyhow, Result};
-use crossterm::event::{KeyCode, KeyModifiers};
-use crate::input::keys::{KeyEvent};
-use crate::input::keys::sequence::KeySequence;
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 pub trait KeyEncoder {
     fn encode(&self) -> Result<String>;
@@ -57,16 +55,5 @@ impl KeyEncoder for KeyEvent {
                 Err(anyhow!("Unsupported key modifiers: {:?}", self.modifiers))
             }
         }
-    }
-}
-
-impl KeyEncoder for KeySequence {
-    fn encode(&self) -> Result<String> {
-        let mut encoded_keys = String::new();
-        for key in &self.keys {
-            let encoded = key.encode()?;
-            encoded_keys.push_str(&encoded);
-        }
-        Ok(encoded_keys)
     }
 }

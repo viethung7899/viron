@@ -1,17 +1,23 @@
-use crate::actions::composite::{ComboAction, RepeatingAction};
-use crate::actions::core::definition::create_action_from_definition;
+use nom::Parser;
 use crate::actions::core::{ActionDefinition, Executable};
 use crate::actions::{command, editing, search};
 use crate::core::mode::Mode;
 use crate::core::operation::Operator;
 use crate::input::keymaps::KeyMap;
-use crate::input::keys::{KeyEncoder, KeyEvent};
-use crossterm::event::{KeyCode, KeyModifiers};
-use keys::sequence::KeySequence;
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use nom::combinator::opt;
+use crate::actions::buffer::SetRegister;
+use crate::actions::composite::{ComboAction, RepeatingAction};
+use crate::actions::core::definition::create_action_from_definition;
+use crate::input::keys::KeyEncoder;
+use crate::input::state::{InputState};
+use crate::input::state::internal::RepeatState;
+use crate::input::state::parser::{from_keymap_with_repeat, register, ParserResult};
 
 pub mod events;
 pub mod keymaps;
 pub mod keys;
+pub mod state;
 
 #[derive(Debug, Clone)]
 pub struct PendingOperation {
@@ -20,119 +26,89 @@ pub struct PendingOperation {
 }
 
 #[derive(Debug)]
-pub struct InputState {
-    pub repeat: Option<usize>,
-    pub sequence: KeySequence,
-    pub pending_operation: Option<PendingOperation>,
+pub struct InputProcessor {
+    state: InputState,
+    repeats: RepeatState,
 }
 
-impl InputState {
+impl InputProcessor {
     pub fn new() -> Self {
-        InputState {
-            repeat: None,
-            sequence: KeySequence::new(),
-            pending_operation: None,
+        InputProcessor {
+            state: InputState::new(),
+            repeats: RepeatState::new(),
         }
-    }
-
-    fn push_operation(&mut self, operator: Operator) {
-        self.pending_operation = Some(PendingOperation {
-            operator,
-            repeat: self.repeat,
-        });
-        self.repeat = None;
     }
 
     pub fn is_empty(&self) -> bool {
-        self.repeat.is_none() && self.pending_operation.is_none() && self.sequence.is_empty()
+        self.state.is_empty()
+    }
+
+    pub fn add_key(&mut self, key_event: KeyEvent) {
+        let encoded = key_event.encode().unwrap_or_default();
+        self.state.add_string(&encoded);
     }
 
     pub fn clear(&mut self) {
-        self.repeat = None;
-        self.pending_operation = None;
-        self.sequence.clear();
+        self.state.clear();
+        self.repeats.clear();
     }
 
-    pub fn display(&self) -> String {
-        let mut result = String::new();
-        if let Some(ref pending) = self.pending_operation {
-            if let Some(repeat) = pending.repeat {
-                result.push_str(&repeat.to_string());
-            }
-            result.push_str(&pending.operator.to_string());
-        };
-        if let Some(repeat) = self.repeat {
-            result.push_str(&repeat.to_string());
-        };
-        result.push_str(&self.sequence.encode().unwrap_or_default());
-        result
-    }
-
-    pub fn add_key(&mut self, key: KeyEvent) {
-        match key.code {
-            KeyCode::Char(c) if c.is_numeric() => {
-                let number = c.to_digit(10).unwrap() as usize;
-                self.add_number_key(number);
-            }
-            _ => {
-                self.sequence.add(key);
-            }
-        }
-    }
-
-    fn add_number_key(&mut self, number: usize) {
-        if let Some(ref mut repeat) = self.repeat {
-            *repeat = *repeat * 10 + number;
-        } else if number > 0 {
-            self.repeat = Some(number);
-        } else {
-            self.sequence.add(KeyEvent {
-                code: KeyCode::Char('0'),
-                modifiers: crossterm::event::KeyModifiers::NONE,
-            })
-        }
-    }
-
-    fn get_total_repeat(&self) -> usize {
-        let motion_repeat = self.repeat.unwrap_or(1);
-        let operation_repeat = self
-            .pending_operation
-            .as_ref()
-            .and_then(|op| op.repeat)
-            .unwrap_or(1);
-        motion_repeat * operation_repeat
+    pub fn display_input(&self) -> &str {
+        self.state.display()
     }
 
     pub fn get_executable(&mut self, mode: &Mode, keymap: &KeyMap) -> Option<Box<dyn Executable>> {
-        let Some(definition) = self.get_action_from_sequence(mode, keymap) else {
-            return None;
-        };
+        // Get the register if it exists
+        let result = opt(register).parse(self.state.get_input());
+        match result {
+            Ok((_, Some(ParserResult { result: name, length }))) => {
+                self.state.advance(length);
+                return Some(Box::new(SetRegister::new(name)));
+            }
+            Err(nom::Err::Failure(_)) | Err(nom::Err::Error(_)) => {
+                self.clear();
+            }
+            _ => {}
+        }
 
+        // Get the repeat and action definition
+        let result = from_keymap_with_repeat(mode, keymap)(self.state.get_input());
+        match result {
+            Ok((_, ParserResult { result: (optional_repeat, definition), length })) => {
+                self.state.advance(length);
+                self.repeats.repeat = optional_repeat;
+                return Some(self.process_definition(mode, definition));
+            }
+            Err(nom::Err::Failure(_)) | Err(nom::Err::Error(_)) => {
+                self.clear();
+            }
+            Err(nom::Err::Incomplete(_)) => {}
+        }
+
+        None
+    }
+
+    fn process_definition(&mut self, mode: &Mode, definition: ActionDefinition) -> Box<dyn Executable> {
         if let ActionDefinition::EnterMode { mode } = &definition {
-            if let Mode::OperationPending(operation) = mode {
-                self.push_operation(operation.clone());
+            if matches!(mode, Mode::OperationPending(_)) {
+                self.repeats.push_repeat();
             } else {
                 self.clear();
             }
-            return Some(create_action_from_definition(&definition));
+            return create_action_from_definition(&definition);
         }
 
-        let repeat = self.get_total_repeat();
-
-        if let Some(pending) = self.pending_operation.as_ref().cloned() {
+        let repeat = self.repeats.get_total_repeat();
+        if let Mode::OperationPending(operator) = mode {
             self.clear();
             if definition.is_movement_type() {
-                return Some(Box::new(ComboAction::new(
-                    pending.operator,
-                    repeat,
-                    definition,
-                )));
+                return Box::new(ComboAction::new(*operator, repeat, definition))
             }
         }
 
         self.clear();
 
-        let executable: Box<dyn Executable> = if repeat > 1 {
+        if repeat > 1 {
             match definition {
                 ActionDefinition::DeleteCurrentLine => Box::new(ComboAction::new(
                     Operator::Delete,
@@ -154,33 +130,13 @@ impl InputState {
                     repeat,
                     ActionDefinition::MoveLeft { inline },
                 )),
-                _ => Box::new(RepeatingAction::new(repeat, definition)),
+                _ => {
+                    Box::new(RepeatingAction::new(repeat, definition))
+                }
             }
         } else {
             create_action_from_definition(&definition)
-        };
-        Some(executable)
-    }
-
-    fn get_action_from_sequence(
-        &mut self,
-        mode: &Mode,
-        keymap: &KeyMap,
-    ) -> Option<ActionDefinition> {
-        if self.sequence.keys.is_empty() {
-            return None;
-        };
-        let action = keymap.get_action(mode, &self.sequence);
-
-        if let Some(definition) = action {
-            self.sequence.clear();
-            return Some(definition.clone());
         }
-
-        if !keymap.is_partial_match(&mode, &self.sequence) {
-            self.clear();
-        }
-        None
     }
 }
 

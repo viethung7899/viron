@@ -6,7 +6,7 @@ use crate::core::message::MessageManager;
 use crate::core::mode::Mode;
 use crate::core::register::RegisterSystem;
 use crate::core::viewport::Viewport;
-use crate::input::InputState;
+use crate::input::InputProcessor;
 use crate::service::LspService;
 use crate::ui::compositor::Compositor;
 
@@ -26,7 +26,7 @@ pub struct UIContext<'a> {
 pub struct InputContext<'a> {
     pub command_buffer: &'a mut CommandBuffer,
     pub search_buffer: &'a mut SearchBuffer,
-    pub input_state: &'a mut InputState,
+    pub input_state: &'a mut InputProcessor,
 }
 
 pub struct ActionContext<'a> {

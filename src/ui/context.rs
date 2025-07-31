@@ -5,7 +5,7 @@ use crate::core::document::Document;
 use crate::core::message::MessageManager;
 use crate::core::mode::Mode;
 use crate::core::viewport::Viewport;
-use crate::input::InputState;
+use crate::input::InputProcessor;
 use lsp_types::Diagnostic;
 
 pub struct EditorRenderContext<'a> {
@@ -18,7 +18,7 @@ pub struct EditorRenderContext<'a> {
 pub struct InputRenderContext<'a> {
     pub command_buffer: &'a CommandBuffer,
     pub search_buffer: &'a SearchBuffer,
-    pub input_state: &'a InputState,
+    pub input_state: &'a InputProcessor,
 }
 
 pub struct DiagnosticRenderContext<'a> {
