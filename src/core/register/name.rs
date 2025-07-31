@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum RegisterName {
@@ -6,7 +6,7 @@ pub enum RegisterName {
     Unnamed,
     Numbered(u8),
     Named(char),
-    SmallDelete
+    SmallDelete,
 }
 
 impl RegisterName {
@@ -26,17 +26,15 @@ impl RegisterName {
             '0'..='9' => RegisterName::Numbered(c as u8 - b'0'),
             'a'..='z' | 'A'..='Z' => RegisterName::Named(c),
             '_' => RegisterName::SmallDelete,
-            _ => return {
-                Err(anyhow!("Invalid register name: {c}"))
-            }
+            _ => return { Err(anyhow!("Invalid register name: {c}")) },
         };
         Ok(register)
     }
-    
+
     pub fn is_valid_name(c: char) -> bool {
         Self::from_char(c).is_ok()
     }
-    
+
     pub fn all_names() -> Vec<RegisterName> {
         let mut registers = Vec::new();
         registers.push(RegisterName::Unnamed);
