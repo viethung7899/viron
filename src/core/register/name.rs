@@ -5,6 +5,7 @@ pub enum RegisterName {
     #[default]
     Unnamed,
     Numbered(u8),
+    Named(char),
     SmallDelete
 }
 
@@ -14,6 +15,7 @@ impl RegisterName {
         match *self {
             RegisterName::Unnamed => '"',
             RegisterName::Numbered(number) => (number + b'0') as char,
+            RegisterName::Named(char) => char,
             RegisterName::SmallDelete => '_',
         }
     }
@@ -22,6 +24,7 @@ impl RegisterName {
         let register = match c {
             '"' => RegisterName::Unnamed,
             '0'..='9' => RegisterName::Numbered(c as u8 - b'0'),
+            'a'..='z' | 'A'..='Z' => RegisterName::Named(c),
             '_' => RegisterName::SmallDelete,
             _ => return {
                 Err(anyhow!("Invalid register name: {c}"))
@@ -39,6 +42,9 @@ impl RegisterName {
         registers.push(RegisterName::Unnamed);
         for i in 0..=9 {
             registers.push(RegisterName::Numbered(i));
+        }
+        for c in 'a'..='z' {
+            registers.push(RegisterName::Named(c));
         }
         registers.push(RegisterName::SmallDelete);
         registers
