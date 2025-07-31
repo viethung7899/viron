@@ -4,9 +4,9 @@ use crate::core::command::{CommandBuffer, SearchBuffer};
 use crate::core::cursor::Cursor;
 use crate::core::message::MessageManager;
 use crate::core::mode::Mode;
-use crate::core::register::RegisterManager;
+use crate::core::register::RegisterSystem;
 use crate::core::viewport::Viewport;
-use crate::input::InputState;
+use crate::input::InputProcessor;
 use crate::service::LspService;
 use crate::ui::compositor::Compositor;
 
@@ -16,7 +16,7 @@ pub struct EditorContext<'a> {
     pub viewport: &'a mut Viewport,
     pub mode: &'a mut Mode,
     pub buffer_manager: &'a mut BufferManager,
-    pub register_manager: &'a mut RegisterManager,
+    pub register_system: &'a mut RegisterSystem,
 }
 
 pub struct UIContext<'a> {
@@ -26,7 +26,7 @@ pub struct UIContext<'a> {
 pub struct InputContext<'a> {
     pub command_buffer: &'a mut CommandBuffer,
     pub search_buffer: &'a mut SearchBuffer,
-    pub input_state: &'a mut InputState,
+    pub input_state: &'a mut InputProcessor,
 }
 
 pub struct ActionContext<'a> {

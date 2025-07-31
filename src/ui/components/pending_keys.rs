@@ -14,7 +14,7 @@ impl Drawable for PendingKeys {
             ..
         } = self.bounds(buffer, context);
 
-        let pending_keys = context.input.input_state.display();
+        let pending_keys = context.input.input_state.display_input();
         if pending_keys.is_empty() {
             return self.clear(buffer, context);
         }

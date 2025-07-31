@@ -1,12 +1,11 @@
 use crate::actions::core::ActionDefinition;
 use crate::core::mode::Mode;
 use crate::core::operation::Operator;
-use crate::input::keys::sequence::KeySequence;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-struct KeyMapItem(pub HashMap<KeySequence, ActionDefinition>);
+struct KeyMapItem(pub HashMap<String, ActionDefinition>);
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct KeyMap {
@@ -31,7 +30,7 @@ impl KeyMap {
         Self::default()
     }
 
-    pub fn get_action(&self, mode: &Mode, sequence: &KeySequence) -> Option<&ActionDefinition> {
+    pub fn get_action(&self, mode: &Mode, sequence: &str) -> Option<&ActionDefinition> {
         let definition = match mode {
             Mode::Normal => self
                 .normal
@@ -69,21 +68,17 @@ impl KeyMap {
         definition.or_else(|| self.default.0.get(sequence))
     }
 
-    pub fn is_partial_match(&self, mode: &Mode, sequence: &KeySequence) -> bool {
-        let keys: Box<dyn Iterator<Item = &KeySequence>> = match mode {
+    pub fn is_partial_match(&self, mode: &Mode, sequence: &str) -> bool {
+        let mut keys: Box<dyn Iterator<Item = &String>> = match mode {
             Mode::Normal => Box::new(self.movement.0.keys().chain(self.normal.0.keys())),
             Mode::OperationPending(_) => Box::new(self.movement.0.keys()),
             _ => {
                 return false; // No partial matches in other modes
             }
         };
-
-        for key in keys {
-            if sequence.is_prefix_of(key) && sequence.keys.len() < key.keys.len() {
-                return true;
-            }
-        }
-
-        false
+        
+        keys.any(|key| {
+            key.starts_with(sequence) && key.len() > sequence.len()
+        })
     }
 }

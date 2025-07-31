@@ -7,7 +7,7 @@ use crate::actions::types::{editing, mode};
 use crate::core::history::edit::Edit;
 use crate::core::mode::Mode;
 use crate::core::operation::Operator;
-use crate::core::register::RegisterType;
+use crate::core::register::{Register, RegisterKind};
 use async_trait::async_trait;
 
 #[derive(Debug, Clone)]
@@ -77,14 +77,14 @@ impl ComboAction {
         if content.is_empty() {
             return Ok(());
         }
-        let register_type = match movement_type {
-            MovementType::Line => RegisterType::Line,
-            MovementType::Character => RegisterType::Character,
+        let kind = match movement_type {
+            MovementType::Line => RegisterKind::Line,
+            MovementType::Character => RegisterKind::Character,
         };
         ctx.editor.cursor.set_point(before, buffer);
         ctx.editor
-            .register_manager
-            .on_yank(content, register_type);
+            .register_system
+            .on_yank(Register::new(content, kind));
         Ok(())
     }
 
@@ -129,13 +129,13 @@ impl ComboAction {
         after_edit(ctx, &edit).await?;
 
         ctx.editor.buffer_manager.current_mut().history.push(edit);
-        let register_type = match movement_type {
-            MovementType::Line => RegisterType::Line,
-            MovementType::Character => RegisterType::Character,
+        let kind = match movement_type {
+            MovementType::Line => RegisterKind::Line,
+            MovementType::Character => RegisterKind::Character,
         };
         ctx.editor
-            .register_manager
-            .on_delete(deleted, register_type);
+            .register_system
+            .on_delete(Register::new(deleted, kind));
         Ok(true)
     }
 

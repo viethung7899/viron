@@ -18,7 +18,6 @@ use crate::editor::core::EditorCore;
 use crate::editor::input::InputSystem;
 use crate::editor::terminal::TerminalContext;
 use crate::editor::ui::UISystem;
-use crate::input::keys::KeyEvent as VironKeyEvent;
 use crate::input::{events::InputEvent, get_default_input_action};
 use crate::service::LspService;
 use crate::ui::context::{
@@ -107,7 +106,7 @@ impl Editor {
             viewport: &mut self.core.viewport,
             mode: &mut self.core.mode,
             buffer_manager: &mut self.core.buffer_manager,
-            register_manager: &mut self.core.register_manager,
+            register_system: &mut self.core.register_system,
         };
 
         let ui_ctx = UIContext {
@@ -199,10 +198,7 @@ impl Editor {
         Ok(())
     }
 
-    fn handle_key(&mut self, key: KeyEvent) -> Result<Option<Box<dyn Executable>>> {
-        // Convert to our key event type
-        let key_event = VironKeyEvent::from(key);
-
+    fn handle_key(&mut self, key_event: KeyEvent) -> Result<Option<Box<dyn Executable>>> {
         let default_action = get_default_input_action(&key_event, &self.core.mode);
 
         if default_action.is_some() {

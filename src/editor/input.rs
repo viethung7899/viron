@@ -1,11 +1,11 @@
 use crate::core::command::{CommandBuffer, SearchBuffer};
-use crate::input::InputState;
+use crate::input::InputProcessor;
 use crate::input::events::EventHandler;
 
 pub struct InputSystem {
     pub command_buffer: CommandBuffer,
     pub search_buffer: SearchBuffer,
-    pub input_state: InputState,
+    pub input_state: InputProcessor,
     pub event_handler: EventHandler,
 }
 
@@ -14,7 +14,7 @@ impl InputSystem {
         Self {
             command_buffer: CommandBuffer::new(),
             search_buffer: SearchBuffer::new(),
-            input_state: InputState::new(),
+            input_state: InputProcessor::new(),
             event_handler: EventHandler::new(),
         }
     }
