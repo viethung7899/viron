@@ -62,12 +62,15 @@ impl InputProcessor {
                 return Some(Box::new(SetRegister::new(result)));
             }
             Err(nom::Err::Incomplete(_)) => {
+                // Incomplete input, wait for more input
                 return None;
             }
             Err(nom::Err::Error(e)) if e.code == nom::error::ErrorKind::Eof => {
+                // End of input, wait for more input
                 return None;
             }
             Err(nom::Err::Error(e)) if e.code == nom::error::ErrorKind::Tag => {
+                // No action for register input, continue processing
             }
             _ => {
                 // Invalid register input, clear the state
